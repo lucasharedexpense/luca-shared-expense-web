@@ -7,10 +7,11 @@ import { motion, AnimatePresence } from "framer-motion";
 // --- 1. DEFINISI STATE (Mirip Enum Class Kotlin) ---
 export type HeaderVariant = 
   | "HOME" 
+  | "EVENT_DETAILS"
   | "NEW_EVENT" 
   | "EDIT_EVENT" 
   | "NEW_ACTIVITY" 
-  | "DETAILS" 
+  | "ACTIVITY_DETAILS"
   | "EDIT_ACTIVITY" 
   | "ACCOUNT_SETTINGS" 
   | "SUMMARY";
@@ -24,10 +25,11 @@ interface HeaderConfig {
 // Config Map (Mirip property di Enum Kotlin)
 const HEADER_CONFIG: Record<HeaderVariant, HeaderConfig> = {
   HOME:             { title: "Luca",             showLeftIconAsBack: false, showRightLogo: true },
+  EVENT_DETAILS:    { title: "Event Details",    showLeftIconAsBack: true,  showRightLogo: false },
   NEW_EVENT:        { title: "New Event",        showLeftIconAsBack: true,  showRightLogo: false },
   EDIT_EVENT:       { title: "Editing Event",    showLeftIconAsBack: true,  showRightLogo: false },
   NEW_ACTIVITY:     { title: "New Activity",     showLeftIconAsBack: true,  showRightLogo: false },
-  DETAILS:          { title: "Activity Details", showLeftIconAsBack: true,  showRightLogo: false },
+  ACTIVITY_DETAILS: { title: "Activity Details", showLeftIconAsBack: true,  showRightLogo: false },
   EDIT_ACTIVITY:    { title: "Edit Activity",    showLeftIconAsBack: true,  showRightLogo: false },
   ACCOUNT_SETTINGS: { title: "Account Settings", showLeftIconAsBack: true,  showRightLogo: false },
   SUMMARY:          { title: "Summary",          showLeftIconAsBack: true,  showRightLogo: false },

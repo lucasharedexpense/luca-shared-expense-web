@@ -1,17 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Header from "@/components/ui/Header";
-import FloatingNavbar from "@/components/ui/FloatingNavbar";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
 import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { useRouter } from "next/navigation";
 
 export default function HomeScreen() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [navIndex, setNavIndex] = useState(1);
+  const router = useRouter();
 
   // Load Data
   useEffect(() => {
@@ -71,10 +71,13 @@ export default function HomeScreen() {
                {filteredEvents.map((event, index) => (
                  // Pake index buat key karena tadi kita duplikat datanya
                  <EventCard 
-                   key={`${event.id}-${index}`} 
-                   data={event} 
-                   onClick={(id) => console.log(`Open Event ${id}`)} 
-                 />
+                    key={index} 
+                    data={event} 
+                    // 3. UPDATE LOGIC ONCLICK
+                    onClick={(id) => {
+                        router.push(`/event/${id}`); 
+                    }} 
+                />
                ))}
             </div>
           )}

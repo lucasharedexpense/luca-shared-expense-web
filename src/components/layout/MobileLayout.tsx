@@ -4,33 +4,53 @@ import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Header, { HeaderVariant } from "@/components/ui/Header";
 import FloatingNavbar from "@/components/ui/FloatingNavbar";
-import Sidebar from "@/components/ui/Sidebar"; // Import Sidebar yang tadi
+import Sidebar from "@/components/ui/Sidebar"; 
 
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // --- 1. LOGIC NAVBAR (Tentuin Index berdasarkan URL) ---
-  // Kalau URL-nya "/", index = 1 (Home)
-  // Kalau URL-nya "/scan", index = 0
-  // Kalau URL-nya "/contacts", index = 2
+  // =========================================
+  // 1. LOGIC VISIBILITY (PISAH HEADER & NAVBAR)
+  // =========================================
+
+  // A. Kapan Header Global Muncul? 
+  // Muncul terus KECUALI di "/new-event" (karena dia punya header manual sendiri)
+  const shouldShowHeader = pathname !== "/new-event";
+
+  // B. Kapan Navbar Bawah Muncul?
+  // HANYA muncul di 3 halaman utama.
+  // Otomatis HILANG di "/event/..." dan "/new-event"
+  const shouldShowNavbar = ["/", "/scan", "/contacts"].includes(pathname);
+
+  // C. Background Color Logic
+  // Kalau di /new-event pakai putih biar clean. Sisanya kuning (biar nyatu sama Header Global)
+  const isWhiteBackground = pathname === "/new-event";
+
+  // =========================================
+  // 2. LOGIC VARIANT & STATE
+  // =========================================
+
+  // Logic Index Navbar (Active State)
   let navIndex = 1; 
   if (pathname === "/scan") navIndex = 0;
   if (pathname === "/contacts") navIndex = 2;
 
-  // --- 2. LOGIC HEADER (Mapping URL ke Header Variant) ---
-  // Default variant
+  // Logic Header Variant (Icon Kiri & Kanan)
   let headerVariant: HeaderVariant = "HOME";
 
-  // Override berdasarkan path
-  if (pathname === "/new-event") headerVariant = "NEW_EVENT";
-  else if (pathname.startsWith("/event/")) headerVariant = "DETAILS";
-  else if (pathname === "/profile") headerVariant = "ACCOUNT_SETTINGS";
-  else if (pathname === "/scan") headerVariant = "HOME"; // Atau bikin variant SCAN
-  else if (pathname === "/contacts") headerVariant = "HOME"; 
+  if (pathname.startsWith("/event/")) {
+    // Kalau URL depannya "/event/", berarti masuk halaman detail -> Pakai tombol Back
+    // Pastikan di Header.tsx kamu handle variant "DETAILS" atau "EVENT_DETAILS" buat nampilin panah back
+    headerVariant = "EVENT_DETAILS"; 
+  } else if (pathname === "/profile") {
+    headerVariant = "ACCOUNT_SETTINGS";
+  } else if (pathname === "/scan" || pathname === "/contacts") {
+    headerVariant = "HOME";
+  }
 
-  // --- 3. HANDLE NAVIGATION ---
+  // Handle Navigasi dari Navbar Bawah
   const handleNavSelect = (index: number) => {
     if (index === 0) router.push("/scan");
     if (index === 1) router.push("/");
@@ -38,47 +58,46 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="flex flex-col h-dvh w-full bg-ui-accent-yellow relative overflow-hidden">
+    // Container Utama
+    <div className={`flex flex-col h-dvh w-full relative overflow-hidden ${isWhiteBackground ? 'bg-ui-white' : 'bg-ui-accent-yellow'}`}>
       
-      {/* GLOBAL HEADER */}
-      <div className="shrink-0 z-10">
-        <Header 
-          variant={headerVariant} 
-          onLeftIconClick={() => {
-            // Kalau variant HOME, buka sidebar. Kalau bukan, Back.
-            if (headerVariant === "HOME") {
-              setIsSidebarOpen(true);
-            } else {
-              router.back();
-            }
-          }}
-        />
-        {/* Note: SearchBar biasanya spesifik Home, jadi taro di page Home aja */}
-      </div>
+      {/* GLOBAL HEADER (Dikontrol oleh shouldShowHeader) */}
+      {shouldShowHeader && (
+        <div className="shrink-0 z-10">
+          <Header 
+            variant={headerVariant} 
+            onLeftIconClick={() => {
+              // Kalau mode HOME, buka Sidebar. Kalau mode lain (Details), Back.
+              if (headerVariant === "HOME") {
+                setIsSidebarOpen(true);
+              } else {
+                router.back();
+              }
+            }}
+          />
+        </div>
+      )}
 
-      {/* PAGE CONTENT (Ini isi file page.tsx lu) */}
-      {/* Kita kasih flex-1 biar dia ngisi ruang kosong di tengah */}
-      <main className="flex-1 h-screen w-full flex flex-col">
+      {/* PAGE CONTENT */}
+      {/* min-h-0 sangat penting biar scrollbar di child component jalan normal */}
+      <main className="flex-1 w-full flex flex-col relative z-0 overflow-hidden min-h-0">
          {children}
       </main>
 
-      {/* GLOBAL FLOATING NAVBAR */}
-      <FloatingNavbar
-        selectedIndex={navIndex}
-        onItemSelected={handleNavSelect}
-        onAddClick={() => router.push("/new-event")}
-        onContactsClick={() => router.push("/contacts")}
-        onHomeClick={() => router.push("/")}
-      />
+      {/* GLOBAL NAVBAR (Dikontrol oleh shouldShowNavbar) */}
+      {shouldShowNavbar && (
+        <FloatingNavbar
+          selectedIndex={navIndex}
+          onItemSelected={handleNavSelect}
+          // Tombol Plus di Navbar mengarah ke halaman Add Event
+          onAddClick={() => router.push("/new-event")}
+        />
+      )}
 
-      {/* GLOBAL SIDEBAR */}
+      {/* SIDEBAR */}
       <Sidebar 
          isOpen={isSidebarOpen}
          onClose={() => setIsSidebarOpen(false)}
-         onDashboardClick={() => { setIsSidebarOpen(false); router.push("/"); }}
-         onAccountSettingsClick={() => { setIsSidebarOpen(false); router.push("/profile"); }}
-         onLogoutClick={() => { setIsSidebarOpen(false); console.log("Logout..."); }}
-         // ... props lain
       />
     </div>
   );
