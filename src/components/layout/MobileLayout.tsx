@@ -15,7 +15,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // 1. LOGIC VISIBILITY (PISAH HEADER & NAVBAR)
   // =========================================
 
-  const isEditPage = pathname.endsWith("/edit");
+  const isEditPage = pathname.endsWith("/edit") || pathname.endsWith("/add-activity");
 
   // A. Kapan Header Global Muncul? 
   // Muncul terus KECUALI di "/new-event" DAN halaman Edit
@@ -27,7 +27,8 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
   // C. Background Color Logic
   // Pakai putih kalau di /new-event ATAU di halaman Edit
-  const isWhiteBackground = pathname === "/new-event" || isEditPage;
+  const isActivityPage = pathname.includes("/activity/");
+  const isWhiteBackground = pathname === "/new-event" || isEditPage || isActivityPage;
 
   // =========================================
   // 2. LOGIC VARIANT & STATE
@@ -41,9 +42,9 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // Logic Header Variant (Icon Kiri & Kanan)
   let headerVariant: HeaderVariant = "HOME";
 
-  if (pathname.startsWith("/event/")) {
-    // Kalau URL depannya "/event/", berarti masuk halaman detail -> Pakai tombol Back
-    // Pastikan di Header.tsx kamu handle variant "DETAILS" atau "EVENT_DETAILS" buat nampilin panah back
+  if (isActivityPage) {
+    headerVariant = "ACTIVITY_DETAILS";
+  } else if (pathname.startsWith("/event/")) {
     headerVariant = "EVENT_DETAILS"; 
   } else if (pathname === "/profile") {
     headerVariant = "ACCOUNT_SETTINGS";

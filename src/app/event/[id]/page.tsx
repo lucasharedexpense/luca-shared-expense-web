@@ -54,10 +54,9 @@ export default function EventDetailPage() {
     <div className="flex flex-col h-full w-full bg-ui-background">
       <FabAdd
          onClick={() => {
-            console.log("Add Activity clicked!");
             // Nanti di sini arahin ke page Add Activity
-            // router.push(`/event/${eventId}/add-activity`); 
-         }} 
+            router.push(`/event/${eventId}/add-activity`); 
+         }}
       />
       
       {/* HEADER CARD */}
@@ -84,7 +83,11 @@ export default function EventDetailPage() {
          ) : (
             <div className="flex flex-col gap-3">
                {eventData.activities.map((activity, index) => (
-                 <div key={index} className="bg-ui-white p-4 rounded-xl flex items-center gap-4 shadow-sm border border-ui-grey/10">
+                 <div 
+                    key={index}
+                    onClick={() => router.push(`/event/${eventId}/activity/${activity.id}`)}
+                    className="bg-ui-white p-4 rounded-xl flex items-center gap-4 shadow-sm border border-ui-grey/10 cursor-pointer active:scale-[0.98] active:bg-gray-50 transition-all"
+                  >
                     <div 
                       className="w-10 h-10 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: `${activity.categoryColorHex}20` }} // Opacity 20%

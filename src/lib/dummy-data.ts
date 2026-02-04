@@ -321,7 +321,11 @@ contacts: [
           },
           participants: [
             { avatarName: "avatar_3", name: "C" },
-            { avatarName: "avatar_4", name: "D" }
+            { avatarName: "avatar_4", name: "D" },
+            { avatarName: "avatar_5", name: "E" },
+            { avatarName: "avatar_6", name: "F" },
+            { avatarName: "avatar_7", name: "G" },
+            { avatarName: "avatar_8", name: "H" }
           ],
           payerName: "B",
           title: "Tes 2",
