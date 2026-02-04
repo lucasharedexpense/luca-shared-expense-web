@@ -78,7 +78,7 @@ export default function Header({
                   exit={{ opacity: 0, rotate: -90 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <SidebarLogo className="w-4 h-4 text-ui-black" />
+                  <SidebarLogo className="w-6 h-6 text-ui-black" />
                 </motion.div>
               )}
             </AnimatePresence>

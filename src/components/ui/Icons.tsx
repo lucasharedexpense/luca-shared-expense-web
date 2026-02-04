@@ -33,7 +33,7 @@ export const Scan = ({ className }: IconProps) => (
 );
 
 export const SidebarLogo = ({ className }: IconProps) => (
-    <svg width="31" height="27" viewBox="0 0 31 27" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 31 27" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="24" height="5" rx="2.5" fill="black"/>
         <rect y="11" width="31" height="5" rx="2.5" fill="black"/>
         <rect y="22" width="12" height="5" rx="2.5" fill="black"/>

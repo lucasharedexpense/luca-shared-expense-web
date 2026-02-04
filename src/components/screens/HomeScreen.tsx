@@ -35,7 +35,6 @@ export default function HomeScreen() {
       
       {/* HEADER & SEARCH (Area Kuning - Fixed/Tidak ikut scroll) */}
       <div className="shrink-0 z-10">
-        <Header variant="HOME" />
         <SearchBar value={searchQuery} onChange={setSearchQuery} />
       </div>
 
@@ -45,7 +44,7 @@ export default function HomeScreen() {
         
         {/* SCROLLABLE CONTAINER */}
         {/* FIX 3: 'overflow-y-auto' di sini. 'pb-32' biar item terakhir gak ketutup Navbar */}
-        <div className="flex-1 overflow-y-auto no-scrollbar pt-6 pb-32 px-5">
+        <div className="flex-1 overflow-y-auto no-scrollbar pt-6 pb-50 px-5">
           
           {loading ? (
              <div className="flex flex-col items-center justify-center h-full animate-pulse">
@@ -81,12 +80,6 @@ export default function HomeScreen() {
           )}
         </div>
       </div>
-
-      {/* FLOATING NAVBAR (Melayang di atas segalanya) */}
-      <FloatingNavbar
-        selectedIndex={navIndex}
-        onItemSelected={setNavIndex}
-      />
     </div>
   );
 }
