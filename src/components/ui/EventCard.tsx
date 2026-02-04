@@ -9,23 +9,17 @@ interface EventCardProps {
     title: string;
     location?: string; // Optional field
     date: string;
-    participants?: string[];
+    participants: {
+      name: string;
+      avatarName: string;
+    }[];
   };
   onClick: (id: string) => void;
 }
 
-const DUMMY_AVATARS = [
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Ana",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Milo",
-  "https://api.dicebear.com/7.x/avataaars/svg?seed=Siti",
-];
-
 export default function EventCard({ data, onClick }: EventCardProps) {
-  
-  const displayAvatars = (data.participants && data.participants.length > 0) 
-    ? data.participants 
-    : DUMMY_AVATARS;
+
+  const participantAvatars = data.participants?.map((p) => p.avatarName) || [];
 
   return (
     <div 
@@ -66,7 +60,7 @@ export default function EventCard({ data, onClick }: EventCardProps) {
       <div className="border-t border-ui-grey/30 flex justify-end items-center mt-1">
         {/* Avatar Stack di Kanan Bawah */}
         <AvatarStack 
-            avatars={displayAvatars} 
+            avatars={participantAvatars} 
             size={28}
             overlap={-10}
             limit={4} 

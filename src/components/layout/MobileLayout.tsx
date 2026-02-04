@@ -58,7 +58,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
       {/* PAGE CONTENT (Ini isi file page.tsx lu) */}
       {/* Kita kasih flex-1 biar dia ngisi ruang kosong di tengah */}
-      <main className="flex-1 w-full flex flex-col">
+      <main className="flex-1 h-screen w-full flex flex-col">
          {children}
       </main>
 

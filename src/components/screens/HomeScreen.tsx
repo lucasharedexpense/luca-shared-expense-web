@@ -34,7 +34,7 @@ export default function HomeScreen() {
     <div className="flex flex-col h-dvh w-full bg-ui-accent-yellow relative overflow-hidden">
       
       {/* HEADER & SEARCH (Area Kuning - Fixed/Tidak ikut scroll) */}
-      <div className="shrink-0 z-10">
+      <div className="px-5 py-6 shrink-0 z-10">
         <SearchBar value={searchQuery} onChange={setSearchQuery} />
       </div>
 
