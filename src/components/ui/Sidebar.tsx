@@ -72,7 +72,7 @@ export default function Sidebar({
           >
             {/* HEADER */}
             <div className="flex items-center mb-10">
-              <div className="w-[30px] h-[30px] rounded-full overflow-hidden shrink-0">
+              <div className="w-7.5 h-7.5 rounded-full overflow-hidden shrink-0">
                  {/* Pake Logo Luca yang udah lu bikin */}
                  <LucaLogo className="w-full h-full" />
               </div>
@@ -88,14 +88,14 @@ export default function Sidebar({
             {/* MENU ITEMS */}
             <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
               <SidebarMenuItem 
-                icon={<LayoutDashboard className="w-[26px]" />} 
+                icon={<LayoutDashboard className="w-6.5" />} 
                 text="Dashboard" 
                 onClick={onDashboardClick} 
               />
 
               {/* ACCOUNT EXPANDABLE */}
               <SidebarMenuItemExpandable
-                icon={<User className="w-[26px]" />}
+                icon={<User className="w-6.5" />}
                 text="Account"
                 isExpanded={expandAccountMenu}
                 onClick={() => setExpandAccountMenu(!expandAccountMenu)}
@@ -115,17 +115,17 @@ export default function Sidebar({
               </SidebarMenuItemExpandable>
 
               <SidebarMenuItem 
-                icon={<Settings className="w-[26px]" />} 
+                icon={<Settings className="w-6.5" />} 
                 text="Settings" 
                 onClick={onSettingsClick} 
               />
               <SidebarMenuItem 
-                icon={<Flag className="w-[26px]" />} 
+                icon={<Flag className="w-6.5" />} 
                 text="Report Bugs" 
                 onClick={onReportBugClick} 
               />
               <SidebarMenuItem 
-                icon={<Info className="w-[26px]" />} 
+                icon={<Info className="w-6.5" />} 
                 text="About Us" 
                 onClick={onAboutUsClick} 
               />
@@ -133,9 +133,9 @@ export default function Sidebar({
 
             {/* FOOTER */}
             <div className="mt-auto pt-6">
-              <div className="h-[1px] w-full bg-ui-grey mb-6" /> {/* Divider */}
+              <div className="h-px w-full bg-ui-grey mb-6" /> {/* Divider */}
               <SidebarMenuItem 
-                icon={<HelpCircle className="w-[26px]" />} 
+                icon={<HelpCircle className="w-6.5" />} 
                 text="Help & Support" 
                 onClick={onHelpSupportClick} 
               />
@@ -147,7 +147,7 @@ export default function Sidebar({
       {/* 3. LOGOUT DIALOG (Custom Alert) */}
       <AnimatePresence>
         {showLogoutDialog && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
             {/* Overlay Dialog */}
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -160,11 +160,11 @@ export default function Sidebar({
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-ui-white w-full max-w-sm rounded-[24px] p-6 relative z-10 shadow-2xl"
+              className="bg-ui-white w-full max-w-sm rounded-3xl p-6 relative z-10 shadow-2xl"
             >
               {/* Icon Circle */}
               <div className="flex justify-center mb-4">
-                <div className="w-[72px] h-[72px] rounded-full bg-ui-accent-yellow/15 flex items-center justify-center">
+                <div className="w-18 h-18 rounded-full bg-ui-accent-yellow/15 flex items-center justify-center">
                   <LogOut className="w-8 h-8 text-ui-accent-yellow ml-1" />
                 </div>
               </div>
@@ -221,7 +221,7 @@ function SidebarSubMenuItem({ text, onClick }: { text: string, onClick?: () => v
   return (
     <button 
       onClick={onClick}
-      className="w-full flex items-center py-2 pr-2 pl-[42px] active:bg-gray-50 rounded-lg transition-colors text-left"
+      className="w-full flex items-center py-2 pr-2 pl-10.5 active:bg-gray-50 rounded-lg transition-colors text-left"
     >
       <span className="text-[16px] font-medium text-ui-black">{text}</span>
     </button>

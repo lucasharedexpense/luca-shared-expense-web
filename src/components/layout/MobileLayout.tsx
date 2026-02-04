@@ -38,7 +38,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full bg-ui-accent-yellow relative overflow-hidden">
+    <div className="flex flex-col h-dvh w-full bg-ui-accent-yellow relative overflow-hidden">
       
       {/* GLOBAL HEADER */}
       <div className="shrink-0 z-10">
