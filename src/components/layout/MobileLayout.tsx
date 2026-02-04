@@ -15,18 +15,19 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // 1. LOGIC VISIBILITY (PISAH HEADER & NAVBAR)
   // =========================================
 
+  const isEditPage = pathname.endsWith("/edit");
+
   // A. Kapan Header Global Muncul? 
-  // Muncul terus KECUALI di "/new-event" (karena dia punya header manual sendiri)
-  const shouldShowHeader = pathname !== "/new-event";
+  // Muncul terus KECUALI di "/new-event" DAN halaman Edit
+  const shouldShowHeader = pathname !== "/new-event" && !isEditPage;
 
   // B. Kapan Navbar Bawah Muncul?
-  // HANYA muncul di 3 halaman utama.
-  // Otomatis HILANG di "/event/..." dan "/new-event"
+  // Tetap sama: HANYA muncul di 3 halaman utama.
   const shouldShowNavbar = ["/", "/scan", "/contacts"].includes(pathname);
 
   // C. Background Color Logic
-  // Kalau di /new-event pakai putih biar clean. Sisanya kuning (biar nyatu sama Header Global)
-  const isWhiteBackground = pathname === "/new-event";
+  // Pakai putih kalau di /new-event ATAU di halaman Edit
+  const isWhiteBackground = pathname === "/new-event" || isEditPage;
 
   // =========================================
   // 2. LOGIC VARIANT & STATE

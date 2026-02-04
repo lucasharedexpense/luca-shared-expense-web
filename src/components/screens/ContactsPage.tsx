@@ -8,7 +8,10 @@ import {
   Phone, 
   CreditCard, 
   Trash2, 
-  Edit2
+  Edit2,
+  RefreshCw,
+  Camera,
+  User
 } from "lucide-react";
 import { MOCK_DATABASE, Contact } from "@/lib/dummy-data";
 import SearchBar from "../ui/SearchBar";
@@ -259,7 +262,7 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: any) {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
          
-         <div className="bg-ui-white w-full max-w-sm rounded-4xl overflow-hidden relative z-10 shadow-2xl animate-[fadeIn_0.2s_ease-out]">
+         <div className="bg-ui-white h-120 overflow-y-auto no-scrollbar w-full max-w-sm rounded-4xl overflow-hidden relative z-10 shadow-2xl animate-[fadeIn_0.2s_ease-out]">
             {/* Header Image Pattern (Hiasan) */}
             <div className="h-24 bg-ui-accent-yellow w-full relative">
                <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white rounded-full">
@@ -323,57 +326,212 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
    const [name, setName] = useState(initialData?.name || "");
    const [phone, setPhone] = useState(initialData?.phoneNumber || "");
    
+   // --- STATE BANK ACCOUNTS ---
+   // Kita simpan list bank di state lokal dulu sebelum di-save
+   const [bankAccounts, setBankAccounts] = useState<any[]>(initialData?.bankAccounts || []);
+   
+   // State untuk input bank baru
+   const [newBankName, setNewBankName] = useState("");
+   const [newRekening, setNewRekening] = useState("");
+
+   // --- STATE AVATAR ---
+   const [tempAvatarSeed, setTempAvatarSeed] = useState(
+      initialData?.name || `user_${Math.floor(Math.random() * 1000)}`
+   );
+
+   const getAvatarUrl = (seed: string) => 
+      `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
+
+   const handleRandomizeAvatar = () => {
+      setTempAvatarSeed(`user_${Math.floor(Math.random() * 1000)}`);
+   };
+
+   // --- HANDLER BANK ---
+   const handleAddBank = () => {
+      if (!newBankName || !newRekening) return; // Validasi sederhana
+      
+      const newAccount = {
+         bankName: newBankName,
+         accountNumber: newRekening,
+         bankLogo: newBankName // Buat simplifikasi, logo pake nama bank aja
+      };
+      
+      setBankAccounts([...bankAccounts, newAccount]);
+      // Reset input
+      setNewBankName("");
+      setNewRekening("");
+   };
+
+   const handleDeleteBank = (index: number) => {
+      const updatedBanks = [...bankAccounts];
+      updatedBanks.splice(index, 1);
+      setBankAccounts(updatedBanks);
+   };
+   
    const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Bikin object Contact baru
+      
       const newContact: Contact = {
-         id: initialData?.id || Date.now().toString(), // Dummy ID gen
+         id: initialData?.id || Date.now().toString(),
          name,
          phoneNumber: phone,
-         avatarName: initialData?.avatarName || `avatar_${Math.floor(Math.random()*10)}`,
-         bankAccounts: initialData?.bankAccounts || [],
-         userId: "current_user_id"
+         avatarName: getAvatarUrl(tempAvatarSeed), 
+         bankAccounts: bankAccounts, // Simpan list bank terbaru
+         userId: "current_user_id",
       };
       onSave(newContact);
    };
 
    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-         <div className="bg-ui-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-ui-black mb-6">
-               {initialData ? "Edit Contact" : "Add Contact"}
-            </h3>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md transition-all">
+         {/* Container Modal (Scrollable) */}
+         <div className="bg-ui-white h-120 w-full max-w-sm rounded-4xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col relative max-h-[85vh]">
+            
+            {/* Header Sticky (Biar tombol close selalu kelihatan) */}
+            <div className="absolute top-0 left-0 right-0 z-20 flex justify-end p-4">
+               <button 
+                  onClick={onClose}
+                  className="p-2 bg-black/5 hover:bg-black/10 rounded-full transition-colors backdrop-blur-sm"
+               >
+                  <X className="w-5 h-5 text-ui-dark-grey" />
+               </button>
+            </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-               <div>
-                  <label className="text-xs font-bold text-ui-dark-grey uppercase mb-1 block">Name</label>
-                  <input 
-                     type="text" 
-                     required
-                     className="w-full bg-ui-grey/20 p-3 rounded-xl outline-none focus:ring-2 ring-ui-accent-yellow/50 text-ui-black"
-                     value={name}
-                     onChange={(e) => setName(e.target.value)}
-                     placeholder="John Doe"
-                  />
-               </div>
-               <div>
-                  <label className="text-xs font-bold text-ui-dark-grey uppercase mb-1 block">Phone Number</label>
-                  <input 
-                     type="tel" 
-                     className="w-full bg-ui-grey/20 p-3 rounded-xl outline-none focus:ring-2 ring-ui-accent-yellow/50 text-ui-black"
-                     value={phone}
-                     onChange={(e) => setPhone(e.target.value)}
-                     placeholder="0812..."
-                  />
-               </div>
-
-               {/* Note: Bank Form bisa ditambahin di sini nanti kalau mau kompleks */}
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto no-scrollbar flex flex-col">
                
-               <div className="flex gap-3 mt-4">
-                  <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl bg-ui-grey font-bold text-sm text-ui-black">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 rounded-xl bg-ui-accent-yellow font-bold text-sm text-ui-black">Save</button>
+               {/* Avatar Section */}
+               <div className="flex flex-col items-center pt-8 pb-6 px-6 bg-linear-to-b from-ui-accent-yellow/10 to-transparent shrink-0">
+                  <div className="relative group cursor-pointer" onClick={handleRandomizeAvatar}>
+                     <div className="w-24 h-24 rounded-full border-4 border-ui-white bg-ui-grey/10 overflow-hidden shadow-md">
+                        <img 
+                           src={getAvatarUrl(tempAvatarSeed)} 
+                           alt="Avatar Preview" 
+                           className="w-full h-full object-cover"
+                        />
+                     </div>
+                     <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <RefreshCw className="w-8 h-8 text-white drop-shadow-md" />
+                     </div>
+                     <div className="absolute bottom-0 right-0 bg-ui-black p-1.5 rounded-full border-2 border-ui-white">
+                        <Camera className="w-3 h-3 text-white" />
+                     </div>
+                  </div>
+                  <p className="text-xs text-ui-dark-grey mt-2 font-medium opacity-60">Tap to randomize</p>
                </div>
-            </form>
+
+               {/* Form Inputs */}
+               <form onSubmit={handleSubmit} className="px-6 pb-6 flex flex-col gap-5">
+                  
+                  {/* Name Input */}
+                  <div className="space-y-1.5">
+                     <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-wider ml-1">Full Name</label>
+                     <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-ui-dark-grey group-focus-within:text-ui-accent-yellow transition-colors">
+                           <User className="w-5 h-5" />
+                        </div>
+                        <input 
+                           type="text" required
+                           className="w-full bg-ui-grey p-4 pl-12 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-ui-accent-yellow/50 border border-transparent focus:border-ui-accent-yellow/20 text-ui-black font-medium transition-all placeholder:text-ui-dark-grey/40"
+                           value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Budi Santoso"
+                        />
+                     </div>
+                  </div>
+
+                  {/* Phone Input */}
+                  <div className="space-y-1.5">
+                     <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-wider ml-1">Phone Number</label>
+                     <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-ui-dark-grey group-focus-within:text-ui-accent-yellow transition-colors">
+                           <Phone className="w-5 h-5" />
+                        </div>
+                        <input 
+                           type="tel" 
+                           className="w-full bg-ui-grey p-4 pl-12 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-ui-accent-yellow/50 border border-transparent focus:border-ui-accent-yellow/20 text-ui-black font-medium transition-all placeholder:text-ui-dark-grey/40"
+                           value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0812..."
+                        />
+                     </div>
+                  </div>
+
+                  {/* --- BANK ACCOUNTS SECTION --- */}
+                  <div className="space-y-3 pt-2">
+                     <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-wider ml-1 flex items-center gap-2">
+                        Bank Accounts <span className="bg-ui-grey/20 text-[10px] px-1.5 py-0.5 rounded-md">{bankAccounts.length}</span>
+                     </label>
+
+                     {/* List Existing Banks */}
+                     <div className="flex flex-col gap-2">
+                        {bankAccounts.map((bank, index) => (
+                           <div key={index} className="flex items-center justify-between bg-ui-white border border-ui-grey/20 p-3 rounded-xl shadow-sm">
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                 <div className="w-8 h-8 rounded-full bg-ui-accent-yellow/10 flex items-center justify-center shrink-0">
+                                    <CreditCard className="w-4 h-4 text-ui-black" />
+                                 </div>
+                                 <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-bold text-ui-dark-grey uppercase truncate">{bank.bankName}</span>
+                                    <span className="text-sm font-bold text-ui-black truncate font-mono">{bank.accountNumber}</span>
+                                 </div>
+                              </div>
+                              <button 
+                                 type="button"
+                                 onClick={() => handleDeleteBank(index)}
+                                 className="p-2 hover:bg-ui-accent-red/10 rounded-lg group transition-colors"
+                              >
+                                 <Trash2 className="w-4 h-4 text-ui-grey group-hover:text-ui-accent-red transition-colors" />
+                              </button>
+                           </div>
+                        ))}
+                     </div>
+
+                     {/* Add New Bank Form */}
+                     <div className="bg-ui-grey/5 rounded-2xl border border-dashed border-ui-grey/30 flex flex-col gap-2 mt-1">
+                        <div className="bg-ui-grey rounded-xl">
+                           <input 
+                              placeholder="Bank (e.g. BCA)" 
+                              className="flex-1 ps-5 p-2.5 w-full rounded-xl text-sm outline-none border border-ui-grey/20 focus:border-ui-accent-yellow transition-colors placeholder:text-ui-dark-grey text-ui-black"
+                              value={newBankName}
+                              onChange={(e) => setNewBankName(e.target.value)}
+                           />
+                        </div>
+                        <div className="bg-ui-grey rounded-xl">
+                           <input 
+                              placeholder="No. Rekening" 
+                              type="number"
+                              className="flex-[1.5] ps-5 p-2.5 w-full rounded-xl text-sm outline-none border border-ui-grey/20 focus:border-ui-accent-yellow transition-colors placeholder:text-ui-dark-grey text-ui-black font-mono"
+                              value={newRekening}
+                              onChange={(e) => setNewRekening(e.target.value)}
+                           />
+                        </div>
+                        <button 
+                           type="button"
+                           onClick={handleAddBank}
+                           disabled={!newBankName || !newRekening}
+                           className="w-full py-2 bg-ui-black text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-ui-black/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                           <Plus className="w-3.5 h-3.5" />
+                           Add Bank Account
+                        </button>
+                     </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 mt-4 pt-2 border-t border-ui-grey/10">
+                     <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="flex-1 py-3.5 rounded-2xl bg-ui-grey/10 hover:bg-ui-grey/20 font-bold text-sm text-ui-dark-grey transition-colors"
+                     >
+                        Cancel
+                     </button>
+                     <button 
+                        type="submit" 
+                        className="flex-1 py-3.5 rounded-2xl bg-ui-accent-yellow hover:brightness-105 font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20 transition-all active:scale-[0.98]"
+                     >
+                        Save Contact
+                     </button>
+                  </div>
+               </form>
+            </div>
          </div>
       </div>
    );

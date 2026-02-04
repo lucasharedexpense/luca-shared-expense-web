@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"; // 1. Import useParams
 import { MOCK_DATABASE } from "@/lib/dummy-data";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart } from "lucide-react"; 
+import FabAdd from "@/components/ui/FABAdd";
 
 // 2. HAPUS 'params' DARI DALAM KURUNG SINI!
 // Jangan tulis: function EventDetailPage({ params }) ... ERROR NANTI!
@@ -51,20 +52,29 @@ export default function EventDetailPage() {
   // 6. RENDER UI
   return (
     <div className="flex flex-col h-full w-full bg-ui-background">
+      <FabAdd
+         onClick={() => {
+            console.log("Add Activity clicked!");
+            // Nanti di sini arahin ke page Add Activity
+            // router.push(`/event/${eventId}/add-activity`); 
+         }} 
+      />
       
       {/* HEADER CARD */}
       <div className="px-5 pt-4 pb-2 shrink-0">
         <EventHeaderCard 
            event={eventData}
            onBackClick={() => router.back()}
-           onEditClick={() => console.log("Edit clicked")}
+           onEditClick={() => router.push(`/event/${eventId}/edit`)}
            onDeleteClick={() => console.log("Delete clicked")}
         />
       </div>
 
       {/* CONTENT ACTIVITY */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-5 mt-2 pb-32">
-         <h3 className="font-bold text-lg text-ui-black mb-4">Activities</h3>
+      <div className="w-full px-5 mt-2">
+        <h3 className="font-bold text-lg text-ui-black mb-4">Activities</h3>
+      </div>
+      <div className="flex-1 overflow-y-auto no-scrollbar px-5 mt-0 pb-32">
 
          {eventData.activities.length === 0 ? (
             <div className="text-center py-10 opacity-50">

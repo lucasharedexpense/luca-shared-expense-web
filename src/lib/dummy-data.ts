@@ -338,6 +338,96 @@ contacts: [
               timestamp: 1770177198291
             }
           ]
+        },
+        {
+          amount: "", 
+          category: "Food",
+          categoryColorHex: "#FFA726",
+          eventId: "Jl0ZG43KmwCbbuMV7HSH",
+          id: "l0f5ao4UMBUo22Lebcqm",
+          paidBy: {
+            avatarName: "avatar_2",
+            name: "B"
+          },
+          participants: [
+            { avatarName: "avatar_3", name: "C" },
+            { avatarName: "avatar_4", name: "D" }
+          ],
+          payerName: "B",
+          title: "Tes 3",
+
+          // --- Sub-collection: ITEMS ---
+          items: [
+            {
+              discountAmount: 10000,
+              itemName: "Gurame",
+              memberNames: ["Beben", "A", "B"],
+              price: 60000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            }
+          ]
+        },
+        {
+          amount: "", 
+          category: "Food",
+          categoryColorHex: "#FFA726",
+          eventId: "Jl0ZG43KmwCbbuMV7HSH",
+          id: "l0f5ao4UMBUo22Lebcqm",
+          paidBy: {
+            avatarName: "avatar_2",
+            name: "B"
+          },
+          participants: [
+            { avatarName: "avatar_3", name: "C" },
+            { avatarName: "avatar_4", name: "D" }
+          ],
+          payerName: "B",
+          title: "Tes 4",
+
+          // --- Sub-collection: ITEMS ---
+          items: [
+            {
+              discountAmount: 10000,
+              itemName: "Gurame",
+              memberNames: ["Beben", "A", "B"],
+              price: 60000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            }
+          ]
+        },
+        {
+          amount: "", 
+          category: "Food",
+          categoryColorHex: "#FFA726",
+          eventId: "Jl0ZG43KmwCbbuMV7HSH",
+          id: "l0f5ao4UMBUo22Lebcqm",
+          paidBy: {
+            avatarName: "avatar_2",
+            name: "B"
+          },
+          participants: [
+            { avatarName: "avatar_3", name: "C" },
+            { avatarName: "avatar_4", name: "D" }
+          ],
+          payerName: "B",
+          title: "Tes 5",
+
+          // --- Sub-collection: ITEMS ---
+          items: [
+            {
+              discountAmount: 10000,
+              itemName: "Gurame",
+              memberNames: ["Beben", "A", "B"],
+              price: 60000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            }
+          ]
         }
       ]
     },
