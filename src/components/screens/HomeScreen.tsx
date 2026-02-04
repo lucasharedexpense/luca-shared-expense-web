@@ -5,7 +5,7 @@ import Header from "@/components/ui/Header";
 import FloatingNavbar from "@/components/ui/FloatingNavbar";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
-import { MockBackend } from "@/lib/dummy-data";
+import { MOCK_DATABASE } from "@/lib/dummy-data";
 
 export default function HomeScreen() {
   const [events, setEvents] = useState<any[]>([]);
@@ -18,7 +18,7 @@ export default function HomeScreen() {
     const loadData = async () => {
       setLoading(true);
       // Hack: Kita duplikat data dummy biar listnya jadi banyak & bisa dites scroll
-      const data = await MockBackend.getEvents();
+      const data = await MOCK_DATABASE.events;
       setEvents([...data, ...data, ...data]); // Duplikat 3x biar panjang
       setLoading(false);
     };
