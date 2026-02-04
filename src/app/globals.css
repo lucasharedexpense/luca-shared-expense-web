@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
+/* 1. SETUP TEMA (COLORS & FONTS) */
+/* Di Tailwind v4, pake prefix --color- biar otomatis jadi class bg-*, text-*, border-* */
+@theme {
+  --color-ui-black: #000000;
+  --color-ui-white: #FFFFFF;
+  --color-ui-background: #F0EDEA;
+  --color-ui-grey: #EFEFEF;
+  --color-ui-dark-grey: #787675;
+  --color-ui-accent-yellow: #FDBF50;
+  --color-ui-accent-red: #F53B57;
+  
+  --font-display: "IS", sans-serif;
+}
+
+/* 2. HAPUS DARK MODE OTOMATIS */
+/* Gw hapus media query dark mode biar tampilan lu konsisten (Kuning/Putih) 
+   meskipun HP user lagi mode gelap */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: var(--color-ui-background); /* Default background app */
+  --foreground: var(--color-ui-black);     /* Default text color */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* 3. UTILITIES (No Scrollbar) */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+      display: none;
+  }
+  .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
   }
 }
 
+@utility no-scrollbar {
+  /* Untuk Chrome, Safari, dan Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  /* Untuk IE, Edge, dan Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* 4. SETUP FONT */
+/* Catatan: Di Next.js, folder 'public' itu root url. 
+   Jadi '/public/fonts/...' itu SALAH. Harusnya '/fonts/...' */
+@font-face {
+  font-family: "IS";
+  font-style: normal;
+  font-weight: 200 700; /* Range weight variable font */
+  font-display: swap;
+  src: url("/fonts/instrument_sans.ttf") format("truetype"); 
+}
+
+/* 5. BODY DEFAULT */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-display);
+  margin: 0;
+  padding: 0;
 }
