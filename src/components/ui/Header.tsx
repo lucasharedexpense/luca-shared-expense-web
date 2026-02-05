@@ -3,6 +3,7 @@
 import React from "react";
 import { LucaLogo, SidebarLogo, ArrowLeft } from "./Icons";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 // --- 1. DEFINISI STATE (Mirip Enum Class Kotlin) ---
 export type HeaderVariant = 
@@ -49,6 +50,7 @@ export default function Header({
 }: HeaderProps) {
   
   const config = HEADER_CONFIG[variant];
+  const router = useRouter();
 
   return (
     // Surface Container
@@ -107,7 +109,10 @@ export default function Header({
         </div>
 
         {/* KANAN: Logo (AnimatedVisibility Logic) */}
-        <div className="h-full w-12.5 flex items-center justify-center">
+        <div 
+          className="h-full w-12.5 flex items-center justify-center"
+          onClick={() => router.push("/")}
+        >
           <AnimatePresence>
             {config.showRightLogo && (
               <motion.div

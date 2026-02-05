@@ -17,7 +17,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
   // 1. DAFTAR HALAMAN (CONFIG)
   // Halaman utama yang punya Bottom Navbar
-  const mainNavPaths = ["/", "/scan", "/contacts", "/home"]; 
+  const mainNavPaths = ["/scan", "/contacts", "/home"]; 
   
   // Halaman yang TIDAK boleh ada Header Global (Fullscreen pages)
   const noHeaderPaths = [
@@ -26,7 +26,11 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
     "/settings",
     "/account/settings",
     "/about-us",
-    "/help-support"
+    "/help-support",
+    "/auth/login",
+    "/auth/signup",
+    "/auth/fill-profile",
+    "/"
   ];
 
   // 2. LOGIC DETEKSI DINAMIS

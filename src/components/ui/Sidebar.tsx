@@ -48,6 +48,23 @@ export default function Sidebar({
 
   const router = useRouter();
 
+  const handleLogoutProcess = () => {
+    // 1. Hapus Cookie 'luca_session'
+    // Kita set expire-nya ke masa lalu agar browser menghapusnya
+    document.cookie = "luca_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    // 2. Tutup Dialog & Sidebar
+    setShowLogoutDialog(false);
+    onClose();
+
+    // 3. Panggil callback eksternal jika ada (opsional)
+    if (onLogoutClick) onLogoutClick();
+
+    // 4. Redirect ke Halaman Greeting (/) atau Login
+    router.replace("/"); 
+    // Pakai 'replace' biar user gabisa back ke dashboard
+  };
+
   return (
     <>
       {/* 1. OVERLAY (Background Gelap) */}
@@ -148,28 +165,24 @@ export default function Sidebar({
       <AnimatePresence>
         {showLogoutDialog && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-            {/* Overlay Dialog */}
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setShowLogoutDialog(false)}
             />
             
-            {/* Dialog Box */}
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }} 
               animate={{ scale: 1, opacity: 1 }} 
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-ui-white w-full max-w-sm rounded-3xl p-6 relative z-10 shadow-2xl"
             >
-              {/* Icon Circle */}
               <div className="flex justify-center mb-4">
-                <div className="w-18 h-18 rounded-full bg-ui-accent-yellow/15 flex items-center justify-center">
+                <div className="w-18 h-18 rounded-full bg-ui-accent-yellow/15 flex items-center justify-center p-4">
                   <LogOut className="w-8 h-8 text-ui-accent-yellow ml-1" />
                 </div>
               </div>
 
-              {/* Text */}
               <h2 className="text-xl font-bold text-ui-black text-center mb-2 font-display">
                 Keluar Akun?
               </h2>
@@ -177,7 +190,6 @@ export default function Sidebar({
                 Kamu harus login ulang untuk mengakses data Luca.
               </p>
 
-              {/* Buttons */}
               <div className="flex gap-3">
                 <button 
                   onClick={() => setShowLogoutDialog(false)}
@@ -185,11 +197,10 @@ export default function Sidebar({
                 >
                   Batal
                 </button>
+                
+                {/* TOMBOL YA: Panggil fungsi logout process */}
                 <button 
-                  onClick={() => {
-                    setShowLogoutDialog(false);
-                    onLogoutClick?.();
-                  }}
+                  onClick={handleLogoutProcess}
                   className="flex-1 h-12 rounded-full bg-ui-accent-yellow text-ui-black font-bold text-sm hover:brightness-105 transition-all shadow-md active:scale-95"
                 >
                   Ya
