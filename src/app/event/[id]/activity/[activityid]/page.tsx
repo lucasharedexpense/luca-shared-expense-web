@@ -3,9 +3,54 @@
 import React, { useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Edit2, Receipt, User } from "lucide-react";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { Item, MOCK_DATABASE } from "@/lib/dummy-data";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
+
+// --- 1. COMPONENT TERPISAH: RECEIPT ITEM ---
+// Kita buat komponen ini menerima props yang dibutuhkan saja
+interface ReceiptItemProps {
+    item: Item;
+    getAvatarByName: (name: string) => string;
+}
+
+function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
+    return (
+        <div className="flex flex-col gap-2">
+            {/* Baris 1: Qty - Nama - Harga */}
+            <div className="flex justify-between items-start">
+                <div className="flex gap-3">
+                    <span className="text-sm font-mono text-ui-dark-grey pt-0.5 opacity-60">
+                        {item.quantity}x
+                    </span>
+                    <span className="text-sm font-bold text-ui-black leading-snug">
+                        {item.itemName}
+                    </span>
+                </div>
+                <span className="text-sm font-bold text-ui-black">
+                    {new Intl.NumberFormat("id-ID", { 
+                        style: "currency", 
+                        currency: "IDR", 
+                        minimumFractionDigits: 0 
+                    }).format(item.price * item.quantity)}
+                </span>
+            </div>
+
+            {/* Baris 2: Avatar Pemakan */}
+            <div className="flex items-center gap-1 pl-8">
+                {item.memberNames.map((name, i) => (
+                    <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white overflow-hidden shadow-sm">
+                        <img 
+                            src={getAvatarByName(name)} 
+                            className="w-full h-full object-cover" 
+                            alt={name}
+                        />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function ActivityDetailPage() {
   const router = useRouter();
@@ -38,20 +83,26 @@ export default function ActivityDetailPage() {
   };
 
   // 3. HITUNG TOTAL OTOMATIS DARI ITEMS
-  const { subTotal, taxAmount, grandTotal } = useMemo(() => {
-    if (!activityData?.items) return { subTotal: 0, taxAmount: 0, grandTotal: 0 };
+  const { subTotal, taxAmount, grandTotal, taxRate } = useMemo(() => {
+    if (!activityData?.items || activityData.items.length === 0) {
+        return { subTotal: 0, taxAmount: 0, grandTotal: 0, taxRate: 0 };
+    }
+    
+    // 1. Ambil Tax Rate dari item pertama (karena asumsinya sama semua)
+    // Pastikan fallback ke 0 kalau fieldnya undefined
+    const rate = activityData.items[0].taxPercentage || 0;
 
-    const sub = activityData.items.reduce((acc, item) => {
-      return acc + (item.price * item.quantity);
-    }, 0);
-
-    // Asumsi pajak 10% (sesuai screenshot)
-    const tax = sub * 0.1; 
+    // 2. Hitung Subtotal
+    const sub = activityData.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    
+    // 3. Hitung Nominal Tax
+    const tax = sub * (rate / 100); 
     
     return {
       subTotal: sub,
       taxAmount: tax,
-      grandTotal: sub + tax
+      grandTotal: sub + tax,
+      taxRate: rate // Kita return juga ratenya buat ditampilkan di UI
     };
   }, [activityData]);
 
@@ -113,7 +164,7 @@ export default function ActivityDetailPage() {
             TAPI untuk efek kertas sobek di bawah, kita taruh Wave di LUAR div putih ini */}
         <div className="relative drop-shadow-xl filter">
             
-            <div className="text-ui-white -mt-px"> {/* margin minus biar nempel rapi */}
+            <div className="text-ui-white -mt-2"> {/* margin minus biar nempel rapi */}
                 <Wave className="w-full fill-current" />
             </div>
             {/* KERTAS STRUK (BAGIAN ATAS & TENGAH) */}
@@ -122,7 +173,7 @@ export default function ActivityDetailPage() {
                 {/* Judul & Payer */}
                 <div className="text-center mb-8">
                     <h2 className="text-xl font-bold text-ui-black font-display">{activityData.title}</h2>
-                    <p className="text-xs text-ui-dark-grey mt-1">
+                    <p className="text-xs text-ui-dark-grey">
                         Paid by <span className="font-bold text-ui-black">{activityData.payerName}</span>
                     </p>
                 </div>
@@ -131,35 +182,11 @@ export default function ActivityDetailPage() {
                 <div className="flex flex-col gap-6 mb-8">
                     {activityData.items && activityData.items.length > 0 ? (
                         activityData.items.map((item, idx) => (
-                            <div key={idx} className="flex flex-col gap-2">
-                                {/* Baris 1: Qty - Nama - Harga */}
-                                <div className="flex justify-between items-start">
-                                    <div className="flex gap-3">
-                                        <span className="text-sm font-mono text-ui-dark-grey pt-0.5 opacity-60">
-                                            {item.quantity}x
-                                        </span>
-                                        <span className="text-sm font-bold text-ui-black leading-snug">
-                                            {item.itemName}
-                                        </span>
-                                    </div>
-                                    <span className="text-sm font-bold text-ui-black font-mono">
-                                        {formatCurrency(item.price * item.quantity)}
-                                    </span>
-                                </div>
-
-                                {/* Baris 2: Avatar Pemakan */}
-                                <div className="flex items-center gap-1 pl-8">
-                                    {item.memberNames.map((name, i) => (
-                                        <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white overflow-hidden shadow-sm">
-                                            <img 
-                                                src={getAvatarByName(name)} 
-                                                className="w-full h-full object-cover"
-                                                alt={name}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            <ReceiptItem 
+                                key={idx} 
+                                item={item} 
+                                getAvatarByName={getAvatarByName} 
+                            />
                         ))
                     ) : (
                         <p className="text-center text-xs text-gray-400 py-4">No items yet</p>
@@ -167,25 +194,25 @@ export default function ActivityDetailPage() {
                 </div>
 
                 {/* Garis Putus-putus Divider */}
-                <div className="w-full border-b-2 border-dashed border-ui-grey/30 mb-6 relative">
+                <div className="w-full border-b-2 border-dashed border-ui-dark-grey mb-6 relative">
                      {/* Efek Coak Kiri Kanan */}
-                     <div className="absolute -left-8 -top-3 w-6 h-6 rounded-full bg-ui-grey/10"></div>
-                     <div className="absolute -right-8 -top-3 w-6 h-6 rounded-full bg-ui-grey/10"></div>
+                     <div className="absolute -left-8 -top-3 w-6 h-6 rounded-full"></div>
+                     <div className="absolute -right-8 -top-3 w-6 h-6 rounded-full"></div>
                 </div>
 
                 {/* Totals Section */}
                 <div className="flex flex-col gap-2 pb-6">
                     <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
                         <span>Subtotal</span>
-                        <span className="font-mono">{formatCurrency(subTotal)}</span>
+                        <span className="">{formatCurrency(subTotal)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
-                        <span>Tax (10%)</span>
-                        <span className="font-mono">{formatCurrency(taxAmount)}</span>
+                        <span>Tax ({taxRate}%)</span>
+                        <span className="">{formatCurrency(taxAmount)}</span>
                     </div>
                     <div className="flex justify-between items-center text-lg font-bold text-ui-black mt-2">
                         <span>Total Bill</span>
-                        <span className="font-mono">{formatCurrency(grandTotal)}</span>
+                        <span className="">{formatCurrency(grandTotal)}</span>
                     </div>
                 </div>
             </div>
@@ -202,8 +229,8 @@ export default function ActivityDetailPage() {
       {/* --- FOOTER ACTION (EDIT BUTTON) --- */}
       <div className="fixed bottom-8 right-5 z-20">
           <button 
-             onClick={() => console.log("Edit Items")} // Nanti arahkan ke page edit item
-             className="w-14 h-14 bg-ui-white text-ui-black rounded-full shadow-lg shadow-black/10 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
+             onClick={() => router.push(`/event/${eventId}/activity/${activityId}/edit`)}
+             className="w-14 h-14 bg-ui-accent-yellow text-ui-black rounded-full shadow-lg shadow-black/10 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
           >
              <Edit2 className="w-6 h-6" />
           </button>

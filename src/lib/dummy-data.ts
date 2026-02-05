@@ -300,9 +300,9 @@ contacts: [
       imageUrl: "https://firebasestorage.googleapis.com/v0/b/luca-app/o/images%2Fplaceholder.jpg?alt=media",
       location: "Test 2",
       participants: [
-        { avatarName: "avatar_4", name: "D" },
-        { avatarName: "avatar_6", name: "E" },
-        { avatarName: "avatar_7", name: "F" }
+        { avatarName: "avatar_3", name: "Citra Lestari" },
+        { avatarName: "avatar_6", name: "Nana Mirdad" },
+        { avatarName: "avatar_7", name: "Omar Daniel" }
       ],
       settlementResultJson: "{}", // Placeholder JSON string
       title: "Test 2",
@@ -320,12 +320,7 @@ contacts: [
             name: "B"
           },
           participants: [
-            { avatarName: "avatar_3", name: "C" },
-            { avatarName: "avatar_4", name: "D" },
-            { avatarName: "avatar_5", name: "E" },
-            { avatarName: "avatar_6", name: "F" },
-            { avatarName: "avatar_7", name: "G" },
-            { avatarName: "avatar_8", name: "H" }
+            { avatarName: "avatar_3", name: "Citra Lestari" }
           ],
           payerName: "B",
           title: "Tes 2",
@@ -347,17 +342,16 @@ contacts: [
           amount: "", 
           category: "Food",
           categoryColorHex: "#FFA726",
-          eventId: "Jl0ZG43KmwCbbuMV7HSH",
-          id: "l0f5ao4UMBUo22Lebcqm",
+          eventId: "Jl0ZG43KmwCbbuMV7HSI",
+          id: "l0f5ao4UMBUo22Lebcqn",
           paidBy: {
-            avatarName: "avatar_2",
-            name: "B"
+            avatarName: "avatar_3",
+            name: "Citra Lestari"
           },
           participants: [
-            { avatarName: "avatar_3", name: "C" },
-            { avatarName: "avatar_4", name: "D" }
+            { avatarName: "avatar_3", name: "Citra Lestari" }
           ],
-          payerName: "B",
+          payerName: "Citra Lestari",
           title: "Tes 3",
 
           // --- Sub-collection: ITEMS ---
@@ -365,7 +359,34 @@ contacts: [
             {
               discountAmount: 10000,
               itemName: "Gurame",
-              memberNames: ["Beben", "A", "B"],
+              memberNames: [],
+              price: 60000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            },
+            {
+              discountAmount: 10000,
+              itemName: "Bebek",
+              memberNames: [],
+              price: 160000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            },
+            {
+              discountAmount: 1000,
+              itemName: "Ayam",
+              memberNames: [],
+              price: 600000,
+              quantity: 3,
+              taxPercentage: 1,
+              timestamp: 1770177198291
+            },
+            {
+              discountAmount: 50500,
+              itemName: "Nasi",
+              memberNames: [],
               price: 60000,
               quantity: 3,
               taxPercentage: 1,
@@ -378,7 +399,7 @@ contacts: [
           category: "Food",
           categoryColorHex: "#FFA726",
           eventId: "Jl0ZG43KmwCbbuMV7HSH",
-          id: "l0f5ao4UMBUo22Lebcqm",
+          id: "l0f5ao4UMBUo22Lebcqo",
           paidBy: {
             avatarName: "avatar_2",
             name: "B"
@@ -392,15 +413,6 @@ contacts: [
 
           // --- Sub-collection: ITEMS ---
           items: [
-            {
-              discountAmount: 10000,
-              itemName: "Gurame",
-              memberNames: ["Beben", "A", "B"],
-              price: 60000,
-              quantity: 3,
-              taxPercentage: 1,
-              timestamp: 1770177198291
-            }
           ]
         },
         {
@@ -408,7 +420,7 @@ contacts: [
           category: "Food",
           categoryColorHex: "#FFA726",
           eventId: "Jl0ZG43KmwCbbuMV7HSH",
-          id: "l0f5ao4UMBUo22Lebcqm",
+          id: "l0f5ao4UMBUo22Lebcqp",
           paidBy: {
             avatarName: "avatar_2",
             name: "B"
