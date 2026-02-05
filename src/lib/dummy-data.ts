@@ -349,7 +349,8 @@ contacts: [
             name: "Citra Lestari"
           },
           participants: [
-            { avatarName: "avatar_3", name: "Citra Lestari" }
+            { avatarName: "avatar_3", name: "Citra Lestari" },
+            { avatarName: "avatar_6", name: "Nana Mirdad" }
           ],
           payerName: "Citra Lestari",
           title: "Tes 3",
@@ -359,7 +360,7 @@ contacts: [
             {
               discountAmount: 10000,
               itemName: "Gurame",
-              memberNames: [],
+              memberNames: ["Nana Mirdad"],
               price: 60000,
               quantity: 3,
               taxPercentage: 1,

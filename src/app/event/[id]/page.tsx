@@ -73,7 +73,7 @@ export default function EventDetailPage() {
       <div className="px-5 pt-4 pb-2 shrink-0">
         <EventHeaderCard 
            event={eventData}
-           onBackClick={() => router.push("/home")} // Balik ke Home
+           onBackClick={() => router.back()}
            onEditClick={() => router.push(`/event/${eventId}/edit`)} // Edit Event Info
            onDeleteClick={() => console.log("Delete clicked")}
         />
@@ -135,6 +135,16 @@ export default function EventDetailPage() {
             </div>
          )}
       </div>
+
+      {/* --- FOOTER: SUMMARIZE BUTTON --- */}
+      <div className="fixed bottom-8 left-5 right-5 z-30">
+        <button 
+            onClick={() => router.push(`/event/${eventId}/summary`)}
+            className="w-full h-14 bg-ui-accent-yellow text-white rounded-full shadow-xl shadow-black/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg border border-white/10">
+            <span className="mt-0.5 text-ui-black">Summarize</span>
+        </button>
+      </div>
+
     </div>
   );
 }

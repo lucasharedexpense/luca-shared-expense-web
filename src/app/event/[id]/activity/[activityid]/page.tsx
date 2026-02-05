@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Edit2, Receipt, User } from "lucide-react";
+import { Edit2, Receipt, Sparkles, User } from "lucide-react";
 import { Item, MOCK_DATABASE } from "@/lib/dummy-data";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
@@ -227,10 +227,10 @@ export default function ActivityDetailPage() {
       </div>
 
       {/* --- FOOTER ACTION (EDIT BUTTON) --- */}
-      <div className="fixed bottom-8 right-5 z-20">
+      <div className="fixed bottom-12 right-5 z-20">
           <button 
              onClick={() => router.push(`/event/${eventId}/activity/${activityId}/edit`)}
-             className="w-14 h-14 bg-ui-accent-yellow text-ui-black rounded-full shadow-lg shadow-black/10 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
+             className="w-14 h-14 bg-ui-white text-ui-black rounded-full shadow-lg shadow-black/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
           >
              <Edit2 className="w-6 h-6" />
           </button>

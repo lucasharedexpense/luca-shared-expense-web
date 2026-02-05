@@ -42,7 +42,9 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // Logic Header Variant (Icon Kiri & Kanan)
   let headerVariant: HeaderVariant = "HOME";
 
-  if (isActivityPage) {
+  if (pathname.endsWith("/summary")) {
+    headerVariant = "SUMMARY";
+  } else if (isActivityPage) {
     headerVariant = "ACTIVITY_DETAILS";
   } else if (pathname.startsWith("/event/")) {
     headerVariant = "EVENT_DETAILS"; 
