@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LucaLogo } from "./Icons"; // Pake icon yang tadi kita bikin
+import { useRouter } from "next/navigation";
 
 // --- PROPS DEFINITION ---
 interface SidebarProps {
@@ -44,6 +45,8 @@ export default function Sidebar({
   
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [expandAccountMenu, setExpandAccountMenu] = useState(false);
+
+  const router = useRouter();
 
   return (
     <>
@@ -90,7 +93,7 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<LayoutDashboard className="w-6.5" />} 
                 text="Dashboard" 
-                onClick={onDashboardClick} 
+                onClick={() => router.push("/")} 
               />
 
               {/* ACCOUNT EXPANDABLE */}
@@ -103,10 +106,7 @@ export default function Sidebar({
                 {/* SUB MENU */}
                 <SidebarSubMenuItem 
                    text="Account Settings" 
-                   onClick={() => {
-                     // Tutup sidebar opsional, atau biarin kebuka
-                     onAccountSettingsClick?.(); 
-                   }} 
+                   onClick={() => router.push("/account/settings")} 
                 />
                 <SidebarSubMenuItem 
                    text="Logout" 
@@ -117,17 +117,17 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<Settings className="w-6.5" />} 
                 text="Settings" 
-                onClick={onSettingsClick} 
+                onClick={() => router.push("/settings")} 
               />
               <SidebarMenuItem 
                 icon={<Flag className="w-6.5" />} 
                 text="Report Bugs" 
-                onClick={onReportBugClick} 
+                onClick={() => router.push("/report-bug")} 
               />
               <SidebarMenuItem 
                 icon={<Info className="w-6.5" />} 
                 text="About Us" 
-                onClick={onAboutUsClick} 
+                onClick={() => router.push("/about-us")}
               />
             </div>
 
@@ -137,7 +137,7 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<HelpCircle className="w-6.5" />} 
                 text="Help & Support" 
-                onClick={onHelpSupportClick} 
+                onClick={() => router.push("/help-support")} 
               />
             </div>
           </motion.div>

@@ -15,19 +15,35 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // 1. LOGIC VISIBILITY (PISAH HEADER & NAVBAR)
   // =========================================
 
+  // 1. DAFTAR HALAMAN (CONFIG)
+  // Halaman utama yang punya Bottom Navbar
+  const mainNavPaths = ["/", "/scan", "/contacts", "/home"]; 
+  
+  // Halaman yang TIDAK boleh ada Header Global (Fullscreen pages)
+  const noHeaderPaths = [
+    "/new-event",
+    "/report-bug",
+    "/settings",
+    "/account/settings",
+    "/about-us",
+    "/help-support"
+  ];
+
+  // 2. LOGIC DETEKSI DINAMIS
+  // Cek apakah halaman Edit atau Add Activity (berakhiran tertentu)
   const isEditPage = pathname.endsWith("/edit") || pathname.endsWith("/add-activity");
-
-  // A. Kapan Header Global Muncul? 
-  // Muncul terus KECUALI di "/new-event" DAN halaman Edit
-  const shouldShowHeader = pathname !== "/new-event" && !isEditPage;
-
-  // B. Kapan Navbar Bawah Muncul?
-  // Tetap sama: HANYA muncul di 3 halaman utama.
-  const shouldShowNavbar = ["/", "/scan", "/contacts"].includes(pathname);
-
-  // C. Background Color Logic
-  // Pakai putih kalau di /new-event ATAU di halaman Edit
+  
+  // Cek apakah halaman Activity Detail (mengandung "/activity/")
   const isActivityPage = pathname.includes("/activity/");
+
+  // 3. FINAL BOOLEANS (HASIL)
+  // A. Show Header: Muncul jika BUKAN halaman 'noHeader' DAN BUKAN mode edit
+  const shouldShowHeader = !noHeaderPaths.includes(pathname) && !isEditPage;
+
+  // B. Show Navbar: Hanya di halaman utama
+  const shouldShowNavbar = mainNavPaths.includes(pathname);
+
+  // C. Background White: Khusus page tertentu + edit + activity
   const isWhiteBackground = pathname === "/new-event" || isEditPage || isActivityPage;
 
   // =========================================

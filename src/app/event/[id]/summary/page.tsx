@@ -383,7 +383,7 @@ export default function SummaryPage() {
 
                 {/* 3. Bottom Share Button (Sticky inside white container) */}
                 {currentTab === 'SETTLEMENT' && (
-                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pt-10">
+                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pt-10">
                         <button 
                             onClick={() => console.log("Share Clicked")}
                             className="w-full h-14 bg-ui-black text-white rounded-full shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg"
