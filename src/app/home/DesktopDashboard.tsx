@@ -162,7 +162,7 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
 // --- COLUMN 2: EVENT DETAIL ---
 const EventDetailColumn = ({ 
     eventId, activeActivityId, onActivityClick, onClose, 
-    onAddClick, onEditActivity, onSummaryClick 
+    onAddClick, onEditActivity, onSummaryClick, onDeleteActivity
 }: any) => {
     const event = MOCK_DATABASE.events.find(e => e.id === eventId);
     if (!event) return null;
@@ -239,6 +239,22 @@ const EventDetailColumn = ({
                                 `}
                             >
                                 <Edit2 className="w-4 h-4" />
+                            </button>
+
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Mencegah row ikut terklik
+                                    onDeleteActivity(act.id); // Panggil fungsi delete
+                                }}
+                                className={`
+                                    p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 ml-1
+                                    ${isActive 
+                                        ? "bg-white/20 text-ui-black hover:bg-white hover:text-red-500" 
+                                        : "bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500"
+                                    }
+                                `}
+                            >
+                                <Trash2 className="w-4 h-4" />
                             </button>
 
                             <ChevronRight className={`w-5 h-5 shrink-0 ${isActive ? "text-ui-black" : "text-gray-300"}`} />
@@ -532,8 +548,45 @@ export default function DesktopDashboard() {
     const [isLoading, setIsLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
     const activeEvent = MOCK_DATABASE.events.find(e => e.id === selectedEventId);
+
+    const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: any) => {
+        if (!isOpen) return null;
+        return (
+            <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div 
+                    className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col items-center text-center"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+                        <Trash2 className="w-10 h-10 text-red-500" />
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold font-display text-ui-black mb-2">Delete Activity?</h3>
+                    <p className="text-sm text-gray-500 mb-8 px-4 leading-relaxed">
+                        Are you sure you want to delete this activity? This action cannot be undone and will affect the final settlement.
+                    </p>
+                    
+                    <div className="flex gap-3 w-full">
+                        <button 
+                            onClick={onClose} 
+                            className="flex-1 py-3.5 rounded-2xl font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={onConfirm} 
+                            className="flex-1 py-3.5 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                        >
+                            Yes, Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     // --- HANDLER UPDATE DB (Simulated) ---
     const handleUpdateActivityDetail = (updatedActivity: any) => {
@@ -548,6 +601,29 @@ export default function DesktopDashboard() {
             MOCK_DATABASE.events[eventIndex].activities[actIndex] = updatedActivity;
             setRefreshKey(prev => prev + 1); // Refresh UI
         }
+    };
+
+    const handleDeleteClick = (activityId: string) => {
+        setActivityToDelete(activityId);
+    };
+
+    const confirmDeleteActivity = () => {
+        if (!selectedEventId || !activityToDelete) return;
+        
+        const eventIndex = MOCK_DATABASE.events.findIndex(e => e.id === selectedEventId);
+        if (eventIndex !== -1) {
+            // @ts-ignore
+            MOCK_DATABASE.events[eventIndex].activities = MOCK_DATABASE.events[eventIndex].activities.filter(a => a.id !== activityToDelete);
+            
+            // Tutup detail kalo yang dihapus lagi dibuka
+            if (selectedActivityId === activityToDelete) {
+                setSelectedActivityId(null);
+            }
+            setRefreshKey(prev => prev + 1);
+        }
+        
+        // Reset State
+        setActivityToDelete(null);
     };
 
     // ... (Handler Create/Edit Activity yg lama tetep sama)
@@ -609,6 +685,7 @@ export default function DesktopDashboard() {
                         onActivityClick={setSelectedActivityId}
                         onAddClick={openCreateModal}
                         onEditActivity={openEditModal}
+                        onDeleteActivity={handleDeleteClick}
                         onSummaryClick={() => setShowSummaryModal(true)}
                         onClose={() => { setSelectedEventId(null); setSelectedActivityId(null); }}
                     />
@@ -657,6 +734,12 @@ export default function DesktopDashboard() {
                     event={activeEvent}
                 />
             )}
+
+            <DeleteConfirmationModal 
+                isOpen={!!activityToDelete}
+                onClose={() => setActivityToDelete(null)}
+                onConfirm={confirmDeleteActivity}
+            />
         </div>
     );
 }
