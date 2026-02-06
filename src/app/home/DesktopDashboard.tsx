@@ -250,7 +250,7 @@ const EventDetailColumn = ({
                                     p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 ml-1
                                     ${isActive 
                                         ? "bg-white/20 text-ui-black hover:bg-white hover:text-red-500" 
-                                        : "bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500"
+                                        : "bg-gray-100 text-gray-500 hover:bg-ui-accent-red hover:text-ui-white"
                                     }
                                 `}
                             >
