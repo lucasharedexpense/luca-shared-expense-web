@@ -210,7 +210,7 @@ const SettlementCard = ({ item, participants, onToggle }: { item: Settlement, pa
             {/* Amount & Status */}
             <div className="flex items-center gap-3">
                 <div className="flex flex-col items-end">
-                    <span className={`font-bold font-mono ${item.isPaid ? 'line-through text-gray-400' : 'text-ui-black'}`}>
+                    <span className={`font-bold ${item.isPaid ? 'line-through text-gray-400' : 'text-ui-black'}`}>
                         {formatCurrency(item.amount)}
                     </span>
                     {item.isPaid ? (
@@ -249,7 +249,7 @@ const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDeta
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm font-mono text-ui-black">{formatCurrency(detail.totalConsumption)}</span>
+                    <span className="font-bold text-sm text-ui-black">{formatCurrency(detail.totalConsumption)}</span>
                     {expanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                 </div>
             </div>
@@ -264,7 +264,7 @@ const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDeta
                                 <span className="text-xs font-bold text-ui-black">{item.itemName}</span>
                                 <span className="text-[10px] text-gray-500">{item.activityTitle}</span>
                             </div>
-                            <span className="text-xs font-bold font-mono">{formatCurrency(item.splitAmount)}</span>
+                            <span className="text-xs font-bold">{formatCurrency(item.splitAmount)}</span>
                         </div>
                     ))}
                 </div>
@@ -329,7 +329,7 @@ export default function SummaryPage() {
                         {/* Total Expense Card (Always Visible) */}
                         <div className="bg-ui-accent-yellow/20 p-4 rounded-xl flex justify-between items-center border border-ui-accent-yellow/50">
                             <span className="font-semibold text-sm text-ui-black">Total Expense</span>
-                            <span className="font-bold text-lg font-mono text-ui-black">{formatCurrency(summaryData.totalExpense)}</span>
+                            <span className="font-bold text-lg text-ui-black">{formatCurrency(summaryData.totalExpense)}</span>
                         </div>
 
                         {currentTab === 'SETTLEMENT' ? (

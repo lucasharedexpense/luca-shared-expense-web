@@ -61,7 +61,7 @@ const TeamMemberCard = ({ name, role }: { name: string, role: string }) => (
     <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
         <Info className="w-8 h-8" />
     </div>
-    <h3 className="text-sm font-bold text-ui-black mb-5">{name}</h3>
+    <h3 className="text-sm font-bold text-ui-black mb-5 md:mb-0">{name}</h3>
     <p className="text-xs text-ui-dark-grey mb-5 h-8 flex items-center justify-center">{role}</p>
     
     <div className="flex gap-2 mt-auto">

@@ -1,7 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import MobileLayout from "@/components/layout/MobileLayout"; // Import layout tadi
+import MainLayout from "@/components/layout/MainLayout"; // <--- GANTI IMPORT INI
 
 export const metadata: Metadata = {
   title: "Luca App",
@@ -15,11 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        {/* Bungkus children di sini */}
-        <MobileLayout>
+      <body className="bg-ui-background"> 
+        {/* Bungkus children dengan MainLayout */}
+        <MainLayout>
           {children}
-        </MobileLayout>
+        </MainLayout>
       </body>
     </html>
   );

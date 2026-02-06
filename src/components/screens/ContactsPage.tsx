@@ -105,7 +105,7 @@ export default function ContactsPage() {
 
         {/* Search & Add */}
         <div className="flex gap-3">
-          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search contacts..."/>
           <button 
              onClick={() => { setEditingContact(null); setIsFormOpen(true); }}
              className="w-12.5 h-12.5 rounded-full bg-ui-accent-yellow shadow-md flex items-center justify-center active:scale-95 transition-transform shrink-0"

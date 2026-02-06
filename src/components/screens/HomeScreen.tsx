@@ -35,7 +35,7 @@ export default function HomeScreen() {
       
       {/* HEADER & SEARCH (Area Kuning - Fixed/Tidak ikut scroll) */}
       <div className="px-5 py-6 shrink-0 z-10">
-        <SearchBar value={searchQuery} onChange={setSearchQuery} />
+        <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search Events..."/>
       </div>
 
       {/* CONTENT AREA (Area Putih) */}
