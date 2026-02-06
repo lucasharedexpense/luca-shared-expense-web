@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, CalendarClock } from "lucide-react";
+import { Search, Plus, CalendarClock, Edit2 } from "lucide-react"; // Import Edit2
 import { MOCK_DATABASE } from "@/lib/dummy-data";
-import NewEventModal from "./NewEventModal"; // 
+import NewEventModal from "./NewEventModal";
 
-// Helper calculate total
+// Helper hitung total
 const getEventTotal = (event: any) => {
   return event.activities.reduce((acc: number, act: any) => {
      const actTotal = act.items.reduce((s: number, i: any) => s + (i.price * i.quantity), 0);
@@ -15,55 +15,84 @@ const getEventTotal = (event: any) => {
 
 interface EventListProps {
   onEventClick: (eventId: string) => void;
-  // onNewEventClick: () => void; // REMOVE THIS PROP (We handle it internally now)
   activeId?: string | null;
 }
 
 export default function EventList({ onEventClick, activeId }: EventListProps) {
   const [search, setSearch] = useState("");
-  const [showNewEventModal, setShowNewEventModal] = useState(false); // State for Modal
+  const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Local state for events (so we can add to it instantly without real DB for now)
   const [events, setEvents] = useState(MOCK_DATABASE.events);
+
+  // --- STATE UNTUK EDIT ---
+  // Menyimpan data event yang sedang diedit, atau null jika create baru
+  const [editingEvent, setEditingEvent] = useState<any | null>(null);
 
   const filteredEvents = events.filter(e => 
     e.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  // HANDLER: Create New Event
-  const handleCreateEvent = (title: string, date: Date, participants: string[]) => {
+  // HANDLER: Buka Modal Create
+  const openCreateModal = () => {
+    setEditingEvent(null); // Reset edit state
+    setShowNewEventModal(true);
+  };
+
+  // HANDLER: Buka Modal Edit
+  const openEditModal = (e: React.MouseEvent, event: any) => {
+    e.stopPropagation(); // Biar ga ke-trigger onEventClick (pindah halaman)
+    setEditingEvent(event);
+    setShowNewEventModal(true);
+  };
+
+  // HANDLER: Save (Create / Update)
+  const handleSaveEvent = (title: string, date: Date, participants: string[]) => {
     setIsLoading(true);
 
     setTimeout(() => {
-        const newEvent = {
-            id: Math.random().toString(36).substr(2, 9),
-            title: title,
-            date: date.toISOString(),
-            status: "active",
-            // Gabungkan User (kita sendiri) + Peserta yang dipilih
-            participants: ["You", ...participants], 
-            activities: []
-        };
-
-        // Update List
-        // @ts-ignore
-        setEvents([newEvent, ...events]);
+        if (editingEvent) {
+            // --- LOGIC UPDATE ---
+            const updatedEvents = events.map(ev => {
+                if (ev.id === editingEvent.id) {
+                    return {
+                        ...ev,
+                        title: title,
+                        date: date.toISOString(),
+                        // Gabungkan "You" jika belum ada, plus participants baru
+                        participants: ["You", ...participants], 
+                    };
+                }
+                return ev;
+            });
+            // @ts-ignore
+            setEvents(updatedEvents);
+        } else {
+            // --- LOGIC CREATE ---
+            const newEvent = {
+                id: Math.random().toString(36).substr(2, 9),
+                title: title,
+                date: date.toISOString(),
+                status: "active",
+                participants: ["You", ...participants],
+                activities: []
+            };
+            // @ts-ignore
+            setEvents([newEvent, ...events]);
+            onEventClick(newEvent.id);
+        }
         
         // Reset & Close
         setIsLoading(false);
         setShowNewEventModal(false);
+        setEditingEvent(null);
         
-        // Auto select the new event
-        onEventClick(newEvent.id);
-        
-    }, 1000);
+    }, 800);
   };
 
   return (
     <>
         <div className="flex flex-col h-full">
-            {/* 1. SEARCH BAR */}
+            {/* SEARCH BAR */}
             <div className="mb-4 sticky top-0 bg-white z-10 py-2">
                 <div className="relative group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-ui-black transition-colors" />
@@ -77,12 +106,12 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                 </div>
             </div>
 
-            {/* 2. LIST CONTENT */}
+            {/* LIST CONTENT */}
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pb-20 pr-1">
                 
                 {/* Button Add New */}
                 <button 
-                    onClick={() => setShowNewEventModal(true)} // Open Modal
+                    onClick={openCreateModal}
                     className="w-full py-3.5 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-wide hover:border-ui-accent-yellow hover:text-ui-black hover:bg-ui-accent-yellow/5 transition-all group"
                 >
                     <div className="p-1 rounded-full bg-gray-100 group-hover:bg-ui-accent-yellow transition-colors">
@@ -109,6 +138,7 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                             {/* Active Indicator */}
                             {isActive && <div className="absolute left-0 top-4 bottom-4 w-1 bg-ui-accent-yellow rounded-r-full" />}
 
+                            {/* Header Card */}
                             <div className="flex justify-between items-start mb-2 pl-2">
                                 <div>
                                     <h3 className={`font-bold text-sm line-clamp-1 mb-1 ${isActive ? "text-ui-black" : "text-gray-700"}`}>
@@ -119,8 +149,18 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                                         <span>{new Date(event.date).toLocaleDateString()}</span>
                                     </div>
                                 </div>
+                                
+                                {/* TOMBOL EDIT (Hanya muncul saat hover card) */}
+                                <button 
+                                    onClick={(e) => openEditModal(e, event)}
+                                    className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-ui-accent-yellow hover:text-ui-black transition-all opacity-0 group-hover:opacity-100"}
+                                    title="Edit Event"
+                                >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                </button>
                             </div>
                             
+                            {/* Footer Card */}
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 pl-2">
                                 <div className="flex items-center -space-x-2">
                                     {[...Array(Math.min(3, event.participants.length))].map((_, i) => (
@@ -128,6 +168,11 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                                             {String.fromCharCode(65+i)}
                                         </div>
                                     ))}
+                                    {event.participants.length > 3 && (
+                                        <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-400">
+                                            +{event.participants.length - 3}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <span className="text-sm font-bold text-ui-black">
@@ -140,12 +185,13 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
             </div>
         </div>
 
-        {/* --- 3. MODAL COMPONENT --- */}
+        {/* --- MODAL (CREATE / EDIT) --- */}
         <NewEventModal 
             isOpen={showNewEventModal}
             onClose={() => setShowNewEventModal(false)}
-            onSubmit={handleCreateEvent}
+            onSubmit={handleSaveEvent}
             isLoading={isLoading}
+            initialData={editingEvent} // Kirim data kalau lagi edit
         />
     </>
   );

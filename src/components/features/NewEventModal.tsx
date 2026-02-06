@@ -1,19 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Calendar, Type, Loader2, Search, Check } from "lucide-react";
 import { MOCK_DATABASE } from "@/lib/dummy-data";
 
-// --- HELPER: Random Background Color (Sama kayak di Contacts) ---
+// Helper (Sama kayak sebelumnya)
 const getAvatarColor = (name: string) => {
   const colors = ["bg-red-100", "bg-blue-100", "bg-green-100", "bg-orange-100", "bg-purple-100", "bg-teal-100"];
   return colors[name.length % colors.length];
 };
 
-// --- HELPER: Get Avatar URL (Support HTTP & Dicebear) ---
 const getAvatarSrc = (avatarName: string) => {
   if (avatarName?.startsWith("http")) return avatarName;
-  // Gunakan seed dari avatarName, atau default ke string kosong
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
 };
 
@@ -22,14 +20,47 @@ interface NewEventModalProps {
   onClose: () => void;
   onSubmit: (title: string, date: Date, participants: string[]) => void;
   isLoading?: boolean;
+  // --- NEW PROP: INITIAL DATA ---
+  initialData?: {
+    title: string;
+    date: string;
+    participants: string[];
+  } | null;
 }
 
-export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = false }: NewEventModalProps) {
+export default function NewEventModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  isLoading = false,
+  initialData = null 
+}: NewEventModalProps) {
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  
+  const [date, setDate] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchContact, setSearchContact] = useState("");
+
+  // --- EFFECT: ISI FORM SAAT MODAL DIBUKA (EDIT MODE) ---
+  useEffect(() => {
+    if (isOpen) {
+        if (initialData) {
+            // Edit Mode
+            setTitle(initialData.title);
+            // Format Date ke YYYY-MM-DD untuk input type="date"
+            const isoDate = new Date(initialData.date).toISOString().split('T')[0];
+            setDate(isoDate);
+            // Filter "You" atau user sendiri dari list participants biar gak dobel
+            const others = initialData.participants.filter(p => p !== "You" && p !== MOCK_DATABASE.username);
+            setSelectedIds(others);
+        } else {
+            // Create Mode (Reset)
+            setTitle("");
+            setDate(new Date().toISOString().split('T')[0]);
+            setSelectedIds([]);
+        }
+        setSearchContact("");
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -47,7 +78,7 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
     onSubmit(title, new Date(date), selectedIds);
   };
 
-  // Filter Contacts & Exclude Current User
+  // Filter Contacts
   const filteredContacts = MOCK_DATABASE.contacts
     .filter(c => c.name !== MOCK_DATABASE.username)
     .filter(c => c.name.toLowerCase().includes(searchContact.toLowerCase()));
@@ -61,15 +92,19 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
         {/* Header */}
         <div className="flex justify-between items-center mb-6 shrink-0">
           <div>
-            <h3 className="font-bold text-xl text-ui-black font-display">New Event</h3>
-            <p className="text-xs text-gray-500">Create a new bill splitting group</p>
+            <h3 className="font-bold text-xl text-ui-black font-display">
+                {initialData ? "Edit Event" : "New Event"}
+            </h3>
+            <p className="text-xs text-gray-500">
+                {initialData ? "Update event details" : "Create a new bill splitting group"}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
-        {/* Form Body (Scrollable) */}
+        {/* Form Body */}
         <div className="flex-1 overflow-y-auto pr-2 -mr-2 no-scrollbar">
             <form id="createEventForm" onSubmit={handleSubmit} className="flex flex-col gap-5">
             
@@ -107,14 +142,13 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                 </div>
             </div>
 
-            {/* --- PARTICIPANT SELECTION --- */}
+            {/* Participants */}
             <div className="space-y-2">
                 <div className="flex justify-between items-end">
                     <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Invite Friends</label>
                     <span className="text-xs font-bold text-ui-accent-yellow">{selectedIds.length} Selected</span>
                 </div>
-
-                {/* Search Friends */}
+                {/* Search */}
                 <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                     <input 
@@ -125,13 +159,11 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                         className="w-full h-9 pl-9 pr-3 rounded-lg bg-white border border-gray-200 text-xs focus:border-ui-accent-yellow outline-none transition-all"
                     />
                 </div>
-
-                {/* Grid List Friends */}
+                {/* Grid List */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-55 overflow-y-auto no-scrollbar p-1">
                     {filteredContacts.length > 0 ? (
                         filteredContacts.map((contact) => {
                             const isSelected = selectedIds.includes(contact.name);
-                            // Logic avatar source yang diperbaiki
                             const avatarSrc = `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`;
                             const bgColor = getAvatarColor(contact.name);
 
@@ -147,14 +179,9 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                                         }
                                     `}
                                 >
-                                    {/* Avatar dengan background color random biar cantik */}
                                     <div className="relative shrink-0">
                                         <div className={`w-9 h-9 rounded-full overflow-hidden border border-gray-100 ${bgColor}`}>
-                                            <img 
-                                                src={avatarSrc} 
-                                                alt={contact.name} 
-                                                className="w-full h-full object-cover"
-                                            />
+                                            <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover"/>
                                         </div>
                                         {isSelected && (
                                             <div className="absolute -bottom-1 -right-1 bg-ui-accent-yellow rounded-full p-0.5 border-2 border-white shadow-sm">
@@ -162,7 +189,6 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                                             </div>
                                         )}
                                     </div>
-                                    
                                     <span className={`text-sm font-medium truncate ${isSelected ? "text-ui-black font-bold" : "text-gray-600"}`}>
                                         {contact.name}
                                     </span>
@@ -170,17 +196,16 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                             )
                         })
                     ) : (
-                        <div className="col-span-1 sm:col-span-2 flex flex-col items-center justify-center py-8 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
+                        <div className="col-span-1 sm:col-span-2 text-center py-8 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
                             <p className="text-xs">No contacts found.</p>
                         </div>
                     )}
                 </div>
             </div>
-
             </form>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer */}
         <div className="flex gap-3 mt-6 pt-4 border-t border-gray-50 shrink-0">
             <button 
                 type="button" 
@@ -195,10 +220,9 @@ export default function NewEventModal({ isOpen, onClose, onSubmit, isLoading = f
                 disabled={!title.trim() || isLoading}
                 className="flex-1 h-12 rounded-xl bg-ui-accent-yellow text-ui-black font-bold shadow-lg shadow-ui-accent-yellow/20 hover:brightness-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Event"}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Event")}
             </button>
         </div>
-
       </div>
     </div>
   );

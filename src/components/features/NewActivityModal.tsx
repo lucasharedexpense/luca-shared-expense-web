@@ -2,19 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  X, 
-  Loader2, 
-  Utensils, 
-  Car, 
-  Ticket, 
-  ShoppingBag, 
-  MoreHorizontal, 
-  Wallet, 
-  Check 
+  X, Loader2, Utensils, Car, Ticket, ShoppingBag, 
+  MoreHorizontal, Wallet, Check 
 } from "lucide-react";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
 
-// --- DUMMY CATEGORIES ---
+// --- DUMMY CATEGORIES (Sama kayak sebelumnya) ---
 const CATEGORIES = [
   { id: 'food', name: 'Food', icon: Utensils, color: 'bg-orange-100 text-orange-600' },
   { id: 'transport', name: 'Transport', icon: Car, color: 'bg-blue-100 text-blue-600' },
@@ -23,7 +15,6 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' },
 ];
 
-// Helper Avatar Logic (Copied from previous steps for consistency)
 const getAvatarUrl = (avatarName: string) => {
     if (avatarName?.startsWith("http")) return avatarName;
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
@@ -37,16 +28,17 @@ const getAvatarColor = (name: string) => {
 interface NewActivityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // Updated onSubmit signature to match data structure
   onSubmit: (data: {
       title: string;
       amount: number;
       category: string;
-      payerName: string; // Using Name for simplicity in this mock, usually ID
-      splitAmong: string[]; // List of names
+      payerName: string;
+      splitAmong: string[];
   }) => void;
-  participants: string[]; // List of names from the Event
+  participants: string[];
   isLoading?: boolean;
+  // --- NEW PROP: INITIAL DATA ---
+  initialData?: any; 
 }
 
 export default function NewActivityModal({ 
@@ -54,35 +46,49 @@ export default function NewActivityModal({
   onClose, 
   onSubmit, 
   participants,
-  isLoading = false 
+  isLoading = false,
+  initialData = null
 }: NewActivityModalProps) {
   
-  // --- STATE ---
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("food");
   const [payerName, setPayerName] = useState("");
   const [splitAmong, setSplitAmong] = useState<string[]>([]);
 
-  // Reset state when modal opens
+  // --- EFFECT: POPULATE FORM IF EDITING ---
   useEffect(() => {
     if (isOpen) {
-        setTitle("");
-        setAmount("");
-        setCategory("food");
-        if (participants.length > 0) {
-            setPayerName(participants[0]); // Default payer = creator/first
-            setSplitAmong(participants); // Default split = everyone
+        if (initialData) {
+            // MODE EDIT
+            setTitle(initialData.title);
+            
+            // Hitung total amount dari items yang ada
+            const total = initialData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+            setAmount(new Intl.NumberFormat("id-ID").format(total));
+            
+            // Set fields lainnya (Asumsi category default 'food' kalau ga ada di data dummy)
+            setCategory(initialData.category || "food"); 
+            setPayerName(initialData.payerName);
+            setSplitAmong(initialData.participants); // List orang yang terlibat split
+        } else {
+            // MODE CREATE (RESET)
+            setTitle("");
+            setAmount("");
+            setCategory("food");
+            if (participants.length > 0) {
+                setPayerName(participants[0]); 
+                setSplitAmong(participants); 
+            }
         }
     }
-  }, [isOpen, participants]);
+  }, [isOpen, initialData, participants]);
 
   if (!isOpen) return null;
 
-  // --- HANDLERS ---
   const handleToggleSplit = (name: string) => {
     if (splitAmong.includes(name)) {
-      if (splitAmong.length > 1) { // Min 1 person
+      if (splitAmong.length > 1) { 
         setSplitAmong(prev => prev.filter(p => p !== name));
       }
     } else {
@@ -105,7 +111,6 @@ export default function NewActivityModal({
     });
   };
 
-  // Helper for formatting Rp
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value.replace(/\D/g, "");
       if (val) {
@@ -124,8 +129,12 @@ export default function NewActivityModal({
         {/* HEADER */}
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
           <div>
-            <h3 className="font-bold text-xl text-ui-black font-display">New Activity</h3>
-            <p className="text-xs text-gray-500">Record an expense for this event</p>
+            <h3 className="font-bold text-xl text-ui-black font-display">
+                {initialData ? "Edit Activity" : "New Activity"}
+            </h3>
+            <p className="text-xs text-gray-500">
+                {initialData ? "Update expense details" : "Record an expense for this event"}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-400" />
@@ -195,20 +204,18 @@ export default function NewActivityModal({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* 3. PAYER (Who Paid?) */}
+                    {/* 3. PAYER */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                                 <Wallet className="w-3 h-3" /> Paid By
                             </label>
                         </div>
-                        
                         <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
                             {participants.map((pName) => {
                                 const isSelected = payerName === pName;
-                                const avatarUrl = getAvatarUrl(pName); // Use Name as seed
+                                const avatarUrl = getAvatarUrl(pName);
                                 const bgColor = getAvatarColor(pName);
-
                                 return (
                                     <div 
                                         key={pName} 
@@ -234,7 +241,7 @@ export default function NewActivityModal({
                         </div>
                     </div>
 
-                    {/* 4. SPLIT (For Whom?) */}
+                    {/* 4. SPLIT */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Split Among</label>
@@ -242,13 +249,11 @@ export default function NewActivityModal({
                                 {splitAmong.length} People
                             </span>
                         </div>
-                        
                         <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
                             {participants.map((pName) => {
                                 const isSelected = splitAmong.includes(pName);
                                 const avatarUrl = getAvatarUrl(pName);
                                 const bgColor = getAvatarColor(pName);
-
                                 return (
                                     <div 
                                         key={pName}
@@ -278,11 +283,10 @@ export default function NewActivityModal({
                         </div>
                     </div>
                 </div>
-
             </form>
         </div>
 
-        {/* FOOTER ACTIONS */}
+        {/* FOOTER */}
         <div className="p-6 border-t border-gray-100 bg-gray-50/50">
             <div className="flex gap-3">
                 <button 
@@ -298,7 +302,7 @@ export default function NewActivityModal({
                     disabled={!title || !amount || isLoading}
                     className="flex-2 h-12 rounded-xl bg-ui-black text-white font-bold shadow-lg shadow-black/20 hover:opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Activity"}
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Activity")}
                 </button>
             </div>
         </div>
