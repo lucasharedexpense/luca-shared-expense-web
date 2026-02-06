@@ -3,16 +3,19 @@
 import React, { useState } from "react";
 import EventList from "@/components/features/EventList";
 import { MOCK_DATABASE } from "@/lib/dummy-data";
-import { ShoppingCart, ChevronRight, X, ArrowLeft, Receipt, UserCircle } from "lucide-react";
+// Import Component Modal Baru
+import NewActivityModal from "@/components/features/NewActivityModal"; 
+import { ShoppingCart, ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus } from "lucide-react";
 
-// --- COLUMN 2: EVENT DETAIL (LEBIH CLEAN) ---
-const EventDetailColumn = ({ eventId, activeActivityId, onActivityClick, onClose }: any) => {
+// --- COLUMN 2: EVENT DETAIL (UPDATED) ---
+// Tambahkan prop onAddClick
+const EventDetailColumn = ({ eventId, activeActivityId, onActivityClick, onClose, onAddClick }: any) => {
     const event = MOCK_DATABASE.events.find(e => e.id === eventId);
     if (!event) return null;
 
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* Header dengan background halus */}
+            {/* Header */}
             <div className="p-6 border-b border-gray-50 flex justify-between items-start bg-gray-50/30">
                 <div>
                     <h2 className="text-2xl font-bold font-display text-ui-black line-clamp-1">{event.title}</h2>
@@ -23,7 +26,20 @@ const EventDetailColumn = ({ eventId, activeActivityId, onActivityClick, onClose
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                
+                {/* --- TOMBOL ADD NEW ACTIVITY (BARU) --- */}
+                <button 
+                    onClick={onAddClick}
+                    className="w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-wide hover:border-ui-accent-yellow hover:text-ui-black hover:bg-ui-accent-yellow/5 transition-all group"
+                >
+                    <div className="p-1 rounded-full bg-gray-100 group-hover:bg-ui-accent-yellow transition-colors">
+                        <Plus className="w-3.5 h-3.5 text-gray-500 group-hover:text-ui-black" />
+                    </div>
+                    Add New Activity
+                </button>
+
+                {/* List Activities */}
                 {event.activities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
@@ -65,15 +81,15 @@ const EventDetailColumn = ({ eventId, activeActivityId, onActivityClick, onClose
     );
 };
 
-// --- COLUMN 3: ACTIVITY DETAIL (LEBIH MODERN) ---
+// ... (ActivityDetailColumn code remains the same) ...
 const ActivityDetailColumn = ({ eventId, activityId, onClose }: any) => {
+    // ... Copy paste kode ActivityDetailColumn yang sebelumnya (tidak berubah)
     const event = MOCK_DATABASE.events.find(e => e.id === eventId);
     const activity = event?.activities.find(a => a.id === activityId);
     if (!activity) return null;
 
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-xl xl:shadow-sm border border-gray-100 overflow-hidden">
-            {/* Header Kuning di Kolom 3 biar kontras */}
             <div className="p-6 border-b border-gray-50 flex items-center gap-3 bg-ui-accent-yellow/10">
                 <button onClick={onClose} className="xl:hidden p-1 hover:bg-white/50 rounded-full">
                     <ArrowLeft className="w-5 h-5 text-ui-black" />
@@ -114,7 +130,6 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose }: any) => {
                 </table>
             </div>
             
-            {/* Total Footer yang Stand Out */}
             <div className="p-6 bg-gray-900 text-white mt-auto">
                 <div className="flex justify-between items-center">
                     <div>
@@ -123,7 +138,6 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose }: any) => {
                             Rp {new Intl.NumberFormat("id-ID").format(activity.items.reduce((a,b) => a + (b.price*b.quantity), 0))}
                         </span>
                     </div>
-                    {/* Fake action button */}
                     <button className="px-4 py-2 bg-ui-accent-yellow text-ui-black rounded-xl text-xs font-bold hover:brightness-110 transition-all">
                         Edit
                     </button>
@@ -131,15 +145,64 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose }: any) => {
             </div>
         </div>
     );
-}
+};
+
 
 // --- MAIN LAYOUT ---
 export default function DesktopDashboard() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
+    // State untuk Modal & Loading
+    const [showActivityModal, setShowActivityModal] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    // State force update (hack untuk re-render mock data)
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const activeEvent = MOCK_DATABASE.events.find(e => e.id === selectedEventId);
+
+    // Handler Add Activity
+    const handleCreateActivity = (data: {
+        title: string;
+        amount: number;
+        category: string;
+        payerName: string;
+        splitAmong: string[];
+    }) => {
+        if (!selectedEventId) return;
+        setIsLoading(true);
+
+        setTimeout(() => {
+            const newActivity = {
+                id: Math.random().toString(36).substr(2, 9),
+                title: data.title,
+                payerName: data.payerName,
+                // Create items based on split logic (Simplified: Divide equally)
+                items: data.splitAmong.map(participant => ({
+                     itemName: "Shared Split", // Generic name for split
+                     quantity: 1,
+                     price: Math.floor(data.amount / data.splitAmong.length), // Simple equal split
+                })),
+                participants: data.splitAmong
+            };
+
+            // 1. Update Mock Data
+            const eventIndex = MOCK_DATABASE.events.findIndex(e => e.id === selectedEventId);
+            if (eventIndex >= 0) {
+                 // @ts-ignore
+                MOCK_DATABASE.events[eventIndex].activities.unshift(newActivity);
+            }
+
+            // 2. Refresh UI
+            setIsLoading(false);
+            setShowActivityModal(false);
+            setSelectedActivityId(newActivity.id); 
+            setRefreshKey(prev => prev + 1); 
+
+        }, 800);
+    };
+
     return (
-        // BG-GRAY-50/50 agar kartu putih menonjol
         <div className="flex h-[calc(100vh-64px)] w-full gap-5 p-6 relative overflow-hidden bg-gray-50/50">
             
             {/* KOLOM 1: LIST EVENT */}
@@ -148,26 +211,27 @@ export default function DesktopDashboard() {
                 w-[35%] xl:w-[320px]
             `}>
                 <h2 className="text-2xl font-bold font-display text-ui-black mb-6 px-1">Dashboard</h2>
-                
-                {/* Kartu List dengan Background Putih Bersih */}
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 flex-1 overflow-hidden flex flex-col">
                     <EventList 
+                        key={refreshKey} // Biar list refresh juga kalo ada perubahan total harga nanti
                         activeId={selectedEventId}
                         onEventClick={(id) => {
                             setSelectedEventId(id);
                             setSelectedActivityId(null); 
-                        }}
+                        }} 
                     />
                 </div>
             </div>
 
-            {/* KOLOM 2 */}
+            {/* KOLOM 2: EVENT DETAIL */}
             {selectedEventId ? (
                 <div className="flex-1 flex flex-col pt-14 min-w-0 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]">
                     <EventDetailColumn 
+                        key={refreshKey} // Force Re-render saat data update
                         eventId={selectedEventId} 
                         activeActivityId={selectedActivityId}
                         onActivityClick={setSelectedActivityId}
+                        onAddClick={() => setShowActivityModal(true)} // Buka modal
                         onClose={() => {
                             setSelectedEventId(null);
                             setSelectedActivityId(null);
@@ -175,26 +239,25 @@ export default function DesktopDashboard() {
                     />
                 </div>
             ) : (
-                // EMPTY STATE YANG GANTENG
+                // EMPTY STATE
                 <div className="flex-1 pt-14 animate-in fade-in duration-700">
                     <div className="h-full flex flex-col items-center justify-center text-center border-2 border-dashed border-gray-200 rounded-3xl bg-white/50">
                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                             <Receipt className="w-10 h-10 text-gray-300" />
                         </div>
                         <h3 className="text-lg font-bold text-gray-500">No Event Selected</h3>
-                        <p className="text-sm text-gray-400 mt-1 max-w-xs">Select an event from the list on the left to view details and manage expenses.</p>
+                        <p className="text-sm text-gray-400 mt-1 max-w-xs">Select an event from the list on the left to view details.</p>
                     </div>
                 </div>
             )}
 
-            {/* KOLOM 3 */}
+            {/* KOLOM 3: ACTIVITY DETAIL */}
             {selectedEventId && selectedActivityId && (
                 <>
                     <div 
                         className="xl:hidden absolute inset-0 bg-ui-black/20 backdrop-blur-[2px] z-10 animate-in fade-in duration-300"
                         onClick={() => setSelectedActivityId(null)}
                     />
-
                     <div className={`
                         flex flex-col pt-14 z-20 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]
                         absolute right-6 top-0 bottom-6 w-[65%] max-w-112.5 shadow-2xl
@@ -208,6 +271,19 @@ export default function DesktopDashboard() {
                         />
                     </div>
                 </>
+            )}
+
+            {/* --- MODAL ADD ACTIVITY --- */}
+            {activeEvent && (
+                <NewActivityModal 
+                    isOpen={showActivityModal}
+                    onClose={() => setShowActivityModal(false)}
+                    onSubmit={handleCreateActivity}
+                    participants={activeEvent.participants.map((p: any) => 
+                        typeof p === 'string' ? p : p.name
+                    )}
+                    isLoading={isLoading}
+                />
             )}
         </div>
     );
