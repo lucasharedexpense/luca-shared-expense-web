@@ -156,8 +156,7 @@ export default function DesktopDashboard() {
                         onEventClick={(id) => {
                             setSelectedEventId(id);
                             setSelectedActivityId(null); 
-                        }} 
-                        onNewEventClick={() => console.log("New Event")} 
+                        }}
                     />
                 </div>
             </div>

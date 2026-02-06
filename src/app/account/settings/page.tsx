@@ -11,38 +11,54 @@ import {
   X, 
   Eye, 
   EyeOff, 
-  Camera 
+  Camera,
+  Loader2,
+  User,
+  Shield,
+  AlertTriangle
 } from "lucide-react";
 import { MOCK_DATABASE } from "@/lib/dummy-data";
 
 // --- HELPER: GET AVATAR URL ---
 const getAvatarUrl = (avatarName: string) => {
-  if (avatarName.startsWith("http")) return avatarName;
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName}`;
+  if (avatarName?.startsWith("http")) return avatarName;
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
 };
+
+// --- COMPONENT: SETTINGS GROUP CONTAINER (Agar Senada) ---
+const SettingsGroupContainer = ({ title, children }: { title: string, children: React.ReactNode }) => (
+  <div className="w-full bg-white rounded-2xl p-2 mb-4 shadow-sm border border-gray-100">
+    <h3 className="px-4 pt-3 pb-1 text-sm font-bold text-ui-accent-yellow uppercase tracking-wider">
+        {title}
+    </h3>
+    <div className="flex flex-col p-2 gap-2">
+        {children}
+    </div>
+  </div>
+);
 
 // --- COMPONENT: AVATAR SELECTION MODAL ---
 const AvatarSelectionModal = ({ isOpen, onClose, onSelect }: any) => {
   if (!isOpen) return null;
   
-  // Dummy list avatar options
-  const avatarOptions = ["avatar_1", "avatar_2", "avatar_3", "avatar_4", "avatar_5", "avatar_6"];
+  // Dummy list avatar options (Simulasi Seed Dicebear)
+  const avatarOptions = ["Felix", "Aneka", "Zoe", "Jack", "Molly", "Buster", "Bubba", "Sassy", "Bandit"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-lg">Choose Avatar</h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-bold text-lg text-ui-black">Choose Avatar</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <div className="grid grid-cols-3 gap-4">
-          {avatarOptions.map((av, idx) => (
+          {avatarOptions.map((seed, idx) => (
             <button 
               key={idx}
-              onClick={() => onSelect(av)}
-              className="aspect-square rounded-full overflow-hidden border-2 border-transparent hover:border-ui-accent-yellow transition-all bg-gray-100"
+              onClick={() => onSelect(seed)}
+              className="aspect-square rounded-full overflow-hidden bg-gray-50 border-2 border-transparent hover:border-ui-accent-yellow hover:scale-105 transition-all shadow-sm"
             >
-              <img src={getAvatarUrl(av)} className="w-full h-full object-cover" alt={av} />
+              <img src={getAvatarUrl(seed)} className="w-full h-full object-cover" alt={seed} />
             </button>
           ))}
         </div>
@@ -58,6 +74,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
   const [confirmPass, setConfirmPass] = useState("");
   const [showPass, setShowPass] = useState({ old: false, new: false, confirm: false });
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -70,98 +87,92 @@ const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
       setError("New passwords do not match");
       return;
     }
-    onConfirm(oldPass, newPass);
+    setIsLoading(true);
+    // Simulate delay inside modal
+    setTimeout(() => {
+        setIsLoading(false);
+        onConfirm(oldPass, newPass);
+    }, 1000);
   };
 
   const toggleShow = (field: 'old'|'new'|'confirm') => {
     setShowPass(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
+  const InputField = ({ label, value, onChange, show, onToggle }: any) => (
+      <div className="relative">
+        <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">{label}</label>
+        <input 
+            type={show ? "text" : "password"}
+            value={value}
+            onChange={(e) => { onChange(e.target.value); setError(""); }}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-ui-accent-yellow focus:ring-1 focus:ring-ui-accent-yellow transition-all"
+        />
+        <button onClick={onToggle} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-        <h3 className="font-bold text-xl mb-1">Change Password</h3>
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="flex justify-between items-center mb-2">
+             <h3 className="font-bold text-xl text-ui-black">Change Password</h3>
+             <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
         <p className="text-sm text-gray-500 mb-6">Enter your current and new password.</p>
 
         <div className="flex flex-col gap-4">
-            {/* Old Password */}
-            <div className="relative">
-                <input 
-                    type={showPass.old ? "text" : "password"}
-                    placeholder="Current Password"
-                    value={oldPass}
-                    onChange={(e) => { setOldPass(e.target.value); setError(""); }}
-                    className="w-full bg-ui-grey/20 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-ui-accent-yellow transition-all"
-                />
-                <button onClick={() => toggleShow('old')} className="absolute right-3 top-3 text-gray-400">
-                    {showPass.old ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-            </div>
-
-            {/* New Password */}
-            <div className="relative">
-                <input 
-                    type={showPass.new ? "text" : "password"}
-                    placeholder="New Password"
-                    value={newPass}
-                    onChange={(e) => { setNewPass(e.target.value); setError(""); }}
-                    className="w-full bg-ui-grey/20 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-ui-accent-yellow transition-all"
-                />
-                <button onClick={() => toggleShow('new')} className="absolute right-3 top-3 text-gray-400">
-                    {showPass.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-            </div>
-
-            {/* Confirm Password */}
-            <div className="relative">
-                <input 
-                    type={showPass.confirm ? "text" : "password"}
-                    placeholder="Confirm New Password"
-                    value={confirmPass}
-                    onChange={(e) => { setConfirmPass(e.target.value); setError(""); }}
-                    className="w-full bg-ui-grey/20 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-ui-accent-yellow transition-all"
-                />
-                <button onClick={() => toggleShow('confirm')} className="absolute right-3 top-3 text-gray-400">
-                    {showPass.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-            </div>
+            <InputField label="Current Password" value={oldPass} onChange={setOldPass} show={showPass.old} onToggle={() => toggleShow('old')} />
+            <InputField label="New Password" value={newPass} onChange={setNewPass} show={showPass.new} onToggle={() => toggleShow('new')} />
+            <InputField label="Confirm Password" value={confirmPass} onChange={setConfirmPass} show={showPass.confirm} onToggle={() => toggleShow('confirm')} />
             
-            {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+            {error && (
+                <div className="flex items-center gap-2 text-red-500 bg-red-50 p-3 rounded-xl">
+                    <AlertTriangle className="w-4 h-4" />
+                    <p className="text-xs font-bold">{error}</p>
+                </div>
+            )}
         </div>
 
-        <div className="flex gap-3 mt-6">
-            <button onClick={onClose} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-sm text-gray-600">Cancel</button>
-            <button onClick={handleSubmit} className="flex-1 py-3 bg-ui-accent-yellow rounded-xl font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20">Change</button>
-        </div>
+        <button 
+            onClick={handleSubmit} 
+            disabled={isLoading}
+            className="w-full mt-6 py-3 bg-ui-accent-yellow rounded-xl font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20 flex items-center justify-center gap-2 disabled:opacity-70"
+        >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Update Password
+        </button>
       </div>
     </div>
   );
 };
 
-// --- COMPONENT: CONFIRMATION MODAL (Generic) ---
+// --- COMPONENT: CONFIRMATION MODAL ---
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose, isDanger = false, confirmText = "Yes" }: any) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl text-center">
-        {isDanger ? (
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-                <Trash2 className="w-8 h-8" />
-            </div>
-        ) : (
-            <div className="w-16 h-16 bg-ui-accent-yellow/20 rounded-full flex items-center justify-center mx-auto mb-4 text-ui-black">
-                <LogOut className="w-8 h-8" />
-            </div>
-        )}
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center animate-in zoom-in-95">
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isDanger ? "bg-red-50 text-red-500" : "bg-ui-accent-yellow/20 text-ui-black"
+        }`}>
+            {isDanger ? <Trash2 className="w-8 h-8" /> : <LogOut className="w-8 h-8" />}
+        </div>
         
-        <h3 className="font-bold text-xl mb-2">{title}</h3>
-        <p className="text-sm text-gray-500 mb-6 leading-relaxed">{message}</p>
+        <h3 className="font-bold text-xl mb-2 text-ui-black">{title}</h3>
+        <p className="text-sm text-gray-500 mb-6 leading-relaxed px-4">{message}</p>
         
         <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 bg-gray-100 rounded-full font-bold text-sm text-gray-600">No</button>
+            <button onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-sm text-gray-600 transition-colors">Cancel</button>
             <button 
                 onClick={onConfirm} 
-                className={`flex-1 py-3 rounded-full font-bold text-sm text-white shadow-lg ${isDanger ? 'bg-red-500 shadow-red-500/30' : 'bg-ui-black shadow-black/30'}`}
+                className={`flex-1 py-3 rounded-full font-bold text-sm text-white shadow-lg transition-all ${
+                    isDanger 
+                    ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' 
+                    : 'bg-ui-black hover:bg-gray-800 shadow-black/30'
+                }`}
             >
                 {confirmText}
             </button>
@@ -175,10 +186,10 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose, isDanger = f
 export default function AccountSettingsPage() {
   const router = useRouter();
 
-  // State User Data (Initial load dari MOCK_DATABASE user pertama)
+  // State User Data
   const [user, setUser] = useState({
-    username: MOCK_DATABASE.username, // "Beben"
-    avatar: MOCK_DATABASE.avatarName, // "avatar_5"
+    username: MOCK_DATABASE.username,
+    avatar: MOCK_DATABASE.avatarName,
   });
 
   // UI States
@@ -203,12 +214,11 @@ export default function AccountSettingsPage() {
 
   // Handlers
   const handleUpdateAvatar = (avatarName: string) => {
+    setShowAvatarModal(false);
     setIsLoading(true);
-    // Simulate API Call
     setTimeout(() => {
         setUser(prev => ({ ...prev, avatar: avatarName }));
         setIsLoading(false);
-        setShowAvatarModal(false);
         setToastMessage("Profile picture updated");
     }, 800);
   };
@@ -225,35 +235,34 @@ export default function AccountSettingsPage() {
   };
 
   const handleUpdatePassword = (oldP: string, newP: string) => {
-    setIsLoading(true);
-    setTimeout(() => {
-        setIsLoading(false);
-        setShowPasswordModal(false);
-        setToastMessage("Password updated successfully");
-    }, 1000);
+    setShowPasswordModal(false);
+    setToastMessage("Password updated successfully");
   };
 
   const handleDeleteAccount = () => {
+    setShowDeleteModal(false);
     setIsLoading(true);
     setTimeout(() => {
         setIsLoading(false);
-        setShowDeleteModal(false);
-        router.push("/login"); // Redirect ke login/landing
+        router.push("/login");
     }, 1500);
   };
 
   const handleLogout = () => {
     setShowLogoutModal(false);
-    // Clear session logic here...
-    router.push("/login"); 
+    document.cookie = "luca_session=; path=/; max-age=0"; // Clear session cookie
+    router.push("/"); 
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white relative">
+    <div className="flex flex-col h-full min-h-screen w-full bg-ui-background relative">
       
       {/* HEADER */}
-      <div className="px-5 pt-6 pb-4 flex items-center gap-4 border-b border-gray-100">
-        <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
+      <div className="px-5 pt-6 pb-4 flex items-center gap-4 bg-white sticky top-0 z-30 border-b border-gray-50">
+        <button 
+            onClick={() => router.back()} 
+            className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors"
+        >
              <ArrowLeft className="w-5 h-5 text-ui-black" />
         </button>
         <h1 className="text-xl font-bold font-display text-ui-black">Account Settings</h1>
@@ -261,120 +270,119 @@ export default function AccountSettingsPage() {
 
       {/* CONTENT SCROLLABLE */}
       <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
+        <div className="p-5 flex flex-col gap-2">
         
-        {/* 1. PROFILE PICTURE SECTION */}
-        <div className="py-8 flex flex-col items-center justify-center bg-gray-50/50">
-            <div className="relative group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
-                <div className="w-32 h-32 rounded-full bg-[#FF8C42] border-4 border-ui-accent-yellow p-1 overflow-hidden shadow-xl shadow-orange-200">
-                     <img 
-                        src={getAvatarUrl(user.avatar)} 
-                        className="w-full h-full object-cover rounded-full bg-white" 
-                        alt="Profile"
-                     />
-                </div>
-                {/* Edit Badge */}
-                <div className="absolute bottom-1 right-1 bg-ui-black text-white p-2 rounded-full border-2 border-white shadow-md group-hover:scale-110 transition-transform">
-                    <Camera className="w-4 h-4" />
-                </div>
-            </div>
-            <p className="mt-3 text-sm font-medium text-gray-500">Tap to change profile picture</p>
-        </div>
-
-        <div className="px-6 mt-6">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Profile Information</h2>
-            
-            {/* 2. USERNAME SECTION */}
-            <div className="mb-6">
-                <label className="text-sm font-bold text-ui-black mb-2 block">Username</label>
-                
-                {!isEditingUsername ? (
-                    // Display Mode (Card)
-                    <div 
-                        onClick={() => setIsEditingUsername(true)}
-                        className="flex justify-between items-center bg-gray-50 border border-gray-100 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow transition-colors group"
-                    >
-                        <span className="font-medium text-ui-black">{user.username}</span>
-                        <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-ui-black transition-colors" />
+            {/* 1. PROFILE PICTURE CARD */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center mb-4">
+                <div className="relative group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
+                    <div className="w-28 h-28 rounded-full bg-gray-50 p-1 overflow-hidden shadow-inner">
+                         <img 
+                            src={getAvatarUrl(user.avatar)} 
+                            className="w-full h-full object-cover rounded-full" 
+                            alt="Profile"
+                         />
                     </div>
-                ) : (
-                    // Edit Mode (Input)
-                    <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
-                        <input 
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            className="w-full bg-gray-50 border border-ui-accent-yellow rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-ui-accent-yellow/20"
-                            autoFocus
-                        />
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={() => { setIsEditingUsername(false); setNewUsername(user.username); }}
-                                className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-sm text-gray-600"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={handleUpdateUsername}
-                                disabled={isLoading}
-                                className="flex-1 py-3 bg-ui-accent-yellow rounded-xl font-bold text-sm text-ui-black shadow-sm"
-                            >
-                                {isLoading ? "Saving..." : "Save"}
-                            </button>
+                    {/* Edit Badge */}
+                    <div className="absolute bottom-0 right-0 bg-ui-accent-yellow text-ui-black p-2 rounded-full border-4 border-white shadow-sm group-hover:scale-110 transition-transform">
+                        <Camera className="w-4 h-4" />
+                    </div>
+                </div>
+                <p className="mt-4 text-xs font-bold text-gray-400 uppercase tracking-wide">Tap to change avatar</p>
+            </div>
+
+            {/* 2. PERSONAL INFO GROUP */}
+            <SettingsGroupContainer title="Personal Information">
+                <div className="mb-2">
+                    <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">Username</label>
+                    
+                    {!isEditingUsername ? (
+                        // Display Mode
+                        <div 
+                            onClick={() => setIsEditingUsername(true)}
+                            className="w-full flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow hover:bg-white transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <User className="w-4 h-4 text-gray-400" />
+                                <span className="font-bold text-sm text-ui-black">{user.username}</span>
+                            </div>
+                            <Edit2 className="w-4 h-4 text-gray-300 group-hover:text-ui-black transition-colors" />
                         </div>
+                    ) : (
+                        // Edit Mode
+                        <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-1">
+                            <input 
+                                value={newUsername}
+                                onChange={(e) => setNewUsername(e.target.value)}
+                                className="w-full bg-white border border-ui-accent-yellow rounded-xl px-4 py-3 text-sm font-bold text-ui-black outline-none shadow-sm focus:ring-4 focus:ring-ui-accent-yellow/10 transition-all"
+                                autoFocus
+                            />
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => { setIsEditingUsername(false); setNewUsername(user.username); }}
+                                    className="flex-1 py-2.5 bg-gray-100 rounded-xl font-bold text-xs text-gray-500 hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleUpdateUsername}
+                                    disabled={isLoading}
+                                    className="flex-1 py-2.5 bg-ui-accent-yellow rounded-xl font-bold text-xs text-ui-black shadow-sm hover:brightness-105 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {isLoading && <Loader2 className="w-3 h-3 animate-spin"/>}
+                                    Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </SettingsGroupContainer>
+
+            {/* 3. SECURITY GROUP */}
+            <SettingsGroupContainer title="Security">
+                <div className="mb-2">
+                    <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">Password</label>
+                    <div 
+                        onClick={() => setShowPasswordModal(true)}
+                        className="w-full flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow hover:bg-white transition-all group"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Shield className="w-4 h-4 text-gray-400" />
+                            <span className="font-bold text-sm text-ui-black tracking-widest">••••••••</span>
+                        </div>
+                        <Edit2 className="w-4 h-4 text-gray-300 group-hover:text-ui-black transition-colors" />
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            </SettingsGroupContainer>
 
-        {/* DIVIDER */}
-        <div className="h-px bg-gray-100 mx-6 mb-6" />
-
-        <div className="px-6">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Security</h2>
-
-            {/* 3. PASSWORD SECTION */}
-            <div className="mb-6">
-                <label className="text-sm font-bold text-ui-black mb-2 block">Password</label>
-                <div 
-                    onClick={() => setShowPasswordModal(true)}
-                    className="flex justify-between items-center bg-gray-50 border border-gray-100 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow transition-colors group"
-                >
-                    <span className="font-medium text-ui-black tracking-widest">••••••••</span>
-                    <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-ui-black transition-colors" />
+            {/* 4. DANGER ZONE GROUP */}
+            <div className="w-full bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 mt-2">
+                <h3 className="text-sm font-bold text-red-500 uppercase tracking-wider mb-3 px-2">Danger Zone</h3>
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={() => setShowLogoutModal(true)}
+                        className="w-full py-4 rounded-xl bg-gray-50 text-ui-black font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors border border-gray-100"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        Log Out
+                    </button>
+                    
+                    <button 
+                        onClick={() => setShowDeleteModal(true)}
+                        className="w-full py-4 rounded-xl bg-red-50 text-red-500 font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-colors border border-red-100"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Account
+                    </button>
                 </div>
             </div>
+
         </div>
-
-        {/* DIVIDER */}
-        <div className="h-px bg-gray-100 mx-6 mb-6" />
-
-        <div className="px-6 pb-6">
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Actions</h2>
-
-            {/* 4. DANGER ACTIONS */}
-            <div className="flex flex-col gap-3">
-                <button 
-                    onClick={() => setShowDeleteModal(true)}
-                    className="w-full py-4 rounded-xl bg-red-50 text-red-500 font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
-                >
-                    Delete Account
-                </button>
-                
-                <button 
-                    onClick={() => setShowLogoutModal(true)}
-                    className="w-full py-4 rounded-xl bg-ui-accent-yellow text-ui-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-ui-accent-yellow/20 hover:bg-yellow-400 transition-colors"
-                >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                </button>
-            </div>
-        </div>
-
       </div>
 
       {/* SUCCESS TOAST */}
       {toastMessage && (
-        <div className="absolute bottom-8 left-6 right-6 bg-green-500 text-white p-4 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-100">
-            <div className="bg-white/20 p-1 rounded-full"><Check className="w-4 h-4" /></div>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-ui-black text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-50">
+            <div className="bg-green-500 rounded-full p-0.5"><Check className="w-3 h-3 text-white" strokeWidth={4} /></div>
             <span className="font-bold text-sm">{toastMessage}</span>
         </div>
       )}
@@ -394,11 +402,11 @@ export default function AccountSettingsPage() {
 
       <ConfirmModal 
         isOpen={showLogoutModal}
-        title="Keluar Akun?"
-        message="Kamu harus login ulang untuk mengakses data Luca."
+        title="Log Out?"
+        message="Are you sure you want to log out from this device?"
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleLogout}
-        confirmText="Yes, Logout"
+        confirmText="Yes, Log Out"
       />
 
       <ConfirmModal 
