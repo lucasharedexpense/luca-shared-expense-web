@@ -3,6 +3,14 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
+import { validateFirebaseEnv } from "./validate-env";
+
+// Validate environment on app load
+try {
+  validateFirebaseEnv();
+} catch (error) {
+  console.error("Environment validation failed:", error);
+}
 
 interface AuthContextType {
   user: User | null;

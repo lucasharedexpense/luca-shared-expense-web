@@ -12,11 +12,6 @@ import {
   AlertCircle 
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons";
-import { 
-  validateEmail, 
-  getPasswordError, 
-  getConfirmPasswordError 
-} from "@/lib/validation";
 import { signUpWithEmail, signInWithGoogle } from "@/lib/firebase-auth";
 
 // --- VALIDATION HELPER ---
@@ -109,28 +104,29 @@ export default function SignUpPage() {
     
     // Email Validation
     if (!email) {
-        setEmailError("Email tidak boleh kosong");
+        setEmailError("Email is required");
         isValid = false;
-    } else if (!validateEmail(email)) {
-        setEmailError("Format email tidak valid");
+    } else if (!ValidationUtils.isValidEmail(email)) {
+        setEmailError("Invalid email address");
         isValid = false;
     } else {
         setEmailError(null);
     }
 
     // Password Validation
-    const passwordError = getPasswordError(password);
-    if (passwordError) {
-        setPasswordError(passwordError);
+    if (!password) {
+        setPasswordError("Password is required");
+        isValid = false;
+    } else if (!ValidationUtils.isValidPassword(password)) {
+        setPasswordError("Password must be at least 6 characters");
         isValid = false;
     } else {
         setPasswordError(null);
     }
 
     // Confirm Password Validation
-    const confirmError = getConfirmPasswordError(password, confirmPassword);
-    if (confirmError) {
-        setConfirmError(confirmError);
+    if (confirmPassword !== password) {
+        setConfirmError("Passwords do not match");
         isValid = false;
     } else {
         setConfirmError(null);
@@ -214,17 +210,7 @@ export default function SignUpPage() {
         <div className="flex flex-col gap-4 mb-8">
             <CustomInputForm 
                 value={email}
-                onChange={(val) => { 
-                    setEmail(val);
-                    // Real-time email validation
-                    if (!val) {
-                        setEmailError("Email tidak boleh kosong");
-                    } else if (!validateEmail(val)) {
-                        setEmailError("Format email tidak valid");
-                    } else {
-                        setEmailError(null);
-                    }
-                }}
+                onChange={(val) => { setEmail(val); setEmailError(null); }}
                 placeholder="Email Address"
                 icon={<Mail className="w-4 h-4" />}
                 error={emailError}
@@ -232,18 +218,7 @@ export default function SignUpPage() {
 
             <CustomInputForm 
                 value={password}
-                onChange={(val) => { 
-                    setPassword(val);
-                    // Real-time password validation
-                    const error = getPasswordError(val);
-                    setPasswordError(error);
-                    
-                    // Re-validate confirm password if it has value
-                    if (confirmPassword) {
-                        const confirmError = getConfirmPasswordError(val, confirmPassword);
-                        setConfirmError(confirmError);
-                    }
-                }}
+                onChange={(val) => { setPassword(val); setPasswordError(null); }}
                 placeholder="Password"
                 icon={<Lock className="w-4 h-4" />}
                 isPassword={true}
@@ -252,12 +227,7 @@ export default function SignUpPage() {
 
             <CustomInputForm 
                 value={confirmPassword}
-                onChange={(val) => { 
-                    setConfirmPassword(val);
-                    // Real-time confirm password validation
-                    const error = getConfirmPasswordError(password, val);
-                    setConfirmError(error);
-                }}
+                onChange={(val) => { setConfirmPassword(val); setConfirmError(null); }}
                 placeholder="Confirm Password"
                 icon={<Lock className="w-4 h-4" />}
                 isPassword={true}
