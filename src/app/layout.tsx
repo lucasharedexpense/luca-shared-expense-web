@@ -1,7 +1,7 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import MainLayout from "@/components/layout/MainLayout"; // <--- GANTI IMPORT INI
+import MainLayout from "@/components/layout/MainLayout";
+import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "Luca App",
@@ -15,11 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-ui-background"> 
-        {/* Bungkus children dengan MainLayout */}
-        <MainLayout>
-          {children}
-        </MainLayout>
+      <body className="bg-ui-background">
+        <AuthProvider>
+          <MainLayout>
+            {children}
+          </MainLayout>
+        </AuthProvider>
       </body>
     </html>
   );
