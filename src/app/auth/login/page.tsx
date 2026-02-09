@@ -11,6 +11,7 @@ import {
   Loader2, 
   AlertCircle 
 } from "lucide-react";
+import { validateEmail, getPasswordError } from "@/lib/validation";
 import { loginWithEmail, signInWithGoogle } from "@/lib/firebase-auth";
 
 // --- VALIDATION UTILS ---
@@ -99,21 +100,21 @@ export default function LoginPage() {
   const validate = () => {
     let isValid = true;
     
+    // Validate Email
     if (!email) {
-        setEmailError("Email is required");
+        setEmailError("Email tidak boleh kosong");
         isValid = false;
-    } else if (!ValidationUtils.isValidEmail(email)) {
-        setEmailError("Invalid email address");
+    } else if (!validateEmail(email)) {
+        setEmailError("Format email tidak valid");
         isValid = false;
     } else {
         setEmailError(null);
     }
 
-    if (!password) {
-        setPasswordError("Password is required");
-        isValid = false;
-    } else if (!ValidationUtils.isValidPassword(password)) {
-        setPasswordError("Password must be at least 6 characters");
+    // Validate Password
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+        setPasswordError(passwordError);
         isValid = false;
     } else {
         setPasswordError(null);
@@ -179,7 +180,17 @@ export default function LoginPage() {
         <div className="flex flex-col gap-4">
             <CustomInputForm 
                 value={email}
-                onChange={(val) => { setEmail(val); setEmailError(null); }}
+                onChange={(val) => { 
+                    setEmail(val);
+                    // Real-time email validation
+                    if (!val) {
+                        setEmailError("Email tidak boleh kosong");
+                    } else if (!validateEmail(val)) {
+                        setEmailError("Format email tidak valid");
+                    } else {
+                        setEmailError(null);
+                    }
+                }}
                 placeholder="Email Address"
                 icon={<Mail className="w-4 h-4" />}
                 error={emailError}
@@ -187,7 +198,12 @@ export default function LoginPage() {
 
             <CustomInputForm 
                 value={password}
-                onChange={(val) => { setPassword(val); setPasswordError(null); }}
+                onChange={(val) => { 
+                    setPassword(val);
+                    // Real-time password validation
+                    const error = getPasswordError(val);
+                    setPasswordError(error);
+                }}
                 placeholder="Password"
                 icon={<Lock className="w-4 h-4" />}
                 isPassword={true}
