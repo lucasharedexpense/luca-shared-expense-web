@@ -11,13 +11,12 @@ import {
   Loader2, 
   AlertCircle 
 } from "lucide-react";
-import { LucaLogo } from "@/components/ui/Icons"; // Pastikan icon ini ada
-
-// --- VALIDATION HELPER ---
-const ValidationUtils = {
-  isValidEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-  isValidPassword: (password: string) => password.length >= 6
-};
+import { LucaLogo } from "@/components/ui/Icons";
+import { 
+  validateEmail, 
+  getPasswordError, 
+  getConfirmPasswordError 
+} from "@/lib/validation";
 
 // --- COMPONENT: CUSTOM INPUT FORM ---
 interface CustomInputProps {
@@ -102,29 +101,28 @@ export default function SignUpPage() {
     
     // Email Validation
     if (!email) {
-        setEmailError("Email is required");
+        setEmailError("Email tidak boleh kosong");
         isValid = false;
-    } else if (!ValidationUtils.isValidEmail(email)) {
-        setEmailError("Invalid email address");
+    } else if (!validateEmail(email)) {
+        setEmailError("Format email tidak valid");
         isValid = false;
     } else {
         setEmailError(null);
     }
 
     // Password Validation
-    if (!password) {
-        setPasswordError("Password is required");
-        isValid = false;
-    } else if (!ValidationUtils.isValidPassword(password)) {
-        setPasswordError("Password must be at least 6 characters");
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+        setPasswordError(passwordError);
         isValid = false;
     } else {
         setPasswordError(null);
     }
 
     // Confirm Password Validation
-    if (confirmPassword !== password) {
-        setConfirmError("Passwords do not match");
+    const confirmError = getConfirmPasswordError(password, confirmPassword);
+    if (confirmError) {
+        setConfirmError(confirmError);
         isValid = false;
     } else {
         setConfirmError(null);
@@ -198,7 +196,17 @@ export default function SignUpPage() {
         <div className="flex flex-col gap-4 mb-8">
             <CustomInputForm 
                 value={email}
-                onChange={(val) => { setEmail(val); setEmailError(null); }}
+                onChange={(val) => { 
+                    setEmail(val);
+                    // Real-time email validation
+                    if (!val) {
+                        setEmailError("Email tidak boleh kosong");
+                    } else if (!validateEmail(val)) {
+                        setEmailError("Format email tidak valid");
+                    } else {
+                        setEmailError(null);
+                    }
+                }}
                 placeholder="Email Address"
                 icon={<Mail className="w-4 h-4" />}
                 error={emailError}
@@ -206,7 +214,18 @@ export default function SignUpPage() {
 
             <CustomInputForm 
                 value={password}
-                onChange={(val) => { setPassword(val); setPasswordError(null); }}
+                onChange={(val) => { 
+                    setPassword(val);
+                    // Real-time password validation
+                    const error = getPasswordError(val);
+                    setPasswordError(error);
+                    
+                    // Re-validate confirm password if it has value
+                    if (confirmPassword) {
+                        const confirmError = getConfirmPasswordError(val, confirmPassword);
+                        setConfirmError(confirmError);
+                    }
+                }}
                 placeholder="Password"
                 icon={<Lock className="w-4 h-4" />}
                 isPassword={true}
@@ -215,7 +234,12 @@ export default function SignUpPage() {
 
             <CustomInputForm 
                 value={confirmPassword}
-                onChange={(val) => { setConfirmPassword(val); setConfirmError(null); }}
+                onChange={(val) => { 
+                    setConfirmPassword(val);
+                    // Real-time confirm password validation
+                    const error = getConfirmPasswordError(password, val);
+                    setConfirmError(error);
+                }}
                 placeholder="Confirm Password"
                 icon={<Lock className="w-4 h-4" />}
                 isPassword={true}
