@@ -12,13 +12,8 @@ import {
   AlertCircle 
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons";
-import { signUpWithEmail, signInWithGoogle } from "@/lib/firebase-auth";
-
-// --- VALIDATION HELPER ---
-const ValidationUtils = {
-  isValidEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-  isValidPassword: (password: string) => password.length >= 6
-};
+import { signInWithGoogle } from "@/lib/firebase-auth";
+import { validateEmail, getPasswordError, getConfirmPasswordError } from "@/lib/validation";
 
 // --- COMPONENT: CUSTOM INPUT FORM ---
 interface CustomInputProps {
@@ -104,29 +99,28 @@ export default function SignUpPage() {
     
     // Email Validation
     if (!email) {
-        setEmailError("Email is required");
+        setEmailError("Email tidak boleh kosong");
         isValid = false;
-    } else if (!ValidationUtils.isValidEmail(email)) {
-        setEmailError("Invalid email address");
+    } else if (!validateEmail(email)) {
+        setEmailError("Format email tidak valid");
         isValid = false;
     } else {
         setEmailError(null);
     }
 
     // Password Validation
-    if (!password) {
-        setPasswordError("Password is required");
-        isValid = false;
-    } else if (!ValidationUtils.isValidPassword(password)) {
-        setPasswordError("Password must be at least 6 characters");
+    const pwError = getPasswordError(password);
+    if (pwError) {
+        setPasswordError(pwError);
         isValid = false;
     } else {
         setPasswordError(null);
     }
 
     // Confirm Password Validation
-    if (confirmPassword !== password) {
-        setConfirmError("Passwords do not match");
+    const confirmErr = getConfirmPasswordError(password, confirmPassword);
+    if (confirmErr) {
+        setConfirmError(confirmErr);
         isValid = false;
     } else {
         setConfirmError(null);
@@ -135,7 +129,7 @@ export default function SignUpPage() {
     return isValid;
   };
 
-  // Handle Sign Up
+  // Handle Sign Up → Redirect ke halaman verifikasi OTP
   const handleSignUp = async () => {
     if (!validate()) return;
     
@@ -143,9 +137,27 @@ export default function SignUpPage() {
     setGlobalError(null);
 
     try {
-        await signUpWithEmail(email, password);
-        // Success -> Redirect to fill profile
-        router.push("/auth/fill-profile");
+        // Cek dulu apakah email sudah terdaftar di Firebase
+        const { fetchSignInMethodsForEmail } = await import("firebase/auth");
+        const { auth } = await import("@/lib/firebase");
+        const methods = await fetchSignInMethodsForEmail(auth, email);
+        
+        if (methods.length > 0) {
+          setGlobalError("Email already in use. Please use a different email.");
+          setIsLoading(false);
+          return;
+        }
+    } catch {
+        // fetchSignInMethods bisa error di beberapa config Firebase, skip saja
+    }
+
+    try {
+        // Simpan email & password di sessionStorage untuk dipakai setelah OTP verified
+        sessionStorage.setItem("otp_email", email);
+        sessionStorage.setItem("otp_password", password);
+
+        // Redirect ke halaman verifikasi email
+        router.push("/auth/verify-email");
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Sign up failed. Please try again.";
