@@ -132,6 +132,8 @@ export default function LoginPage() {
 
     try {
         await loginWithEmail(email, password);
+        // Set session cookie agar middleware tahu user sudah login
+        document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
         // Success -> Redirect to home
         router.push("/home");
     } catch (error) {
