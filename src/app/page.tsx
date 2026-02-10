@@ -2,15 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LucaLogo } from "@/components/ui/Icons"; // Pastikan icon ini ada
-// import { auth, googleProvider } from "@/lib/firebase"; // Uncomment jika firebase sudah setup
-// import { signInWithPopup } from "firebase/auth";
+import { LucaLogo } from "@/components/ui/Icons";
+import { signInWithGoogle } from "@/lib/firebase-auth";
+import { AlertCircle } from "lucide-react";
 
 // --- COMPONENT: SOCIAL BUTTON ---
-const SocialButton = ({ text, icon, onClick }: { text: string, icon: React.ReactNode, onClick: () => void }) => (
+const SocialButton = ({ text, icon, onClick, disabled }: { text: string, icon: React.ReactNode, onClick: () => void, disabled?: boolean }) => (
   <button
     onClick={onClick}
-    className="w-full h-12.5 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-50 active:bg-gray-100 transition-all group"
+    disabled={disabled}
+    className="w-full h-12.5 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-50 active:bg-gray-100 transition-all group disabled:opacity-70 disabled:cursor-not-allowed"
   >
     <div className="w-6 h-6 mr-3 flex items-center justify-center">
       {icon}
@@ -23,39 +24,42 @@ const SocialButton = ({ text, icon, onClick }: { text: string, icon: React.React
 export default function GreetingPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // --- HANDLERS ---
   
   const handleGoogleLogin = async () => {
+    if (isLoading) return;
     setIsLoading(true);
+    setErrorMsg(null);
     try {
-      // --- REAL FIREBASE LOGIC (Uncomment kalo config firebase udah ada) ---
-      /*
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const user = await signInWithGoogle();
       
-      // Cek apakah user baru (Logic Backend/Firestore biasanya)
+      // Set session cookie agar middleware tahu user sudah login
+      document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
+      
+      // Cek apakah user baru
       const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
       
       if (isNewUser) {
-         router.push("/auth/fill-profile"); // Ke halaman isi profile
+         router.push("/auth/fill-profile");
       } else {
-         router.push("/home"); // Ke Dashboard
+         router.push("/home");
       }
-      */
-
-      // --- MOCK LOGIC (Buat Demo UI) ---
-      console.log("Google Login Clicked");
-      setTimeout(() => {
-        // Anggap user lama -> Masuk Home
-        // Anggap user baru -> router.push("/auth/fill-profile");
-        router.push("/home"); 
-        setIsLoading(false);
-      }, 1000);
 
     } catch (error) {
-      console.error("Login Failed", error);
-      setIsLoading(false);
+      const msg = error instanceof Error ? error.message : "";
+      if (msg !== "__CANCELLED_POPUP__") {
+        // Show error while button is still disabled
+        setErrorMsg(msg);
+        // Re-enable button & dismiss after 2s
+        setTimeout(() => {
+          setErrorMsg(null);
+          setIsLoading(false);
+        }, 2000);
+      } else {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -117,10 +121,19 @@ export default function GreetingPage() {
             <div className="h-px bg-gray-200 flex-1" />
         </div>
 
+        {/* Error Message */}
+        {errorMsg && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium flex items-center gap-2 animate-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {errorMsg}
+            </div>
+        )}
+
         {/* 6. SOCIAL BUTTON */}
         <SocialButton 
             text="Continue with Google"
             onClick={handleGoogleLogin}
+            disabled={isLoading}
             icon={
                 // Google Icon SVG
                 <svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">

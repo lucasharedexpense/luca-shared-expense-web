@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { logout } from "@/lib/firebase-auth";
 import { 
   LayoutDashboard, 
   User, 
@@ -22,8 +23,16 @@ export default function SidebarDesktop() {
   const router = useRouter();
   const pathname = usePathname();
   const [expandAccount, setExpandAccount] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const isActive = (path: string) => pathname === path;
+
+  const handleLogout = async () => {
+    document.cookie = "luca_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    await logout();
+    setShowLogoutDialog(false);
+    router.replace("/");
+  };
 
   return (
     <div className="w-64 h-screen bg-white border-r border-gray-100 flex flex-col sticky top-0 left-0 overflow-y-auto">
@@ -116,12 +125,47 @@ export default function SidebarDesktop() {
          />
          <div 
             className="mt-2 w-full flex items-center px-3 py-3 rounded-xl transition-all text-sm font-bold text-red-500 hover:bg-red-50 cursor-pointer" 
-            onClick={() => router.push("/login")}
+            onClick={() => setShowLogoutDialog(true)}
          >
             <LogOut className="w-5 h-5" />
             <span className="ml-3">Logout</span>
          </div>
       </div>
+
+      {/* LOGOUT CONFIRMATION DIALOG */}
+      {showLogoutDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowLogoutDialog(false)}
+          />
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 relative z-10 shadow-2xl">
+            <div className="flex justify-center mb-4">
+              <div className="w-18 h-18 rounded-full bg-red-50 flex items-center justify-center p-4">
+                <LogOut className="w-8 h-8 text-red-500 ml-1" />
+              </div>
+            </div>
+            <h2 className="text-xl font-bold text-ui-black text-center mb-2">Log Out?</h2>
+            <p className="text-sm text-gray-500 text-center leading-relaxed mb-6">
+              You will need to sign in again to access your account.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutDialog(false)}
+                className="flex-1 h-12 rounded-full bg-gray-100 text-ui-black font-semibold text-sm hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 h-12 rounded-full bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-all shadow-md active:scale-95"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
