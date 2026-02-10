@@ -1,20 +1,26 @@
 /**
  * Environment validation script
  * Run this on app startup to verify Firebase config
+ *
+ * Note: Next.js only supports static access to process.env (e.g. process.env.NEXT_PUBLIC_X).
+ * Dynamic access like process.env[varName] does NOT work on client-side.
  */
 
 export const validateFirebaseEnv = () => {
-  const requiredVars = [
-    "NEXT_PUBLIC_FIREBASE_API_KEY",
-    "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-    "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-    "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-    "NEXT_PUBLIC_FIREBASE_APP_ID",
-    "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
-  ];
+  // Must use direct static access for Next.js client-side compatibility
+  const envMap: Record<string, string | undefined> = {
+    NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  };
 
-  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+  const missingVars = Object.entries(envMap)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
 
   if (missingVars.length > 0) {
     console.error(
