@@ -23,8 +23,6 @@ export const addDocument = async (
   try {
     const docRef = await addDoc(collection(db, collectionName), {
       ...data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     });
     return docRef.id;
   } catch (error) {

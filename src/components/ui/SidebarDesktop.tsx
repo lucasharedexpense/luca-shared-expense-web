@@ -120,7 +120,7 @@ export default function SidebarDesktop() {
             onClick={async () => {
               document.cookie = "luca_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
               await logout();
-              router.replace("/auth/signup");
+              router.replace("/");
             }}
          >
             <LogOut className="w-5 h-5" />

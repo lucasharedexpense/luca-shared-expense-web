@@ -10,6 +10,9 @@ import {
   Loader2, 
   Check 
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { queryDocuments, updateDocument } from "@/lib/firebase-db";
+import { where } from "firebase/firestore";
 
 // --- HELPER: AVATAR URL GENERATOR ---
 // Menggunakan Dicebear untuk generate avatar berdasarkan string
@@ -77,29 +80,42 @@ const AvatarSelectionModal = ({ isOpen, onClose, currentSelection, onSelect }: A
 // --- MAIN PAGE ---
 export default function FillProfilePage() {
   const router = useRouter();
+  const { user } = useAuth();
 
   // State
   const [username, setUsername] = useState("");
-  const [selectedAvatar, setSelectedAvatar] = useState(""); // Kosong = belum pilih
+  const [selectedAvatar, setSelectedAvatar] = useState("avatar_1");
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Handle Create Account
   const handleCreateAccount = async () => {
     if (!username.trim()) {
-        alert("Username wajib diisi!"); // Bisa diganti toast custom
+        alert("Username wajib diisi!");
+        return;
+    }
+    if (!user) {
+        alert("No authenticated user found. Please sign in again.");
+        router.replace("/auth/signup");
         return;
     }
 
     setIsLoading(true);
 
     try {
-        // --- SIMULASI API UPDATE PROFILE ---
-        console.log("Updating profile:", { username, avatar: selectedAvatar });
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Find the user document by uid
+        const userDocs = await queryDocuments("users", [where("uid", "==", user.uid)]);
+        
+        if (userDocs.length > 0) {
+          // Update existing doc with username & avatar from this form
+          await updateDocument("users", userDocs[0].id, {
+            username: username.trim(),
+            avatarName: selectedAvatar || "avatar_1",
+          });
+        }
 
-        // Pastikan cookie session aman (jika belum di set di signup)
-        document.cookie = "luca_session=true; path=/; max-age=86400";
+        // Pastikan cookie session aman
+        document.cookie = "luca_session=true; path=/; max-age=604800";
         
         // Redirect ke Home
         router.push("/home");

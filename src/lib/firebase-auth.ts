@@ -59,9 +59,9 @@ export const signUpWithEmail = async (
     await addDocument("users", {
       uid: user.uid,
       email: user.email,
-      displayName: displayName || user.email?.split("@")[0],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
-      createdAt: new Date(),
+      username: displayName || user.email?.split("@")[0],
+      avatarName: "avatar_1",
+      createdAt: Date.now(),
     });
 
     return user;
@@ -125,9 +125,9 @@ const ensureUserDocument = async (user: User) => {
       await addDocument("users", {
         uid: user.uid,
         email: user.email,
-        displayName: user.displayName || user.email?.split("@")[0],
-        avatar: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
-        createdAt: new Date(),
+        username: user.displayName || user.email?.split("@")[0],
+        avatarName: "avatar_1",
+        createdAt: Date.now(),
       });
     }
   } catch (error) {

@@ -148,11 +148,17 @@ export default function LoginPage() {
     setGlobalError(null);
 
     try {
-        await signInWithGoogle();
+        const user = await signInWithGoogle();
         // Set session cookie agar middleware tahu user sudah login
         document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
-        // Success -> Redirect to home
-        router.push("/home");
+        
+        // Cek apakah user baru
+        const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
+        if (isNewUser) {
+          router.push("/auth/fill-profile");
+        } else {
+          router.push("/home");
+        }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Google sign-in failed. Please try again.";
         if (errorMessage !== "__CANCELLED_POPUP__") {

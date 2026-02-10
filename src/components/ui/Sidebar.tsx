@@ -14,8 +14,9 @@ import {
   ChevronUp 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LucaLogo } from "./Icons"; // Pake icon yang tadi kita bikin
+import { LucaLogo } from "./Icons";
 import { useRouter } from "next/navigation";
+import { logout } from "@/lib/firebase-auth";
 
 // --- PROPS DEFINITION ---
 interface SidebarProps {
@@ -48,21 +49,22 @@ export default function Sidebar({
 
   const router = useRouter();
 
-  const handleLogoutProcess = () => {
+  const handleLogoutProcess = async () => {
     // 1. Hapus Cookie 'luca_session'
-    // Kita set expire-nya ke masa lalu agar browser menghapusnya
     document.cookie = "luca_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-    // 2. Tutup Dialog & Sidebar
+    // 2. Firebase sign out
+    await logout();
+
+    // 3. Tutup Dialog & Sidebar
     setShowLogoutDialog(false);
     onClose();
 
-    // 3. Panggil callback eksternal jika ada (opsional)
+    // 4. Panggil callback eksternal jika ada (opsional)
     if (onLogoutClick) onLogoutClick();
 
-    // 4. Redirect ke Halaman Signup/Login
-    router.replace("/auth/signup"); 
-    // Pakai 'replace' biar user gabisa back ke dashboard
+    // 5. Redirect ke Halaman Greeting
+    router.replace("/");
   };
 
   return (
