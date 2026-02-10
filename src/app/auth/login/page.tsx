@@ -143,17 +143,26 @@ export default function LoginPage() {
 
   // Handle Google Sign In
   const handleGoogleSignIn = async () => {
+    if (isGoogleLoading || isLoading) return;
     setIsGoogleLoading(true);
     setGlobalError(null);
 
     try {
         await signInWithGoogle();
+        // Set session cookie agar middleware tahu user sudah login
+        document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
         // Success -> Redirect to home
         router.push("/home");
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Google sign-in failed. Please try again.";
-        setGlobalError(errorMessage);
-        setIsGoogleLoading(false);
+        if (errorMessage !== "__CANCELLED_POPUP__") {
+          // Show error while button is still disabled
+          setGlobalError(errorMessage);
+          // Re-enable button after 2s
+          setTimeout(() => setIsGoogleLoading(false), 2000);
+        } else {
+          setIsGoogleLoading(false);
+        }
     }
   };
 

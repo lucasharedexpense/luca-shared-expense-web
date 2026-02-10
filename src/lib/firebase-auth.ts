@@ -32,7 +32,9 @@ const getAuthErrorMessage = (error: AuthError): string => {
     case "auth/too-many-requests":
       return "Too many login attempts. Please try again later.";
     case "auth/popup-closed-by-user":
-      return "Login cancelled.";
+      return "Login cancelled. Please wait before trying again.";
+    case "auth/cancelled-popup-request":
+      return "__CANCELLED_POPUP__"; // sentinel – callers should silently ignore
     case "auth/popup-blocked":
       return "Popup was blocked. Please allow popups for this site.";
     default:
@@ -87,16 +89,38 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
 // SIGN IN WITH GOOGLE
 // ============================================================================
 
+// Module-level lock to prevent concurrent signInWithPopup calls
+// (React Strict Mode double-mount or rapid clicks)
+let _googlePopupInFlight = false;
+
 export const signInWithGoogle = async (): Promise<User> => {
+  // Guard: if a popup is already open, wait for it instead of opening another
+  if (_googlePopupInFlight) {
+    throw new Error("__CANCELLED_POPUP__");
+  }
+  _googlePopupInFlight = true;
+
   try {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
     const user = userCredential.user;
 
-    // Check if user exists in Firestore
-    const existingUsers = await queryDocuments("users", [where("uid", "==", user.uid)]);
+    // Fire-and-forget: create user doc in Firestore if needed (don't block redirect)
+    ensureUserDocument(user);
 
-    // If user doesn't exist, create user document
+    return user;
+  } catch (error) {
+    const authError = error as AuthError;
+    throw new Error(getAuthErrorMessage(authError));
+  } finally {
+    _googlePopupInFlight = false;
+  }
+};
+
+// Background helper — ensures a Firestore user doc exists without blocking sign-in
+const ensureUserDocument = async (user: User) => {
+  try {
+    const existingUsers = await queryDocuments("users", [where("uid", "==", user.uid)]);
     if (existingUsers.length === 0) {
       await addDocument("users", {
         uid: user.uid,
@@ -106,11 +130,8 @@ export const signInWithGoogle = async (): Promise<User> => {
         createdAt: new Date(),
       });
     }
-
-    return user;
   } catch (error) {
-    const authError = error as AuthError;
-    throw new Error(getAuthErrorMessage(authError));
+    console.error("Error ensuring user document:", error);
   }
 };
 

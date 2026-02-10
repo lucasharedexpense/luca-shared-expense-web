@@ -60,8 +60,8 @@ export default function Sidebar({
     // 3. Panggil callback eksternal jika ada (opsional)
     if (onLogoutClick) onLogoutClick();
 
-    // 4. Redirect ke Halaman Greeting (/) atau Login
-    router.replace("/"); 
+    // 4. Redirect ke Halaman Signup/Login
+    router.replace("/auth/signup"); 
     // Pakai 'replace' biar user gabisa back ke dashboard
   };
 

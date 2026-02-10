@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { logout } from "@/lib/firebase-auth";
 import { 
   LayoutDashboard, 
   User, 
@@ -116,7 +117,11 @@ export default function SidebarDesktop() {
          />
          <div 
             className="mt-2 w-full flex items-center px-3 py-3 rounded-xl transition-all text-sm font-bold text-red-500 hover:bg-red-50 cursor-pointer" 
-            onClick={() => router.push("/login")}
+            onClick={async () => {
+              document.cookie = "luca_session=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+              await logout();
+              router.replace("/auth/signup");
+            }}
          >
             <LogOut className="w-5 h-5" />
             <span className="ml-3">Logout</span>
