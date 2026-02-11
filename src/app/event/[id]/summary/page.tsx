@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Share2, RefreshCw, ArrowRight, Check, ChevronDown, ChevronUp } from "lucide-react";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities } from "@/lib/firestore";
 
 // --- TYPES ---
 interface Settlement {
@@ -278,25 +279,62 @@ const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDeta
 export default function SummaryPage() {
     const router = useRouter();
     const params = useParams();
+    const { userId, loading: authLoading } = useAuth();
     
     const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
     const [currentTab, setCurrentTab] = useState<'SETTLEMENT' | 'DETAILS'>('SETTLEMENT');
+    const [eventData, setEventData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     
     // Local state untuk tracking settlement yang sudah dibayar (checkbox)
     const [paidSettlementIds, setPaidSettlementIds] = useState<string[]>([]);
 
-    // 1. Load Data & Calculate
-    const { eventData, summaryData } = useMemo(() => {
-        const event = MOCK_DATABASE.events.find(e => e.id === eventId);
-        if (!event) return { eventData: null, summaryData: null };
-        
-        return { 
-            eventData: event, 
-            summaryData: calculateSummary(event) 
-        };
-    }, [eventId]);
+    // Fetch event data dari Firebase
+    useEffect(() => {
+        const fetchEvent = async () => {
+            if (authLoading) return;
+            if (!userId || !eventId) {
+                setLoading(false);
+                return;
+            }
 
-    if (!eventData || !summaryData) return <div className="p-10 text-center">Event not found</div>;
+            try {
+                setLoading(true);
+                const allEvents = await getEventsWithActivities(userId);
+                const event = allEvents.find((e: any) => e.id === eventId);
+                setEventData(event || null);
+            } catch (error) {
+                console.error("Error fetching event:", error);
+                setEventData(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEvent();
+    }, [userId, eventId, authLoading]);
+
+    // Calculate summary dari fetched data
+    const summaryData = useMemo(() => {
+        if (!eventData) return null;
+        return calculateSummary(eventData);
+    }, [eventData]);
+
+    if (!eventData || !summaryData) return (
+        <div className="p-10 text-center bg-ui-background h-full flex flex-col items-center justify-center gap-4">
+            {loading ? (
+                <>
+                    <div className="w-12 h-12 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-ui-dark-grey">Loading summary...</p>
+                </>
+            ) : (
+                <>
+                    <p className="text-ui-dark-grey font-bold">Event not found</p>
+                    <button onClick={() => router.back()} className="text-ui-accent-yellow font-bold hover:underline">Go Back</button>
+                </>
+            )}
+        </div>
+    );
 
     const togglePaid = (id: string) => {
         if (paidSettlementIds.includes(id)) {

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Edit2, Receipt, Sparkles, Trash2, User } from "lucide-react";
-import { Item, MOCK_DATABASE } from "@/lib/dummy-data";
+import { Item } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities } from "@/lib/firestore";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
 
@@ -54,31 +56,67 @@ function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
 
 export default function ActivityDetailPage() {
   const router = useRouter();
-  
-  // 1. SOLUSI ERROR "params is a Promise":
-  // Kita pakai hook useParams() yang aman untuk Client Component
   const params = useParams();
+  const { userId, loading: authLoading } = useAuth();
   
-  // Unwrap params (karena bisa string atau array)
+  // State
+  const [eventData, setEventData] = useState<any>(null);
+  const [activityData, setActivityData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEqualSplit, setIsEqualSplit] = useState(false);
+  
+  // Unwrap params
   const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const activityId = Array.isArray(params?.activityid) ? params.activityid[0] : params?.activityid;
 
-  // 2. CARI DATA DARI MOCK DATABASE
-  const eventData = MOCK_DATABASE.events.find((e) => e.id === eventId);
-  const activityData = eventData?.activities.find((a) => a.id === activityId);
+  // Fetch data dari Firebase
+  useEffect(() => {
+    const fetchData = async () => {
+      if (authLoading) return;
+      if (!userId || !eventId || !activityId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const allEvents = await getEventsWithActivities(userId);
+        const event = allEvents.find((e: any) => e.id === eventId);
+        const activity = event?.activities.find((a: any) => a.id === activityId);
+        
+        setEventData(event || null);
+        setActivityData(activity || null);
+      } catch (error) {
+        console.error("Error fetching activity:", error);
+        setEventData(null);
+        setActivityData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId, eventId, activityId, authLoading]);
 
   // Helper untuk cari avatar user berdasarkan nama
-  // (Di real app, sebaiknya simpan userId di item, bukan nama)
   const getAvatarByName = (name: string) => {
     // Cari di partisipan activity dulu
-    const participant = activityData?.participants.find(p => p.name === name);
-    if (participant) return participant.avatarName;
+    const participant = activityData?.participants?.find((p: any) => p.name === name);
+    if (participant) {
+      return participant.avatarName?.startsWith("http") 
+        ? participant.avatarName 
+        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
+    }
     
     // Kalau ga ada, cari di event level
-    const eventParticipant = eventData?.participants.find(p => p.name === name);
-    if (eventParticipant) return eventParticipant.avatarName;
+    const eventParticipant = eventData?.participants?.find((p: any) => p.name === name);
+    if (eventParticipant) {
+      return eventParticipant.avatarName?.startsWith("http")
+        ? eventParticipant.avatarName
+        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
+    }
 
-    // Fallback ke random dicebear
+    // Fallback ke dicebear
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
   };
 
@@ -88,12 +126,11 @@ export default function ActivityDetailPage() {
         return { subTotal: 0, taxAmount: 0, grandTotal: 0, taxRate: 0 };
     }
     
-    // 1. Ambil Tax Rate dari item pertama (karena asumsinya sama semua)
-    // Pastikan fallback ke 0 kalau fieldnya undefined
-    const rate = activityData.items[0].taxPercentage || 0;
+    // 1. Ambil Tax Rate dari item pertama
+    const rate = activityData.items[0]?.taxPercentage || 0;
 
     // 2. Hitung Subtotal
-    const sub = activityData.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const sub = activityData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
     
     // 3. Hitung Nominal Tax
     const tax = sub * (rate / 100); 
@@ -106,7 +143,15 @@ export default function ActivityDetailPage() {
     };
   }, [activityData]);
 
-  const [isEqualSplit, setIsEqualSplit] = useState(false);
+  // --- HANDLING LOADING ---
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-ui-background gap-4 p-5">
+        <div className="w-12 h-12 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-ui-dark-grey">Loading activity...</p>
+      </div>
+    );
+  }
 
   // --- HANDLING NOT FOUND ---
   if (!activityData) {
@@ -130,12 +175,13 @@ export default function ActivityDetailPage() {
                 {/* 1. BAGIAN AVATAR */}
                 {/* Tambahkan: flex-1, min-w-0, overflow-x-auto */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                    {activityData.participants.map((p, idx) => (
-                        <div key={idx} className="flex flex-col items-center shrink-0"> {/* shrink-0 di item juga penting */}
+                    {activityData?.participants?.map((p: any, idx: number) => (
+                        <div key={idx} className="flex flex-col items-center shrink-0">
                             <div className="inline-block h-10 w-10 rounded-full ring-2 ring-white bg-gray-100 overflow-hidden">
                                     <img 
-                                    src={p.avatarName.startsWith("http") ? p.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} 
+                                    src={getAvatarByName(p.name)} 
                                     className="w-full h-full object-cover"
+                                    alt={p.name}
                                 />
                             </div>
                         </div>
@@ -178,10 +224,10 @@ export default function ActivityDetailPage() {
                     </p>
                 </div>
 
-                {/* List Items dari MOCK DATABASE */}
+                {/* List Items dari Firebase */}
                 <div className="flex flex-col gap-6 mb-8">
-                    {activityData.items && activityData.items.length > 0 ? (
-                        activityData.items.map((item, idx) => (
+                    {activityData?.items && activityData.items.length > 0 ? (
+                        activityData.items.map((item: any, idx: number) => (
                             <ReceiptItem 
                                 key={idx} 
                                 item={item} 

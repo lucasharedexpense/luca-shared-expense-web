@@ -1,11 +1,36 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities } from "@/lib/firestore";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart, Utensils, Car, Zap, Ticket } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
+
+// --- HELPER: FORMAT DATE ---
+const formatDate = (dateInput: any): string => {
+  if (!dateInput) return "";
+  let date: Date;
+  
+  if (dateInput instanceof Date) {
+    date = dateInput;
+  } else if (typeof dateInput.toDate === "function") {
+    date = dateInput.toDate();
+  } else if (typeof dateInput === "object" && "seconds" in dateInput) {
+    date = new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds || 0) / 1000000);
+  } else if (typeof dateInput === "string" || typeof dateInput === "number") {
+    date = new Date(dateInput);
+  } else {
+    return "";
+  }
+  
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 // --- HELPER: LOGIC ICON BERDASARKAN KATEGORI ---
 const getCategoryIcon = (category: string) => {
@@ -38,15 +63,50 @@ const getActivityTotal = (activity: any) => {
 export default function EventDetailPage() {
   const router = useRouter();
   const params = useParams(); 
+  const { userId, loading: authLoading } = useAuth();
+  
+  // State
+  const [eventData, setEventData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
   // Unwrap ID
   const rawId = params?.id;
   const eventId = Array.isArray(rawId) ? rawId[0] : rawId;
 
-  // CARI DATA
-  const eventData = eventId 
-    ? MOCK_DATABASE.events.find((e) => e.id === eventId) 
-    : null;
+  // Fetch event dari Firebase
+  useEffect(() => {
+    const fetchEvent = async () => {
+      if (authLoading) return;
+      if (!userId || !eventId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const allEvents = await getEventsWithActivities(userId);
+        const event = allEvents.find((e) => e.id === eventId);
+        setEventData(event || null);
+      } catch (error) {
+        console.error("Error fetching event:", error);
+        setEventData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvent();
+  }, [userId, eventId, authLoading]);
+
+  // HANDLING LOADING
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-ui-background gap-4 p-5">
+        <div className="w-12 h-12 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-ui-dark-grey">Loading event...</p>
+      </div>
+    );
+  }
 
   // HANDLING NOT FOUND
   if (!eventData) {
@@ -72,7 +132,10 @@ export default function EventDetailPage() {
       {/* HEADER CARD */}
       <div className="px-5 pt-4 pb-2 shrink-0">
         <EventHeaderCard 
-           event={eventData}
+           event={{
+             ...eventData,
+             date: formatDate(eventData.date),
+           }}
            onBackClick={() => router.back()}
            onEditClick={() => router.push(`/event/${eventId}/edit`)} // Edit Event Info
            onDeleteClick={() => console.log("Delete clicked")}
@@ -92,7 +155,7 @@ export default function EventDetailPage() {
             </div>
          ) : (
             <div className="flex flex-col gap-3">
-               {eventData.activities.map((activity, index) => {
+               {eventData.activities.map((activity: any, index: number) => {
                  
                  // Kalkulasi Total Real-time
                  const totalBill = getActivityTotal(activity);
