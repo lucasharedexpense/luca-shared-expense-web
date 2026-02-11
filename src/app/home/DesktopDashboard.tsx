@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import EventList from "@/components/features/EventList";
-import { MOCK_DATABASE, Item } from "@/lib/dummy-data";
-import NewActivityModal from "@/components/features/NewActivityModal"; 
+import { Item } from "@/lib/dummy-data";
+import NewActivityModal from "@/components/features/NewActivityModal";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities } from "@/lib/firestore";
 import { 
     ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus, Edit2, 
     Trash2, Check, Save, RotateCcw, 
@@ -162,9 +164,9 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
 // --- COLUMN 2: EVENT DETAIL ---
 const EventDetailColumn = ({ 
     eventId, activeActivityId, onActivityClick, onClose, 
-    onAddClick, onEditActivity, onSummaryClick, onDeleteActivity
+    onAddClick, onEditActivity, onSummaryClick, onDeleteActivity, events
 }: any) => {
-    const event = MOCK_DATABASE.events.find(e => e.id === eventId);
+    const event = events.find((e: any) => e.id === eventId);
     if (!event) return null;
 
     return (
@@ -197,7 +199,7 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {event.activities.map((act) => {
+                {event.activities.map((act: any) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -281,9 +283,9 @@ const EventDetailColumn = ({
 };
 
 // --- COLUMN 3: ACTIVITY DETAIL (NOW WITH EDIT LOGIC) ---
-const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity }: any) => {
-    const event = MOCK_DATABASE.events.find(e => e.id === eventId);
-    const activity = event?.activities.find(a => a.id === activityId);
+const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, events }: any) => {
+    const event = events.find((e: any) => e.id === eventId);
+    const activity = event?.activities.find((a: any) => a.id === activityId);
 
     // --- STATE EDIT MODE ---
     const [isEditing, setIsEditing] = useState(false);
@@ -541,6 +543,8 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity }
 export default function DesktopDashboard() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+    const [events, setEvents] = useState<any[]>([]);
+    const { userId, loading: authLoading } = useAuth();
 
     // State Modal & Refresh
     const [showActivityModal, setShowActivityModal] = useState(false);
@@ -550,7 +554,26 @@ export default function DesktopDashboard() {
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
-    const activeEvent = MOCK_DATABASE.events.find(e => e.id === selectedEventId);
+    // Fetch events from Firebase
+    useEffect(() => {
+        const loadEvents = async () => {
+            if (authLoading) return;
+            if (!userId) {
+                setEvents([]);
+                return;
+            }
+            try {
+                const data = await getEventsWithActivities(userId);
+                setEvents(data);
+            } catch (error) {
+                console.error("Error loading events:", error);
+                setEvents([]);
+            }
+        };
+        loadEvents();
+    }, [userId, authLoading]);
+
+    const activeEvent = events.find((e: any) => e.id === selectedEventId);
 
     const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: any) => {
         if (!isOpen) return null;
@@ -591,14 +614,14 @@ export default function DesktopDashboard() {
     // --- HANDLER UPDATE DB (Simulated) ---
     const handleUpdateActivityDetail = (updatedActivity: any) => {
         if (!selectedEventId) return;
-        const eventIndex = MOCK_DATABASE.events.findIndex(e => e.id === selectedEventId);
+        const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
         if (eventIndex === -1) return;
 
         // @ts-ignore
-        const actIndex = MOCK_DATABASE.events[eventIndex].activities.findIndex(a => a.id === updatedActivity.id);
+        const actIndex = events[eventIndex].activities.findIndex((a: any) => a.id === updatedActivity.id);
         if (actIndex >= 0) {
             // @ts-ignore
-            MOCK_DATABASE.events[eventIndex].activities[actIndex] = updatedActivity;
+            events[eventIndex].activities[actIndex] = updatedActivity;
             setRefreshKey(prev => prev + 1); // Refresh UI
         }
     };
@@ -610,10 +633,10 @@ export default function DesktopDashboard() {
     const confirmDeleteActivity = () => {
         if (!selectedEventId || !activityToDelete) return;
         
-        const eventIndex = MOCK_DATABASE.events.findIndex(e => e.id === selectedEventId);
+        const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
         if (eventIndex !== -1) {
             // @ts-ignore
-            MOCK_DATABASE.events[eventIndex].activities = MOCK_DATABASE.events[eventIndex].activities.filter(a => a.id !== activityToDelete);
+            events[eventIndex].activities = events[eventIndex].activities.filter((a: any) => a.id !== activityToDelete);
             
             // Tutup detail kalo yang dihapus lagi dibuka
             if (selectedActivityId === activityToDelete) {
@@ -634,10 +657,10 @@ export default function DesktopDashboard() {
         if (!selectedEventId) return;
         setIsLoading(true);
         setTimeout(() => {
-            const eventIndex = MOCK_DATABASE.events.findIndex(e => e.id === selectedEventId);
+            const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
             if (eventIndex === -1) return;
 
-            const newItems = data.splitAmong.map(participantName => ({
+            const newItems = data.splitAmong.map((participantName: any) => ({
                 itemName: "Shared Split", quantity: 1, price: Math.floor(data.amount / data.splitAmong.length),
                 discountAmount: 0, taxPercentage: 0, timestamp: Date.now(), memberNames: [participantName] 
             }));
@@ -646,8 +669,8 @@ export default function DesktopDashboard() {
             if (editingActivity) {
                 // Update Existing Header
                 // @ts-ignore
-                const activities = MOCK_DATABASE.events[eventIndex].activities;
-                const actIndex = activities.findIndex(a => a.id === editingActivity.id);
+                const activities = events[eventIndex].activities;
+                const actIndex = activities.findIndex((a: any) => a.id === editingActivity.id);
                 if (actIndex >= 0) {
                     activities[actIndex] = { ...activities[actIndex], title: data.title, payerName: data.payerName, participants: formattedParticipants, items: newItems, category: data.category };
                 }
@@ -655,7 +678,7 @@ export default function DesktopDashboard() {
                 // Create New
                 const newActivity = { id: Math.random().toString(36).substr(2, 9), title: data.title, payerName: data.payerName, items: newItems, participants: formattedParticipants, category: data.category };
                 // @ts-ignore
-                MOCK_DATABASE.events[eventIndex].activities.unshift(newActivity);
+                events[eventIndex].activities.unshift(newActivity);
                 setSelectedActivityId(newActivity.id);
             }
             setIsLoading(false); setShowActivityModal(false); setEditingActivity(null); setRefreshKey(prev => prev + 1); 
@@ -671,7 +694,7 @@ export default function DesktopDashboard() {
             <div className="shrink-0 flex flex-col w-[35%] xl:w-[320px]">
                 <h2 className="text-2xl font-bold font-display text-ui-black mb-6 px-1">Dashboard</h2>
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 flex-1 overflow-hidden flex flex-col">
-                    <EventList key={refreshKey} activeId={selectedEventId} onEventClick={(id) => { setSelectedEventId(id); setSelectedActivityId(null); }} />
+                    <EventList key={refreshKey} activeId={selectedEventId} onEventClick={(id) => { setSelectedEventId(id); setSelectedActivityId(null); }} events={events} />
                 </div>
             </div>
 
@@ -688,6 +711,7 @@ export default function DesktopDashboard() {
                         onDeleteActivity={handleDeleteClick}
                         onSummaryClick={() => setShowSummaryModal(true)}
                         onClose={() => { setSelectedEventId(null); setSelectedActivityId(null); }}
+                        events={events}
                     />
                 </div>
             ) : (
@@ -708,7 +732,8 @@ export default function DesktopDashboard() {
                             eventId={selectedEventId}
                             activityId={selectedActivityId}
                             onClose={() => setSelectedActivityId(null)}
-                            onUpdateActivity={handleUpdateActivityDetail} // Pass handler baru
+                            onUpdateActivity={handleUpdateActivityDetail}
+                            events={events}
                         />
                     </div>
                 </>

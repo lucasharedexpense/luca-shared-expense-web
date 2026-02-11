@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, CalendarClock, Edit2 } from "lucide-react"; // Import Edit2
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { Search, Plus, CalendarClock, Edit2 } from "lucide-react";
 import NewEventModal from "./NewEventModal";
 
 // Helper hitung total
@@ -16,13 +15,14 @@ const getEventTotal = (event: any) => {
 interface EventListProps {
   onEventClick: (eventId: string) => void;
   activeId?: string | null;
+  events?: any[];
 }
 
-export default function EventList({ onEventClick, activeId }: EventListProps) {
+export default function EventList({ onEventClick, activeId, events: providedEvents }: EventListProps) {
   const [search, setSearch] = useState("");
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [events, setEvents] = useState(MOCK_DATABASE.events);
+  const [events, setEvents] = useState(providedEvents || []);
 
   // --- STATE UNTUK EDIT ---
   // Menyimpan data event yang sedang diedit, atau null jika create baru
