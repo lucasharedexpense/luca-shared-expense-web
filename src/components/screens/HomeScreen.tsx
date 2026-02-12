@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
 import { useRouter } from "next/navigation";
@@ -16,27 +16,37 @@ export default function HomeScreen() {
   const { userId, loading: authLoading } = useAuth();
 
   // Load Data from Firebase
-  useEffect(() => {
-    const loadData = async () => {
-      if (authLoading) return;
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
+  const loadData = useCallback(async () => {
+    if (authLoading) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const data = await getEventsWithActivities(userId);
-        setEvents(data);
-      } catch (error) {
-        console.error("Error loading events:", error);
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    try {
+      setLoading(true);
+      const data = await getEventsWithActivities(userId);
+      setEvents(data);
+    } catch (error) {
+      console.error("Error loading events:", error);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
   }, [userId, authLoading]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Re-fetch when user navigates back (e.g. after creating event)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (userId && !authLoading) loadData();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [userId, authLoading, loadData]);
 
   const filteredEvents = events.filter((e) =>
     e.title.toLowerCase().includes(searchQuery.toLowerCase())

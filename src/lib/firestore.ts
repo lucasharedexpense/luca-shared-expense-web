@@ -8,11 +8,48 @@ import {
   getDocs,
   doc,
   query,
+  addDoc,
+  updateDoc,
+  deleteDoc,
   QueryDocumentSnapshot,
   DocumentData,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+
+// ==================== HELPERS ====================
+
+/**
+ * Format a Date object to DD/MM/YYYY string
+ */
+function formatDateToDDMMYYYY(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+/**
+ * Parse various date formats into a JS Date
+ */
+function parseDateSafe(dateInput: any): Date {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput?.toDate === "function") return dateInput.toDate();
+  if (typeof dateInput === "object" && "seconds" in dateInput) {
+    return new Date(dateInput.seconds * 1000);
+  }
+  if (typeof dateInput === "string") {
+    // Handle DD/MM/YYYY
+    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    }
+    const parsed = new Date(dateInput);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -37,6 +74,7 @@ export interface Event {
   name: string;
   location: string;
   date: Timestamp | string | Date;
+  imageUrl: string;
   settlementResultJson: string;
   participants?: Participant[];
   title?: string; // Alias for name
@@ -70,11 +108,19 @@ function docToActivity(doc: QueryDocumentSnapshot<DocumentData>): Activity {
  */
 function docToEvent(doc: QueryDocumentSnapshot<DocumentData>): Event {
   const data = doc.data();
+  // Convert date: if it's a Timestamp, convert to DD/MM/YYYY string
+  let dateValue = data.date;
+  if (dateValue && typeof dateValue?.toDate === "function") {
+    dateValue = formatDateToDDMMYYYY(dateValue.toDate());
+  } else if (dateValue && typeof dateValue === "object" && "seconds" in dateValue) {
+    dateValue = formatDateToDDMMYYYY(new Date(dateValue.seconds * 1000));
+  }
   return {
     id: doc.id,
-    name: data.name || data.title || "",
+    name: data.title || data.name || "",
     location: data.location || "",
-    date: data.date || Timestamp.now(),
+    date: dateValue || "",
+    imageUrl: data.imageUrl || "",
     settlementResultJson: data.settlementResultJson || "{}",
     participants: data.participants || [],
   };
@@ -206,5 +252,111 @@ export async function getEventWithActivities(
   } catch (error) {
     console.error(`Error fetching event ${eventId}:`, error);
     return null;
+  }
+}
+
+// ==================== CREATE / UPDATE / DELETE EVENT ====================
+
+export interface CreateEventData {
+  title: string;
+  location?: string;
+  date: Date | string;
+  imageUrl?: string;
+  participants: { name: string; avatarName: string }[];
+}
+
+/**
+ * Create a new event under users/{userId}/events
+ * Returns the new event ID
+ */
+export async function createEvent(
+  userId: string,
+  data: CreateEventData
+): Promise<string> {
+  try {
+    const eventsRef = collection(db, "users", userId, "events");
+    const docRef = await addDoc(eventsRef, {
+      title: data.title,
+      location: data.location || "",
+      date: typeof data.date === "string" ? data.date : formatDateToDDMMYYYY(data.date),
+      imageUrl: data.imageUrl || "",
+      participants: data.participants,
+      settlementResultJson: "{}",
+    });
+    console.log(`✅ Created event: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating event:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing event
+ * Path: users/{userId}/events/{eventId}
+ */
+export async function updateEvent(
+  userId: string,
+  eventId: string,
+  data: Partial<CreateEventData>
+): Promise<void> {
+  try {
+    const eventRef = doc(db, "users", userId, "events", eventId);
+    const updateData: Record<string, any> = {};
+    
+    if (data.title !== undefined) {
+      updateData.title = data.title;
+    }
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.date !== undefined) {
+      updateData.date = typeof data.date === "string" 
+        ? data.date 
+        : formatDateToDDMMYYYY(data.date);
+    }
+    if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+    if (data.participants !== undefined) updateData.participants = data.participants;
+
+    await updateDoc(eventRef, updateData);
+    console.log(`✅ Updated event: ${eventId}`);
+  } catch (error) {
+    console.error("Error updating event:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an event
+ * Path: users/{userId}/events/{eventId}
+ */
+export async function deleteEvent(
+  userId: string,
+  eventId: string
+): Promise<void> {
+  try {
+    const eventRef = doc(db, "users", userId, "events", eventId);
+    await deleteDoc(eventRef);
+    console.log(`✅ Deleted event: ${eventId}`);
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an activity from an event
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ */
+export async function deleteActivity(
+  userId: string,
+  eventId: string,
+  activityId: string
+): Promise<void> {
+  try {
+    const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
+    await deleteDoc(activityRef);
+    console.log(`✅ Deleted activity: ${activityId}`);
+  } catch (error) {
+    console.error("Error deleting activity:", error);
+    throw error;
   }
 }

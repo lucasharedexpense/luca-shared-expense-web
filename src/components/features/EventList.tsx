@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Plus, CalendarClock, Edit2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, Plus, CalendarClock, Edit2, Trash2 } from "lucide-react";
 import NewEventModal from "./NewEventModal";
+import AvatarStack from "@/components/ui/AvatarStack";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { useAuth } from "@/lib/auth-context";
+import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
 
 // Helper hitung total
 const getEventTotal = (event: any) => {
@@ -16,17 +20,25 @@ interface EventListProps {
   onEventClick: (eventId: string) => void;
   activeId?: string | null;
   events?: any[];
+  onRefresh?: () => void;
 }
 
-export default function EventList({ onEventClick, activeId, events: providedEvents }: EventListProps) {
+export default function EventList({ onEventClick, activeId, events: providedEvents, onRefresh }: EventListProps) {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [events, setEvents] = useState(providedEvents || []);
 
+  // Sync events when parent re-fetches
+  useEffect(() => {
+    if (providedEvents) setEvents(providedEvents);
+  }, [providedEvents]);
+
   // --- STATE UNTUK EDIT ---
   // Menyimpan data event yang sedang diedit, atau null jika create baru
   const [editingEvent, setEditingEvent] = useState<any | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<any | null>(null);
 
   const filteredEvents = events.filter(e => 
     e.title.toLowerCase().includes(search.toLowerCase())
@@ -40,53 +52,78 @@ export default function EventList({ onEventClick, activeId, events: providedEven
 
   // HANDLER: Buka Modal Edit
   const openEditModal = (e: React.MouseEvent, event: any) => {
-    e.stopPropagation(); // Biar ga ke-trigger onEventClick (pindah halaman)
+    e.stopPropagation();
     setEditingEvent(event);
     setShowNewEventModal(true);
   };
 
-  // HANDLER: Save (Create / Update)
-  const handleSaveEvent = (title: string, date: Date, participants: string[]) => {
+  // HANDLER: Delete Event
+  const handleDeleteEvent = (e: React.MouseEvent, event: any) => {
+    e.stopPropagation();
+    setEventToDelete(event);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!user?.uid || !eventToDelete) return;
+    try {
+      await deleteEvent(user.uid, eventToDelete.id);
+      onRefresh?.();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Failed to delete event.");
+    } finally {
+      setEventToDelete(null);
+    }
+  };
+
+  // HANDLER: Save (Create / Update) - Firebase
+  const handleSaveEvent = async (data: {
+    title: string;
+    date: Date;
+    location: string;
+    imageUrl: string;
+    participants: { name: string; avatarName: string }[];
+  }) => {
+    if (!user?.uid) return;
     setIsLoading(true);
 
-    setTimeout(() => {
-        if (editingEvent) {
-            // --- LOGIC UPDATE ---
-            const updatedEvents = events.map(ev => {
-                if (ev.id === editingEvent.id) {
-                    return {
-                        ...ev,
-                        title: title,
-                        date: date.toISOString(),
-                        // Gabungkan "You" jika belum ada, plus participants baru
-                        participants: ["You", ...participants], 
-                    };
-                }
-                return ev;
-            });
-            // @ts-ignore
-            setEvents(updatedEvents);
-        } else {
-            // --- LOGIC CREATE ---
-            const newEvent = {
-                id: Math.random().toString(36).substr(2, 9),
-                title: title,
-                date: date.toISOString(),
-                status: "active",
-                participants: ["You", ...participants],
-                activities: []
-            };
-            // @ts-ignore
-            setEvents([newEvent, ...events]);
-            onEventClick(newEvent.id);
-        }
-        
-        // Reset & Close
-        setIsLoading(false);
-        setShowNewEventModal(false);
-        setEditingEvent(null);
-        
-    }, 800);
+    try {
+      // Always include current user as first participant
+      const allParticipants = [
+        {
+          name: user.displayName || "You",
+          avatarName: user.displayName || "You",
+        },
+        ...data.participants,
+      ];
+
+      const eventPayload = {
+        title: data.title,
+        date: data.date,
+        location: data.location,
+        imageUrl: data.imageUrl,
+        participants: allParticipants,
+      };
+
+      if (editingEvent) {
+        // --- UPDATE EXISTING EVENT ---
+        await updateEvent(user.uid, editingEvent.id, eventPayload);
+      } else {
+        // --- CREATE NEW EVENT ---
+        const newId = await createEvent(user.uid, eventPayload);
+        onEventClick(newId);
+      }
+
+      // Refresh data from parent
+      onRefresh?.();
+    } catch (error) {
+      console.error("Error saving event:", error);
+      alert("Failed to save event. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setShowNewEventModal(false);
+      setEditingEvent(null);
+    }
   };
 
   return (
@@ -127,7 +164,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                             key={event.id}
                             onClick={() => onEventClick(event.id)}
                             className={`
-                                relative p-4 rounded-2xl border transition-all cursor-pointer group
+                                relative rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                 hover:shadow-md hover:-translate-y-0.5
                                 ${isActive 
                                     ? "bg-ui-accent-yellow/5 border-ui-accent-yellow ring-1 ring-ui-accent-yellow shadow-sm" 
@@ -135,6 +172,14 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                                 }
                             `}
                         >
+                            {/* Event Image Thumbnail */}
+                            {event.imageUrl && (
+                                <div className="w-full aspect-video overflow-hidden">
+                                    <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                                </div>
+                            )}
+
+                            <div className="p-4">
                             {/* Active Indicator */}
                             {isActive && <div className="absolute left-0 top-4 bottom-4 w-1 bg-ui-accent-yellow rounded-r-full" />}
 
@@ -146,39 +191,43 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                                     </h3>
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
                                         <CalendarClock className="w-3 h-3" />
-                                        <span>{new Date(event.date).toLocaleDateString()}</span>
+                                        <span>{typeof event.date === 'string' ? event.date : new Date(event.date).toLocaleDateString("en-GB")}</span>
                                     </div>
                                 </div>
                                 
-                                {/* TOMBOL EDIT (Hanya muncul saat hover card) */}
-                                <button 
-                                    onClick={(e) => openEditModal(e, event)}
-                                    className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-ui-accent-yellow hover:text-ui-black transition-all opacity-0 group-hover:opacity-100"}
-                                    title="Edit Event"
-                                >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                </button>
+                                {/* TOMBOL EDIT & DELETE (Hanya muncul saat hover card) */}
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button 
+                                        onClick={(e) => openEditModal(e, event)}
+                                        className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-ui-accent-yellow hover:text-ui-black transition-all"}
+                                        title="Edit Event"
+                                    >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => handleDeleteEvent(e, event)}
+                                        className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-red-500 hover:text-white transition-all"}
+                                        title="Delete Event"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
                             
                             {/* Footer Card */}
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 pl-2">
-                                <div className="flex items-center -space-x-2">
-                                    {[...Array(Math.min(3, event.participants.length))].map((_, i) => (
-                                        <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-500">
-                                            {String.fromCharCode(65+i)}
-                                        </div>
-                                    ))}
-                                    {event.participants.length > 3 && (
-                                        <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-400">
-                                            +{event.participants.length - 3}
-                                        </div>
-                                    )}
-                                </div>
+                                <AvatarStack 
+                                    avatars={event.participants?.map((p: any) => p.avatarName || p.name?.charAt(0)?.toUpperCase() || "?") || []}
+                                    size={24}
+                                    overlap={-8}
+                                    limit={3}
+                                />
 
                                 <span className="text-sm font-bold text-ui-black">
                                     {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(getEventTotal(event))}
                                 </span>
                             </div>
+                            </div>{/* end p-4 wrapper */}
                         </div>
                     )
                 })}
@@ -191,7 +240,16 @@ export default function EventList({ onEventClick, activeId, events: providedEven
             onClose={() => setShowNewEventModal(false)}
             onSubmit={handleSaveEvent}
             isLoading={isLoading}
-            initialData={editingEvent} // Kirim data kalau lagi edit
+            initialData={editingEvent}
+        />
+
+        {/* --- MODAL DELETE EVENT --- */}
+        <DeleteConfirmModal
+            isOpen={!!eventToDelete}
+            onClose={() => setEventToDelete(null)}
+            onConfirm={confirmDeleteEvent}
+            title="Delete Event?"
+            name={eventToDelete?.title || "this event"}
         />
     </>
   );

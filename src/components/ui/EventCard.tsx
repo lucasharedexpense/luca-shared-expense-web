@@ -24,6 +24,7 @@ interface EventCardProps {
     name: string;
     location: string;
     date: any; // Firestore Timestamp or Date or serialized
+    imageUrl?: string;
     participants?: Participant[];
     activities?: Activity[];
   };
@@ -49,7 +50,17 @@ function getSafeDate(dateInput: any): Date {
     return new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
   }
   
-  if (typeof dateInput === "string" || typeof dateInput === "number") {
+  if (typeof dateInput === "string") {
+    // Handle DD/MM/YYYY format
+    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    }
+    const parsedDate = new Date(dateInput);
+    if (!isNaN(parsedDate.getTime())) return parsedDate;
+  }
+  
+  if (typeof dateInput === "number") {
     const parsedDate = new Date(dateInput);
     if (!isNaN(parsedDate.getTime())) return parsedDate;
   }
@@ -74,9 +85,22 @@ export default function EventCard({ data, onClick }: EventCardProps) {
   return (
     <div 
       onClick={() => onClick?.(data.id)}
-      className="relative group w-full bg-ui-white p-5 rounded-3xl shadow-xl border border-ui-grey/40 flex flex-col gap-4 transition-all active:scale-[0.99] active:bg-gray-50 cursor-pointer overflow-hidden hover:shadow-md"
+      className="relative group w-full bg-ui-white rounded-3xl shadow-xl border border-ui-grey/40 flex flex-col transition-all active:scale-[0.99] active:bg-gray-50 cursor-pointer overflow-hidden hover:shadow-md"
     >
       
+      {/* EVENT IMAGE BANNER */}
+      {data.imageUrl && (
+        <div className="w-full aspect-video relative overflow-hidden">
+          <img 
+            src={data.imageUrl} 
+            alt={data.name} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+        </div>
+      )}
+
+      <div className="p-5 flex flex-col gap-4">
       {/* HEADER: Event Name & Participants Avatar */}
       <div className="flex justify-between items-start gap-3">
         <h3 className="font-bold text-ui-black text-[19px] leading-snug flex-1">
@@ -112,7 +136,7 @@ export default function EventCard({ data, onClick }: EventCardProps) {
           </span>
         </div>
       </div>
-      
+      </div>{/* end p-5 wrapper */}
     </div>
   );
 }

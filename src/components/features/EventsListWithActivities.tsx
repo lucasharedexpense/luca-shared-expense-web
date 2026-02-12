@@ -41,9 +41,20 @@ function getSafeDate(dateInput: any): Date {
   }
 
   // Case 5: String or number timestamp
-  if (typeof dateInput === "string" || typeof dateInput === "number") {
+  if (typeof dateInput === "string") {
+    // Handle DD/MM/YYYY format
+    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    }
     const parsedDate = new Date(dateInput);
-    // Check if valid date
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+  }
+
+  if (typeof dateInput === "number") {
+    const parsedDate = new Date(dateInput);
     if (!isNaN(parsedDate.getTime())) {
       return parsedDate;
     }
