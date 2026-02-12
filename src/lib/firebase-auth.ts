@@ -7,8 +7,12 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   AuthError,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  deleteUser,
 } from "firebase/auth";
-import { addDocument, getDocuments, queryDocuments } from "./firebase-db";
+import { addDocument, getDocuments, queryDocuments, updateDocument, deleteDocument } from "./firebase-db";
 import { where } from "firebase/firestore";
 
 // ============================================================================
@@ -167,5 +171,90 @@ export const getUserProfile = async (uid: string) => {
   } catch (error) {
     console.error("Error getting user profile:", error);
     throw error;
+  }
+};
+
+// ============================================================================
+// UPDATE USER PROFILE IN FIRESTORE
+// ============================================================================
+
+export const updateUserProfile = async (
+  uid: string,
+  data: { username?: string; avatarName?: string }
+): Promise<void> => {
+  try {
+    const users = await queryDocuments("users", [where("uid", "==", uid)]);
+    if (users.length > 0) {
+      const userDocId = users[0].id;
+      await updateDocument("users", userDocId, data);
+    } else {
+      throw new Error("User profile not found");
+    }
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// CHANGE PASSWORD
+// ============================================================================
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      throw new Error("No user is currently logged in");
+    }
+
+    // Re-authenticate the user before changing password
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Update the password
+    await updatePassword(user, newPassword);
+  } catch (error) {
+    const authError = error as AuthError;
+    if (authError.code === "auth/wrong-password") {
+      throw new Error("Current password is incorrect");
+    }
+    throw new Error(authError.message || "Failed to change password");
+  }
+};
+
+// ============================================================================
+// DELETE ACCOUNT
+// ============================================================================
+
+export const deleteAccount = async (password?: string): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("No user is currently logged in");
+    }
+
+    // If password is provided and user has email, re-authenticate first
+    if (password && user.email) {
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
+    }
+
+    // Delete user document from Firestore
+    const users = await queryDocuments("users", [where("uid", "==", user.uid)]);
+    if (users.length > 0) {
+      await deleteDocument("users", users[0].id);
+    }
+
+    // Delete the user from Firebase Auth
+    await deleteUser(user);
+  } catch (error) {
+    const authError = error as AuthError;
+    if (authError.code === "auth/requires-recent-login") {
+      throw new Error("Please log in again before deleting your account");
+    }
+    throw new Error(authError.message || "Failed to delete account");
   }
 };

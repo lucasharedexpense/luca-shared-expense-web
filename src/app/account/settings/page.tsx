@@ -15,9 +15,17 @@ import {
   Loader2,
   User,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Mail
 } from "lucide-react";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/auth-context";
+import { 
+  getUserProfile, 
+  updateUserProfile, 
+  changePassword, 
+  deleteAccount, 
+  logout 
+} from "@/lib/firebase-auth";
 
 // --- HELPER: GET AVATAR URL ---
 const getAvatarUrl = (avatarName: string) => {
@@ -185,18 +193,70 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose, isDanger = f
 // --- MAIN PAGE ---
 export default function AccountSettingsPage() {
   const router = useRouter();
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  // State User Data
-  const [user, setUser] = useState({
-    username: MOCK_DATABASE.username,
-    avatar: MOCK_DATABASE.avatarName,
-  });
+  // State User Data from Firestore
+  const [userProfile, setUserProfile] = useState<{
+    username: string;
+    avatar: string;
+    email: string;
+    docId?: string;
+  } | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   // UI States
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [newUsername, setNewUsername] = useState(user.username);
+  const [newUsername, setNewUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Fetch user profile from Firestore
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!authUser) {
+        setProfileLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(authUser.uid);
+        if (profile) {
+          setUserProfile({
+            username: profile.username || authUser.displayName || authUser.email?.split("@")[0] || "User",
+            avatar: profile.avatarName || "avatar_1",
+            email: profile.email || authUser.email || "",
+            docId: profile.id,
+          });
+          setNewUsername(profile.username || authUser.displayName || authUser.email?.split("@")[0] || "User");
+        } else {
+          // Use auth user data as fallback
+          setUserProfile({
+            username: authUser.displayName || authUser.email?.split("@")[0] || "User",
+            avatar: "avatar_1",
+            email: authUser.email || "",
+          });
+          setNewUsername(authUser.displayName || authUser.email?.split("@")[0] || "User");
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        setErrorMessage("Failed to load profile");
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchUserProfile();
+    }
+  }, [authUser, authLoading]);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !authUser) {
+      router.push("/auth/login");
+    }
+  }, [authUser, authLoading, router]);
 
   // Modal States
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -212,47 +272,116 @@ export default function AccountSettingsPage() {
     }
   }, [toastMessage]);
 
+  // Error Timer
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
   // Handlers
-  const handleUpdateAvatar = (avatarName: string) => {
+  const handleUpdateAvatar = async (avatarName: string) => {
+    if (!authUser) return;
     setShowAvatarModal(false);
     setIsLoading(true);
-    setTimeout(() => {
-        setUser(prev => ({ ...prev, avatar: avatarName }));
-        setIsLoading(false);
-        setToastMessage("Profile picture updated");
-    }, 800);
+    try {
+      await updateUserProfile(authUser.uid, { avatarName });
+      setUserProfile(prev => prev ? { ...prev, avatar: avatarName } : null);
+      setToastMessage("Profile picture updated");
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      setErrorMessage("Failed to update profile picture");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleUpdateUsername = () => {
-    if (!newUsername.trim()) return;
+  const handleUpdateUsername = async () => {
+    if (!newUsername.trim() || !authUser) return;
     setIsLoading(true);
-    setTimeout(() => {
-        setUser(prev => ({ ...prev, username: newUsername }));
-        setIsLoading(false);
-        setIsEditingUsername(false);
-        setToastMessage("Username updated successfully");
-    }, 800);
+    try {
+      await updateUserProfile(authUser.uid, { username: newUsername.trim() });
+      setUserProfile(prev => prev ? { ...prev, username: newUsername.trim() } : null);
+      setIsEditingUsername(false);
+      setToastMessage("Username updated successfully");
+    } catch (error) {
+      console.error("Error updating username:", error);
+      setErrorMessage("Failed to update username");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleUpdatePassword = (oldP: string, newP: string) => {
+  const handleUpdatePassword = async (oldP: string, newP: string) => {
     setShowPasswordModal(false);
-    setToastMessage("Password updated successfully");
+    setIsLoading(true);
+    try {
+      await changePassword(oldP, newP);
+      setToastMessage("Password updated successfully");
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      setErrorMessage(error.message || "Failed to update password");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     setShowDeleteModal(false);
     setIsLoading(true);
-    setTimeout(() => {
-        setIsLoading(false);
-        router.push("/login");
-    }, 1500);
+    try {
+      await deleteAccount();
+      document.cookie = "luca_session=; path=/; max-age=0";
+      router.push("/");
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      setErrorMessage(error.message || "Failed to delete account");
+      setIsLoading(false);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutModal(false);
-    document.cookie = "luca_session=; path=/; max-age=0"; // Clear session cookie
-    router.push("/"); 
+    try {
+      await logout();
+      document.cookie = "luca_session=; path=/; max-age=0";
+      router.push("/");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      setErrorMessage("Failed to log out");
+    }
   };
+
+  // Show loading state
+  if (authLoading || profileLoading) {
+    return (
+      <div className="flex flex-col h-full min-h-screen w-full bg-ui-background items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-ui-accent-yellow" />
+        <p className="mt-4 text-sm font-medium text-gray-500">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <div className="flex flex-col h-full min-h-screen w-full bg-ui-background items-center justify-center">
+        <AlertTriangle className="w-8 h-8 text-red-500" />
+        <p className="mt-4 text-sm font-medium text-gray-500">Failed to load profile</p>
+        <button 
+          onClick={() => router.push("/home")}
+          className="mt-4 px-6 py-2 bg-ui-accent-yellow rounded-xl font-bold text-sm"
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
+
+  // Check if user signed in with Google
+  const isGoogleUser = authUser?.providerData?.some(
+    (provider) => provider.providerId === "google.com"
+  ) ?? false;
 
   return (
     <div className="flex flex-col h-full min-h-screen w-full bg-ui-background relative">
@@ -277,7 +406,7 @@ export default function AccountSettingsPage() {
                 <div className="relative group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
                     <div className="w-28 h-28 rounded-full bg-gray-50 p-1 overflow-hidden shadow-inner">
                          <img 
-                            src={getAvatarUrl(user.avatar)} 
+                            src={getAvatarUrl(userProfile.avatar)} 
                             className="w-full h-full object-cover rounded-full" 
                             alt="Profile"
                          />
@@ -303,7 +432,7 @@ export default function AccountSettingsPage() {
                         >
                             <div className="flex items-center gap-3">
                                 <User className="w-4 h-4 text-gray-400" />
-                                <span className="font-bold text-sm text-ui-black">{user.username}</span>
+                                <span className="font-bold text-sm text-ui-black">{userProfile.username}</span>
                             </div>
                             <Edit2 className="w-4 h-4 text-gray-300 group-hover:text-ui-black transition-colors" />
                         </div>
@@ -318,7 +447,7 @@ export default function AccountSettingsPage() {
                             />
                             <div className="flex gap-2">
                                 <button 
-                                    onClick={() => { setIsEditingUsername(false); setNewUsername(user.username); }}
+                                    onClick={() => { setIsEditingUsername(false); setNewUsername(userProfile.username); }}
                                     className="flex-1 py-2.5 bg-gray-100 rounded-xl font-bold text-xs text-gray-500 hover:bg-gray-200 transition-colors"
                                 >
                                     Cancel
@@ -335,22 +464,45 @@ export default function AccountSettingsPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Email Display (Read-only) */}
+                <div className="mb-2">
+                    <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">Email</label>
+                    <div className="w-full flex items-center bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                        <div className="flex items-center gap-3">
+                            <Mail className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-sm text-gray-500">{userProfile.email}</span>
+                        </div>
+                    </div>
+                </div>
             </SettingsGroupContainer>
 
             {/* 3. SECURITY GROUP */}
             <SettingsGroupContainer title="Security">
                 <div className="mb-2">
                     <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">Password</label>
-                    <div 
-                        onClick={() => setShowPasswordModal(true)}
-                        className="w-full flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow hover:bg-white transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <Shield className="w-4 h-4 text-gray-400" />
-                            <span className="font-bold text-sm text-ui-black tracking-widest">••••••••</span>
+                    {isGoogleUser ? (
+                        <div className="w-full flex items-center bg-gray-50 border border-gray-200 p-4 rounded-xl opacity-60">
+                            <div className="flex items-center gap-3 flex-1">
+                                <Shield className="w-4 h-4 text-gray-400" />
+                                <div>
+                                    <span className="font-bold text-sm text-gray-400 block">Signed in with Google</span>
+                                    <span className="text-xs text-gray-400">Password change is not available for Google accounts</span>
+                                </div>
+                            </div>
                         </div>
-                        <Edit2 className="w-4 h-4 text-gray-300 group-hover:text-ui-black transition-colors" />
-                    </div>
+                    ) : (
+                        <div 
+                            onClick={() => setShowPasswordModal(true)}
+                            className="w-full flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded-xl cursor-pointer hover:border-ui-accent-yellow hover:bg-white transition-all group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Shield className="w-4 h-4 text-gray-400" />
+                                <span className="font-bold text-sm text-ui-black tracking-widest">••••••••</span>
+                            </div>
+                            <Edit2 className="w-4 h-4 text-gray-300 group-hover:text-ui-black transition-colors" />
+                        </div>
+                    )}
                 </div>
             </SettingsGroupContainer>
 
@@ -384,6 +536,14 @@ export default function AccountSettingsPage() {
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-ui-black text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-50">
             <div className="bg-green-500 rounded-full p-0.5"><Check className="w-3 h-3 text-white" strokeWidth={4} /></div>
             <span className="font-bold text-sm">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ERROR TOAST */}
+      {errorMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-50">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="font-bold text-sm">{errorMessage}</span>
         </div>
       )}
 
