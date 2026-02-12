@@ -31,14 +31,31 @@ export default function EventHeaderCard({
   // PREVENT ERROR: Mapping dulu dari Object -> String[] buat AvatarStack
   const participantAvatars = event.participants?.map((p) => p.avatarName) || [];
 
+  // Check if event has an imageUrl
+  const hasImage = !!(event as any).imageUrl;
+
   return (
-    <div className="relative w-full h-60 bg-ui-accent-yellow rounded-3xl overflow-hidden shadow-sm shrink-0">
+    <div className="relative w-full h-60 rounded-3xl overflow-hidden shadow-sm shrink-0">
       
-      {/* --- 1. WATERMARK BACKGROUND --- */}
-      <ShoppingCart 
-        className="absolute -bottom-6 -right-6 w-48 h-48 text-white/20 rotate-[-10deg] z-0 pointer-events-none" 
-        strokeWidth={1.5}
-      />
+      {/* --- 1. BACKGROUND (Image or Yellow) --- */}
+      {hasImage ? (
+        <>
+          <img 
+            src={(event as any).imageUrl} 
+            alt={event.title} 
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 z-0" />
+        </>
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-ui-accent-yellow z-0" />
+          <ShoppingCart 
+            className="absolute -bottom-6 -right-6 w-48 h-48 text-white/20 rotate-[-10deg] z-0 pointer-events-none" 
+            strokeWidth={1.5}
+          />
+        </>
+      )}
 
       {/* --- 2. TOP BAR (Buttons) --- */}
       <div className="relative z-10 flex justify-between items-center p-5">
@@ -60,7 +77,7 @@ export default function EventHeaderCard({
       <div className="absolute bottom-0 left-0 w-full p-5 z-10 flex flex-col items-start">
         
         {/* Title Besar */}
-        <h1 className="text-2xl font-bold font-display text-ui-black leading-tight mb-3 line-clamp-2 drop-shadow-sm">
+        <h1 className={`text-2xl font-bold font-display leading-tight mb-3 line-clamp-2 drop-shadow-sm ${hasImage ? 'text-white' : 'text-ui-black'}`}>
           {event.title}
         </h1>
 

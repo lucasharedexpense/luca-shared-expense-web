@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -10,9 +10,12 @@ import {
   Plus,
   Type,
   Check,
-  X
+  X,
+  Loader2
 } from "lucide-react";
-import { MOCK_DATABASE, Contact, Event } from "@/lib/dummy-data";
+import { Contact, Event } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/auth-context";
+import { getContacts, ContactData } from "@/lib/firebase-contacts";
 
 // Define the shape of data returned by this form
 export interface EventFormData {
@@ -33,15 +36,55 @@ interface EventFormProps {
 
 export default function EventForm({ initialData, isEditing = false, onSubmit }: EventFormProps) {
   const router = useRouter();
+  const { user } = useAuth();
+
+  // --- FIREBASE CONTACTS STATE ---
+  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  // Fetch contacts from Firebase
+  useEffect(() => {
+    if (user?.uid) {
+      setContactsLoading(true);
+      getContacts(user.uid)
+        .then((data) => setFirebaseContacts(data))
+        .catch((err) => console.error("Failed to fetch contacts:", err))
+        .finally(() => setContactsLoading(false));
+    }
+  }, [user?.uid]);
 
   // --- STATE FORM ---
   // If initialData exists (Edit Mode), use those values. Otherwise default to empty.
   const [title, setTitle] = useState(initialData?.title || "");
   const [location, setLocation] = useState(initialData?.location || "");
   
-  // Note: Date format from DB might differ from input type="date".
-  // Adjust this if your DB stores "12 Dec 2025" instead of "2025-12-12".
-  const [date, setDate] = useState(initialData?.date || "");
+  // Note: Date format from DB is DD/MM/YYYY string.
+  const [date, setDate] = useState(() => {
+    if (initialData?.date) {
+      try {
+        let d: Date;
+        if (typeof initialData.date === 'object' && 'toDate' in initialData.date) {
+          d = initialData.date.toDate();
+        } else if (typeof initialData.date === 'string') {
+          // Handle DD/MM/YYYY format from Firebase
+          const ddmmyyyy = initialData.date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (ddmmyyyy) {
+            d = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+          } else {
+            d = new Date(initialData.date);
+          }
+        } else {
+          d = new Date(initialData.date);
+        }
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0]; // Convert to YYYY-MM-DD for input type="date"
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return new Date().toISOString().split('T')[0];
+  });
 
   // Convert participants from Event format back to Contact-like format for the state
   const [selectedParticipants, setSelectedParticipants] = useState<any[]>(
@@ -142,9 +185,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                      <CalendarIcon className="w-3 h-3" /> Date
                   </label>
                   <input 
-                    type="text" // Using text to accept any format for dummy data flexibility
-                    placeholder="e.g. 2025-12-12"
-                    // type="date" // Uncomment this for real date picker
+                    type="date"
                     className="w-full bg-ui-grey rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-ui-accent-yellow/50 transition-all font-medium text-ui-black"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
@@ -222,13 +263,19 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
 
                <div className="flex-1 overflow-y-auto p-2">
-                  {MOCK_DATABASE.contacts.map((contact) => {
+                  {contactsLoading ? (
+                    <div className="flex items-center justify-center py-8 text-gray-400">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      <span className="text-sm">Loading contacts...</span>
+                    </div>
+                  ) : (
+                  firebaseContacts.map((contact) => {
                      // Check if participant is selected (by ID or Name)
                      const isSelected = selectedParticipants.some(p => p.id === contact.id || p.name === contact.name);
                      return (
                         <div 
                            key={contact.id}
-                           onClick={() => toggleParticipant(contact)}
+                           onClick={() => toggleParticipant(contact as unknown as Contact)}
                            className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-colors border ${isSelected ? 'bg-ui-accent-yellow/10 border-ui-accent-yellow' : 'hover:bg-ui-grey/5 border-transparent'}`}
                         >
                            <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
@@ -248,7 +295,8 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                            </div>
                         </div>
                      )
-                  })}
+                  })
+                  )}
                </div>
 
                <div className="p-4 border-t border-ui-grey/10">

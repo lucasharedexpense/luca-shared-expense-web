@@ -3,10 +3,11 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities } from "@/lib/firestore";
+import { getEventsWithActivities, deleteActivity, deleteEvent } from "@/lib/firestore";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
-import { ShoppingCart, Utensils, Car, Zap, Ticket } from "lucide-react"; 
+import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 
 // --- HELPER: FORMAT DATE ---
 const formatDate = (dateInput: any): string => {
@@ -19,7 +20,15 @@ const formatDate = (dateInput: any): string => {
     date = dateInput.toDate();
   } else if (typeof dateInput === "object" && "seconds" in dateInput) {
     date = new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds || 0) / 1000000);
-  } else if (typeof dateInput === "string" || typeof dateInput === "number") {
+  } else if (typeof dateInput === "string") {
+    // Handle DD/MM/YYYY format
+    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      date = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    } else {
+      date = new Date(dateInput);
+    }
+  } else if (typeof dateInput === "number") {
     date = new Date(dateInput);
   } else {
     return "";
@@ -68,35 +77,68 @@ export default function EventDetailPage() {
   // State
   const [eventData, setEventData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteEvent, setShowDeleteEvent] = useState(false);
   
   // Unwrap ID
   const rawId = params?.id;
   const eventId = Array.isArray(rawId) ? rawId[0] : rawId;
 
   // Fetch event dari Firebase
+  const fetchEvent = async () => {
+    if (authLoading) return;
+    if (!userId || !eventId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const allEvents = await getEventsWithActivities(userId);
+      const event = allEvents.find((e) => e.id === eventId);
+      setEventData(event || null);
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      setEventData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchEvent = async () => {
-      if (authLoading) return;
-      if (!userId || !eventId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const allEvents = await getEventsWithActivities(userId);
-        const event = allEvents.find((e) => e.id === eventId);
-        setEventData(event || null);
-      } catch (error) {
-        console.error("Error fetching event:", error);
-        setEventData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchEvent();
   }, [userId, eventId, authLoading]);
+
+  // Delete activity handler
+  const confirmDeleteActivity = async () => {
+    if (!userId || !eventId || !activityToDelete) return;
+    try {
+      setDeleting(true);
+      await deleteActivity(userId, eventId, activityToDelete);
+      await fetchEvent(); // Refresh data
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      alert("Failed to delete activity.");
+    } finally {
+      setDeleting(false);
+      setActivityToDelete(null);
+    }
+  };
+
+  // Delete event handler
+  const confirmDeleteEvent = async () => {
+    if (!userId || !eventId) return;
+    try {
+      await deleteEvent(userId, eventId);
+      router.replace("/home");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Failed to delete event.");
+    } finally {
+      setShowDeleteEvent(false);
+    }
+  };
 
   // HANDLING LOADING
   if (loading) {
@@ -137,8 +179,8 @@ export default function EventDetailPage() {
              date: formatDate(eventData.date),
            }}
            onBackClick={() => router.back()}
-           onEditClick={() => router.push(`/event/${eventId}/edit`)} // Edit Event Info
-           onDeleteClick={() => console.log("Delete clicked")}
+           onEditClick={() => router.push(`/event/${eventId}/edit`)}
+           onDeleteClick={() => setShowDeleteEvent(true)}
         />
       </div>
 
@@ -192,6 +234,17 @@ export default function EventDetailPage() {
                             minimumFractionDigits: 0 
                         }).format(totalBill)}
                     </span>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivityToDelete(activity.id);
+                      }}
+                      className="p-2 rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                  );
                })}
@@ -207,6 +260,24 @@ export default function EventDetailPage() {
             <span className="mt-0.5 text-ui-black">Summarize</span>
         </button>
       </div>
+
+      {/* DELETE ACTIVITY CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={!!activityToDelete}
+        onClose={() => setActivityToDelete(null)}
+        onConfirm={confirmDeleteActivity}
+        title="Delete Activity?"
+        name="this activity"
+      />
+
+      {/* DELETE EVENT CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={showDeleteEvent}
+        onClose={() => setShowDeleteEvent(false)}
+        onConfirm={confirmDeleteEvent}
+        title="Delete Event?"
+        name={eventData?.title || "this event"}
+      />
 
     </div>
   );

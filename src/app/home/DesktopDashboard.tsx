@@ -5,7 +5,7 @@ import EventList from "@/components/features/EventList";
 import { Item } from "@/lib/dummy-data";
 import NewActivityModal from "@/components/features/NewActivityModal";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities } from "@/lib/firestore";
+import { getEventsWithActivities, deleteActivity } from "@/lib/firestore";
 import { 
     ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus, Edit2, 
     Trash2, Check, Save, RotateCcw, 
@@ -544,6 +544,7 @@ export default function DesktopDashboard() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
     const [events, setEvents] = useState<any[]>([]);
+    const [eventsLoading, setEventsLoading] = useState(true);
     const { userId, loading: authLoading } = useAuth();
 
     // State Modal & Refresh
@@ -555,22 +556,26 @@ export default function DesktopDashboard() {
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
     // Fetch events from Firebase
+    const refreshEvents = async () => {
+        if (authLoading || !userId) {
+            if (!authLoading) setEvents([]);
+            setEventsLoading(false);
+            return;
+        }
+        try {
+            setEventsLoading(true);
+            const data = await getEventsWithActivities(userId);
+            setEvents(data);
+        } catch (error) {
+            console.error("Error loading events:", error);
+            setEvents([]);
+        } finally {
+            setEventsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const loadEvents = async () => {
-            if (authLoading) return;
-            if (!userId) {
-                setEvents([]);
-                return;
-            }
-            try {
-                const data = await getEventsWithActivities(userId);
-                setEvents(data);
-            } catch (error) {
-                console.error("Error loading events:", error);
-                setEvents([]);
-            }
-        };
-        loadEvents();
+        refreshEvents();
     }, [userId, authLoading]);
 
     const activeEvent = events.find((e: any) => e.id === selectedEventId);
@@ -630,23 +635,25 @@ export default function DesktopDashboard() {
         setActivityToDelete(activityId);
     };
 
-    const confirmDeleteActivity = () => {
-        if (!selectedEventId || !activityToDelete) return;
+    const confirmDeleteActivity = async () => {
+        if (!selectedEventId || !activityToDelete || !userId) return;
         
-        const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
-        if (eventIndex !== -1) {
-            // @ts-ignore
-            events[eventIndex].activities = events[eventIndex].activities.filter((a: any) => a.id !== activityToDelete);
+        try {
+            await deleteActivity(userId, selectedEventId, activityToDelete);
             
             // Tutup detail kalo yang dihapus lagi dibuka
             if (selectedActivityId === activityToDelete) {
                 setSelectedActivityId(null);
             }
-            setRefreshKey(prev => prev + 1);
+            
+            // Refresh from Firebase
+            await refreshEvents();
+        } catch (error) {
+            console.error("Error deleting activity:", error);
+            alert("Failed to delete activity.");
+        } finally {
+            setActivityToDelete(null);
         }
-        
-        // Reset State
-        setActivityToDelete(null);
     };
 
     // ... (Handler Create/Edit Activity yg lama tetep sama)
@@ -694,7 +701,7 @@ export default function DesktopDashboard() {
             <div className="shrink-0 flex flex-col w-[35%] xl:w-[320px]">
                 <h2 className="text-2xl font-bold font-display text-ui-black mb-6 px-1">Dashboard</h2>
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 flex-1 overflow-hidden flex flex-col">
-                    <EventList key={refreshKey} activeId={selectedEventId} onEventClick={(id) => { setSelectedEventId(id); setSelectedActivityId(null); }} events={events} />
+                    <EventList key={refreshKey} activeId={selectedEventId} onEventClick={(id) => { setSelectedEventId(id); setSelectedActivityId(null); }} events={events} onRefresh={refreshEvents} />
                 </div>
             </div>
 
