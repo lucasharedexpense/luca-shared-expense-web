@@ -33,7 +33,15 @@ export default function EventList({ onEventClick, activeId, events: providedEven
 
   // Sync events when parent re-fetches
   useEffect(() => {
-    if (providedEvents) setEvents(providedEvents);
+    if (providedEvents) {
+      // Sort by createdAt descending (newest first)
+      const sorted = [...providedEvents].sort((a, b) => {
+        const aCreated = a.createdAt || 0;
+        const bCreated = b.createdAt || 0;
+        return bCreated - aCreated;
+      });
+      setEvents(sorted);
+    }
   }, [providedEvents]);
 
   // --- STATE UNTUK EDIT ---

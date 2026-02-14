@@ -184,10 +184,8 @@ export async function getEventsWithActivities(
     const eventsWithActivitiesPromises = eventsSnapshot.docs.map(
       async (eventDoc) => {
         const event = docToEvent(eventDoc);
-
         // Fetch activities for this event (nested sub-collection)
         const activities = await getActivitiesForEvent(userId, event.id);
-
         // Combine event with its activities and add title field for component compatibility
         return {
           ...event,
@@ -198,9 +196,14 @@ export async function getEventsWithActivities(
     );
 
     // Step 3: Wait for all parallel fetches to complete
-    const eventsWithActivities = await Promise.all(
-      eventsWithActivitiesPromises
-    );
+    let eventsWithActivities = await Promise.all(eventsWithActivitiesPromises);
+
+    // Sort by createdAt descending (newest first)
+    eventsWithActivities = eventsWithActivities.sort((a, b) => {
+      const aCreated = a.createdAt || 0;
+      const bCreated = b.createdAt || 0;
+      return bCreated - aCreated;
+    });
 
     console.log(
       `✅ Fetched ${eventsWithActivities.length} events with activities`
@@ -208,7 +211,7 @@ export async function getEventsWithActivities(
     return eventsWithActivities;
   } catch (error) {
     console.error("Error fetching events with activities:", error);
-    throw error;
+    return [];
   }
 }
 
@@ -282,6 +285,7 @@ export async function createEvent(
       imageUrl: data.imageUrl || "",
       participants: data.participants,
       settlementResultJson: "{}",
+      createdAt: Date.now(),
     });
     console.log(`✅ Created event: ${docRef.id}`);
     return docRef.id;

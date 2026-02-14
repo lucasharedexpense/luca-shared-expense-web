@@ -6,15 +6,27 @@ import { useAuth } from "@/lib/auth-context";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 import { uploadEventImage } from "@/lib/firebase-storage";
 
-// Helper (Sama kayak sebelumnya)
+
+// Helper: Get avatar color
 const getAvatarColor = (name: string) => {
   const colors = ["bg-red-100", "bg-blue-100", "bg-green-100", "bg-orange-100", "bg-purple-100", "bg-teal-100"];
   return colors[name.length % colors.length];
 };
 
+// Helper: Get avatar src
 const getAvatarSrc = (avatarName: string) => {
   if (avatarName?.startsWith("http")) return avatarName;
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
+};
+
+// Helper: Alphabetical sort, non-alphabetic at bottom
+const alphaSort = (a: { name: string }, b: { name: string }) => {
+  const isAlpha = (str: string) => /^[A-Za-z]/.test(str);
+  const aAlpha = isAlpha(a.name);
+  const bAlpha = isAlpha(b.name);
+  if (aAlpha && !bAlpha) return -1;
+  if (!aAlpha && bAlpha) return 1;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 };
 
 interface NewEventModalProps {
@@ -138,9 +150,15 @@ export default function NewEventModal({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !user?.uid) return;
+    // Require at least one contact selected (so total participants is at least 2)
+    if (selectedContacts.length < 1) {
+      alert("Please select at least one participant to create an event.");
+      return;
+    }
 
     let imageUrl = initialData?.imageUrl || "";
 
@@ -158,16 +176,21 @@ export default function NewEventModal({
       }
     }
 
-    const participants = selectedContacts.map(c => ({
-      name: c.name,
-      avatarName: c.avatarName || c.name,
-    }));
+    // Sort participants before submit
+    const participants = selectedContacts
+      .slice()
+      .sort(alphaSort)
+      .map(c => ({
+        name: c.name,
+        avatarName: c.avatarName || c.name,
+      }));
     onSubmit({ title, date: new Date(date), location, imageUrl, participants });
   };
 
-  // Filter Contacts from Firebase data
+  // Filter and sort Contacts from Firebase data
   const filteredContacts = contacts
-    .filter(c => c.name.toLowerCase().includes(searchContact.toLowerCase()));
+    .filter(c => c.name.toLowerCase().includes(searchContact.toLowerCase()))
+    .sort(alphaSort);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
@@ -196,20 +219,26 @@ export default function NewEventModal({
             
             {/* Input Title */}
             <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Event Name</label>
-                <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        <Type className="w-4 h-4" />
-                    </div>
-                    <input 
-                        autoFocus
-                        type="text" 
-                        placeholder="e.g. Trip to Japan" 
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full h-12 pl-11 pr-4 rounded-xl bg-gray-50 border border-transparent focus:bg-white focus:border-ui-accent-yellow focus:ring-4 focus:ring-ui-accent-yellow/10 transition-all outline-none font-medium text-ui-black"
-                    />
+              <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Event Name</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Type className="w-4 h-4" />
                 </div>
+                <input 
+                  autoFocus
+                  type="text" 
+                  placeholder="e.g. Trip to Japan" 
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full h-12 pl-11 pr-4 rounded-xl bg-gray-50 border border-transparent focus:bg-white focus:border-ui-accent-yellow focus:ring-4 focus:ring-ui-accent-yellow/10 transition-all outline-none font-medium text-ui-black"
+                />
+              </div>
+              {title.trim().length === 0 && (
+                <div className="mt-1 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg flex items-center gap-2">
+                <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Event name is required.
+                </div>
+              )}
             </div>
 
             {/* Input Date */}
@@ -302,6 +331,13 @@ export default function NewEventModal({
                     <label className="text-xs font-bold text-gray-400 ml-1 uppercase tracking-wider">Invite Friends</label>
                     <span className="text-xs font-bold text-ui-accent-yellow">{selectedContacts.length} Selected</span>
                 </div>
+                {/* Warn if not enough participants */}
+                {selectedContacts.length < 1 && (
+                  <div className="mb-2 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs rounded-lg flex items-center gap-2">
+                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Please select at least one participant to create an event.
+                  </div>
+                )}
                 {/* Search */}
                 <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -379,12 +415,12 @@ export default function NewEventModal({
                 Cancel
             </button>
             <button 
-                type="submit"
-                form="createEventForm"
-                disabled={!title.trim() || isLoading || uploading}
-                className="flex-1 h-12 rounded-xl bg-ui-accent-yellow text-ui-black font-bold shadow-lg shadow-ui-accent-yellow/20 hover:brightness-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              type="submit"
+              form="createEventForm"
+              disabled={!title.trim() || isLoading || uploading || selectedContacts.length < 1}
+              className="flex-1 h-12 rounded-xl bg-ui-accent-yellow text-ui-black font-bold shadow-lg shadow-ui-accent-yellow/20 hover:brightness-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-                {(isLoading || uploading) ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Event")}
+              {(isLoading || uploading) ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Event")}
             </button>
         </div>
       </div>
