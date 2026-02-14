@@ -19,13 +19,10 @@ import { getContacts, ContactData } from "@/lib/firebase-contacts";
 
 // Define the shape of data returned by this form
 export interface EventFormData {
-  title: string;
-  location: string;
-  date: string;
-  participants: {
-      name: string;
-      avatarName: string;
-  }[];
+   title: string;
+   location: string;
+   date: string;
+   participantIds: string[]; // Only store contact IDs
 }
 
 interface EventFormProps {
@@ -86,48 +83,47 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
     return new Date().toISOString().split('T')[0];
   });
 
-  // Convert participants from Event format back to Contact-like format for the state
-  const [selectedParticipants, setSelectedParticipants] = useState<any[]>(
-    initialData?.participants.map(p => ({
-        id: p.name, // Fallback ID since simple participant obj might not have one
-        name: p.name,
-        avatarName: p.avatarName,
-        phoneNumber: "" 
-    })) || []
-  );
+   // Store only the contact ID in selectedParticipants for true sync
+   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+      initialData?.participants
+         ? initialData.participants.map((p) => {
+               // Try to find the contact by name and avatarName (legacy events)
+               const found = firebaseContacts.find(
+                  (c) => c.name === p.name && c.avatarName === p.avatarName
+               );
+               return found ? found.id : null;
+            }).filter(Boolean)
+         : []
+   );
   
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // --- HANDLERS ---
-  const handleSave = () => {
-    if (!title || !date) {
-      alert("Please fill in Title and Date!");
-      return;
-    }
+   const handleSave = () => {
+      if (!title || !date) {
+         alert("Please fill in Title and Date!");
+         return;
+      }
 
-    const formData: EventFormData = {
-      title,
-      location,
-      date,
-      participants: selectedParticipants.map(c => ({
-         name: c.name,
-         avatarName: c.avatarName
-      }))
-    };
+      // Store only contact IDs
+      const formData: EventFormData = {
+         title,
+         location,
+         date,
+         participantIds: selectedParticipants,
+      };
 
-    onSubmit(formData);
-  };
+      onSubmit(formData);
+   };
 
-  const toggleParticipant = (contact: Contact) => {
-    // Check by ID first, fallback to Name (since event participants might not have ID ref)
-    const exists = selectedParticipants.find(p => p.id === contact.id || p.name === contact.name);
-    
-    if (exists) {
-      setSelectedParticipants(prev => prev.filter(p => p.name !== contact.name));
-    } else {
-      setSelectedParticipants(prev => [...prev, contact]);
-    }
-  };
+   const toggleParticipant = (contact: Contact) => {
+      const exists = selectedParticipants.includes(contact.id);
+      if (exists) {
+         setSelectedParticipants((prev) => prev.filter((id) => id !== contact.id));
+      } else {
+         setSelectedParticipants((prev) => [...prev, contact.id]);
+      }
+   };
 
   return (
     <div className="flex flex-col h-full w-full bg-ui-white z-1">
@@ -205,33 +201,37 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
                
                {/* Avatar Row + Add Button */}
-               <div className="flex items-center bg-ui-grey rounded-xl px-2 gap-3 overflow-x-auto no-scrollbar py-2 min-h-16">
-                  <button 
-                     onClick={() => setIsContactModalOpen(true)}
-                     className="w-12 h-12 rounded-full border-2 border-dashed border-ui-dark-grey/30 flex items-center justify-center shrink-0 hover:border-ui-accent-yellow hover:bg-ui-accent-yellow/10 transition-all active:scale-95 group"
-                  >
-                     <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
-                  </button>
+              <div className="flex items-center bg-ui-grey rounded-xl px-2 gap-3 overflow-x-auto no-scrollbar py-2 min-h-16">
+                 <button 
+                    onClick={() => setIsContactModalOpen(true)}
+                    className="w-12 h-12 rounded-full border-2 border-dashed border-ui-dark-grey/30 flex items-center justify-center shrink-0 hover:border-ui-accent-yellow hover:bg-ui-accent-yellow/10 transition-all active:scale-95 group"
+                 >
+                    <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
+                 </button>
 
-                  {selectedParticipants.map((p, idx) => (
-                     <div key={idx} className="relative group shrink-0 animate-in fade-in zoom-in duration-200">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border border-ui-grey">
-                            <img 
-                              src={p.avatarName?.startsWith("http") ? p.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} 
-                              alt={p.name}
-                              className="w-full h-full object-cover"
-                            />
-                        </div>
-                        {/* Remove Badge (Hover) */}
-                        <button 
-                           onClick={() => toggleParticipant(p)}
-                           className="absolute -top-1 -right-1 w-5 h-5 bg-ui-accent-red text-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                           <X className="w-3 h-3" />
-                        </button>
-                     </div>
-                  ))}
-               </div>
+                          {selectedParticipants.map((id, idx) => {
+                             const contact = firebaseContacts.find((c) => c.id === id);
+                             if (!contact) return null;
+                             return (
+                                <div key={id} className="relative group shrink-0 animate-in fade-in zoom-in duration-200">
+                                   <div className="w-12 h-12 rounded-full overflow-hidden border border-ui-grey">
+                                      <img
+                                         src={contact.avatarName?.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`}
+                                         alt={contact.name}
+                                         className="w-full h-full object-cover"
+                                      />
+                                   </div>
+                                   {/* Remove Badge (Hover) */}
+                                   <button
+                                      onClick={() => toggleParticipant(contact)}
+                                      className="absolute -top-1 -right-1 w-5 h-5 bg-ui-accent-red text-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                   >
+                                      <X className="w-3 h-3" />
+                                   </button>
+                                </div>
+                             );
+                          })}
+              </div>
             </div>
 
          </div>

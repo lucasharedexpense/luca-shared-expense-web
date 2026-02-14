@@ -26,6 +26,7 @@ import {
   deleteAccount, 
   logout 
 } from "@/lib/firebase-auth";
+import { getEventsWithActivities, updateEvent } from "@/lib/firestore";
 
 // --- HELPER: GET AVATAR URL ---
 const getAvatarUrl = (avatarName: string) => {
@@ -288,6 +289,23 @@ export default function AccountSettingsPage() {
     try {
       await updateUserProfile(authUser.uid, { avatarName });
       setUserProfile(prev => prev ? { ...prev, avatar: avatarName } : null);
+      // --- AUTO UPDATE ALL EVENTS PARTICIPANT AVATAR ---
+      // 1. Fetch all events for this user
+      const events = await getEventsWithActivities(authUser.uid);
+      // 2. For each event, update the participant entry for the user
+      await Promise.all(events.map(async (event) => {
+        if (!event.participants) return;
+        const updatedParticipants = event.participants.map((p: any) => {
+          if (
+            (p.userId && p.userId === authUser.uid) ||
+            (!p.userId && (p.name === authUser.displayName || p.name === authUser.email || p.name === userProfile?.username))
+          ) {
+            return { ...p, avatarName };
+          }
+          return p;
+        });
+        await updateEvent(authUser.uid, event.id, { participants: updatedParticipants });
+      }));
       setToastMessage("Profile picture updated");
     } catch (error) {
       console.error("Error updating avatar:", error);
