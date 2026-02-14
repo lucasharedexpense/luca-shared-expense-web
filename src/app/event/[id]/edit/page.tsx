@@ -64,15 +64,21 @@ export default function EditEventPage() {
 
   const handleUpdate = async (data: EventFormData) => {
     if (!userId || !eventId) return;
-    
     try {
+      // Fetch latest contacts (simulate, should be passed down or fetched in real app)
+      // Here, eventData.participants should be updated to use the latest contact info by ID
+      const allContacts = eventData?.allContacts || [];
+      const participants = data.participantIds.map((id: string) => {
+        const contact = allContacts.find((c: any) => c.id === id);
+        return contact ? { name: contact.name, avatarName: contact.avatarName } : { name: "Unknown", avatarName: "" };
+      });
       await updateEvent(userId, eventId, {
         title: data.title,
         location: data.location,
         date: new Date(data.date),
-        participants: data.participants,
+        participants,
       });
-      router.back(); // Return to Detail Page
+      router.back();
     } catch (error) {
       console.error("Error updating event:", error);
       alert("Failed to update event.");

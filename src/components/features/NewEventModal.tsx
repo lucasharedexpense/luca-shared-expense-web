@@ -322,37 +322,42 @@ export default function NewEventModal({
                         </div>
                     ) : filteredContacts.length > 0 ? (
                         filteredContacts.map((contact) => {
-                            const isSelected = selectedContacts.some(c => c.id === contact.id || c.name === contact.name);
-                            const avatarSrc = `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`;
-                            const bgColor = getAvatarColor(contact.name);
+                          const isSelected = selectedContacts.some(c => c.id === contact.id || c.name === contact.name);
+                          // Use the actual avatarName from the contact, fallback to Dicebear if not present
+                          const avatarSrc = contact.avatarName?.startsWith("http")
+                            ? contact.avatarName
+                            : contact.avatarName
+                              ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.avatarName}`
+                              : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`;
+                          const bgColor = getAvatarColor(contact.name);
 
-                            return (
-                                <div 
-                                    key={contact.id}
-                                    onClick={() => toggleParticipant(contact)}
-                                    className={`
-                                        flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all select-none
-                                        ${isSelected 
-                                            ? "bg-ui-accent-yellow/10 border-ui-accent-yellow ring-1 ring-ui-accent-yellow" 
-                                            : "bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50"
-                                        }
-                                    `}
-                                >
-                                    <div className="relative shrink-0">
-                                        <div className={`w-9 h-9 rounded-full overflow-hidden border border-gray-100 ${bgColor}`}>
-                                            <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover"/>
-                                        </div>
-                                        {isSelected && (
-                                            <div className="absolute -bottom-1 -right-1 bg-ui-accent-yellow rounded-full p-0.5 border-2 border-white shadow-sm">
-                                                <Check className="w-2.5 h-2.5 text-ui-black" strokeWidth={4} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <span className={`text-sm font-medium truncate ${isSelected ? "text-ui-black font-bold" : "text-gray-600"}`}>
-                                        {contact.name}
-                                    </span>
+                          return (
+                            <div 
+                              key={contact.id}
+                              onClick={() => toggleParticipant(contact)}
+                              className={`
+                                flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all select-none
+                                ${isSelected 
+                                  ? "bg-ui-accent-yellow/10 border-ui-accent-yellow ring-1 ring-ui-accent-yellow" 
+                                  : "bg-white border-gray-100 hover:border-gray-300 hover:bg-gray-50"
+                                }
+                              `}
+                            >
+                              <div className="relative shrink-0">
+                                <div className={`w-9 h-9 rounded-full overflow-hidden border border-gray-100 ${bgColor}`}>
+                                  <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover"/>
                                 </div>
-                            )
+                                {isSelected && (
+                                  <div className="absolute -bottom-1 -right-1 bg-ui-accent-yellow rounded-full p-0.5 border-2 border-white shadow-sm">
+                                    <Check className="w-2.5 h-2.5 text-ui-black" strokeWidth={4} />
+                                  </div>
+                                )}
+                              </div>
+                              <span className={`text-sm font-medium truncate ${isSelected ? "text-ui-black font-bold" : "text-gray-600"}`}>
+                                {contact.name}
+                              </span>
+                            </div>
+                          )
                         })
                     ) : (
                         <div className="col-span-1 sm:col-span-2 text-center py-8 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
