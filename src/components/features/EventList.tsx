@@ -7,6 +7,7 @@ import AvatarStack from "@/components/ui/AvatarStack";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
+import { getUserProfile } from "@/lib/firebase-auth";
 
 // Helper hitung total
 const getEventTotal = (event: any) => {
@@ -88,12 +89,21 @@ export default function EventList({ onEventClick, activeId, events: providedEven
     setIsLoading(true);
 
     try {
+      // Fetch current user's profile from Firestore
+      const userProfile = await getUserProfile(user.uid);
+      const currentUserParticipant = userProfile
+        ? {
+            name: userProfile.username || user.displayName || "You",
+            avatarName: userProfile.avatarName || userProfile.username || user.displayName || "You",
+          }
+        : {
+            name: user.displayName || "You",
+            avatarName: user.displayName || "You",
+          };
+
       // Always include current user as first participant
       const allParticipants = [
-        {
-          name: user.displayName || "You",
-          avatarName: user.displayName || "You",
-        },
+        currentUserParticipant,
         ...data.participants,
       ];
 
@@ -216,8 +226,18 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                             
                             {/* Footer Card */}
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 pl-2">
-                                <AvatarStack 
-                                    avatars={event.participants?.map((p: any) => p.avatarName || p.name?.charAt(0)?.toUpperCase() || "?") || []}
+                                <AvatarStack
+                                    avatars={
+                                      event.participants?.map((p: any) => {
+                                        // If avatarName is a URL, use it directly
+                                        if (p.avatarName && typeof p.avatarName === "string" && p.avatarName.startsWith("http")) {
+                                          return p.avatarName;
+                                        }
+                                        // Otherwise, generate Dicebear avatar from avatarName or fallback to name
+                                        const seed = p.avatarName || p.name || "user";
+                                        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+                                      }) || []
+                                    }
                                     size={24}
                                     overlap={-8}
                                     limit={3}
