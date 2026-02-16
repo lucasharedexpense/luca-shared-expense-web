@@ -60,8 +60,8 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
     if (initialData?.date) {
       try {
         let d: Date;
-        if (typeof initialData.date === 'object' && 'toDate' in initialData.date) {
-          d = initialData.date.toDate();
+        if (typeof initialData.date === 'object' && initialData.date !== null && 'toDate' in initialData.date) {
+          d = (initialData.date as any).toDate();
         } else if (typeof initialData.date === 'string') {
           // Handle DD/MM/YYYY format from Firebase
           const ddmmyyyy = initialData.date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -92,7 +92,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                   (c) => c.name === p.name && c.avatarName === p.avatarName
                );
                return found ? found.id : null;
-            }).filter(Boolean)
+            }).filter((id): id is string => id !== null)
          : []
    );
   
@@ -270,8 +270,8 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                     </div>
                   ) : (
                   firebaseContacts.map((contact) => {
-                     // Check if participant is selected (by ID or Name)
-                     const isSelected = selectedParticipants.some(p => p.id === contact.id || p.name === contact.name);
+                     // Check if participant is selected (by ID)
+                     const isSelected = selectedParticipants.includes(contact.id);
                      return (
                         <div 
                            key={contact.id}
