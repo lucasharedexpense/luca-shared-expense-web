@@ -17,7 +17,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
   // 1. DAFTAR HALAMAN (CONFIG)
   // Halaman utama yang punya Bottom Navbar
-  const mainNavPaths = ["/scan", "/contacts", "/home"]; 
+  const mainNavPaths = ["/contacts", "/home"]; 
   
   // Halaman yang TIDAK boleh ada Header Global (Fullscreen pages)
   const noHeaderPaths = [
@@ -40,9 +40,12 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   // Cek apakah halaman Activity Detail (mengandung "/activity/")
   const isActivityPage = pathname.includes("/activity/");
 
+  // Cek apakah halaman Scan (semua route /scan/*)
+  const isScanPage = pathname.startsWith("/scan");
+
   // 3. FINAL BOOLEANS (HASIL)
-  // A. Show Header: Muncul jika BUKAN halaman 'noHeader' DAN BUKAN mode edit
-  const shouldShowHeader = !noHeaderPaths.includes(pathname) && !isEditPage;
+  // A. Show Header: Muncul jika BUKAN halaman 'noHeader' DAN BUKAN mode edit DAN BUKAN scan pages (scan punya header sendiri)
+  const shouldShowHeader = !noHeaderPaths.includes(pathname) && !isEditPage && !isScanPage;
 
   // B. Show Navbar: Hanya di halaman utama
   const shouldShowNavbar = mainNavPaths.includes(pathname);
@@ -70,7 +73,9 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
     headerVariant = "EVENT_DETAILS"; 
   } else if (pathname === "/profile") {
     headerVariant = "ACCOUNT_SETTINGS";
-  } else if (pathname === "/scan" || pathname === "/contacts") {
+  } else if (pathname === "/scan") {
+    headerVariant = "SCAN";
+  } else if (pathname === "/contacts") {
     headerVariant = "HOME";
   }
 
@@ -91,9 +96,11 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           <Header 
             variant={headerVariant} 
             onLeftIconClick={() => {
-              // Kalau mode HOME, buka Sidebar. Kalau mode lain (Details), Back.
+              // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home. Kalau mode lain (Details), Back.
               if (headerVariant === "HOME") {
                 setIsSidebarOpen(true);
+              } else if (headerVariant === "SCAN") {
+                router.push("/home");
               } else {
                 router.back();
               }
@@ -115,6 +122,8 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           onItemSelected={handleNavSelect}
           // Tombol Plus di Navbar mengarah ke halaman Add Event
           onAddClick={() => router.push("/new-event")}
+          // Tombol Scan mengarah ke halaman Scan (kamera akan terbuka otomatis)
+          onScanClick={() => router.push("/scan")}
         />
       )}
 
