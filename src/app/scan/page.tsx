@@ -1,5 +1,14 @@
-import ScanScreen from "@/components/screens/ScanScreen";
+"use client";
 
-export default function Page() {
-  return <ScanScreen />;
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function ScanPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push("/scan/camera");
+  }, [router]);
+
+  return null;
 }

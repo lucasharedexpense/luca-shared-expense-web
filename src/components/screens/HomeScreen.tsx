@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ export default function HomeScreen() {
   const [navIndex, setNavIndex] = useState(1);
   const router = useRouter();
   const { userId, loading: authLoading } = useAuth();
+
 
   // Load Data from Firebase
   const loadData = useCallback(async () => {
@@ -39,7 +40,7 @@ export default function HomeScreen() {
     loadData();
   }, [loadData]);
 
-  // Re-fetch when user navigates back (e.g. after creating event)
+
   useEffect(() => {
     const handleFocus = () => {
       if (userId && !authLoading) loadData();
