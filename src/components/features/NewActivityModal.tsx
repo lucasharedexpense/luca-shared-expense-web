@@ -5,6 +5,7 @@ import {
   X, Loader2, Utensils, Car, Ticket, ShoppingBag, 
   MoreHorizontal, Wallet, Check 
 } from "lucide-react";
+import { Contact } from "@/lib/dummy-data";
 
 // --- DUMMY CATEGORIES (Sama kayak sebelumnya) ---
 const CATEGORIES = [
@@ -15,7 +16,9 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' },
 ];
 
-const getAvatarUrl = (avatarName: string) => {
+const getAvatarUrl = (contact: any) => {
+    // Support both Contact objects and contact data objects
+    const avatarName = contact?.avatarName || contact?.name;
     if (avatarName?.startsWith("http")) return avatarName;
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
 };
@@ -32,10 +35,10 @@ interface NewActivityModalProps {
       title: string;
       amount: number;
       category: string;
-      payerName: string;
-      splitAmong: string[];
+      payerId: string;
+      splitAmongIds: string[];
   }) => void;
-  participants: string[];
+  participants: Contact[];
   isLoading?: boolean;
   // --- NEW PROP: INITIAL DATA ---
   initialData?: any; 
@@ -53,8 +56,8 @@ export default function NewActivityModal({
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("food");
-  const [payerName, setPayerName] = useState("");
-  const [splitAmong, setSplitAmong] = useState<string[]>([]);
+  const [payerId, setPayerId] = useState("");
+  const [splitAmongIds, setSplitAmongIds] = useState<string[]>([]);
 
   // --- EFFECT: POPULATE FORM IF EDITING ---
   useEffect(() => {
@@ -64,21 +67,21 @@ export default function NewActivityModal({
             setTitle(initialData.title);
             
             // Hitung total amount dari items yang ada
-            const total = initialData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+            const total = initialData.items?.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0) || 0;
             setAmount(new Intl.NumberFormat("id-ID").format(total));
             
             // Set fields lainnya (Asumsi category default 'food' kalau ga ada di data dummy)
             setCategory(initialData.category || "food"); 
-            setPayerName(initialData.payerName);
-            setSplitAmong(initialData.participants); // List orang yang terlibat split
+            setPayerId(initialData.payerId || "");
+            setSplitAmongIds(initialData.splitAmongIds || []); // List contact IDs
         } else {
             // MODE CREATE (RESET)
             setTitle("");
             setAmount("");
             setCategory("food");
             if (participants.length > 0) {
-                setPayerName(participants[0]); 
-                setSplitAmong(participants); 
+                setPayerId(participants[0].id); 
+                setSplitAmongIds(participants.map(p => p.id)); 
             }
         }
     }
@@ -86,28 +89,28 @@ export default function NewActivityModal({
 
   if (!isOpen) return null;
 
-  const handleToggleSplit = (name: string) => {
-    if (splitAmong.includes(name)) {
-      if (splitAmong.length > 1) { 
-        setSplitAmong(prev => prev.filter(p => p !== name));
+  const handleToggleSplit = (id: string) => {
+    if (splitAmongIds.includes(id)) {
+      if (splitAmongIds.length > 1) { 
+        setSplitAmongIds(prev => prev.filter(p => p !== id));
       }
     } else {
-      setSplitAmong(prev => [...prev, name]);
+      setSplitAmongIds(prev => [...prev, id]);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = parseInt(amount.replace(/\D/g, ""));
+    const numericAmount = parseInt(amount.replace(/\D/g, "")) || 0;
     
-    if (!title.trim() || isNaN(numericAmount) || numericAmount <= 0) return;
+    if (!title.trim()) return;
     
     onSubmit({
         title,
         amount: numericAmount,
         category,
-        payerName,
-        splitAmong
+        payerId,
+        splitAmongIds
     });
   };
 
@@ -145,33 +148,17 @@ export default function NewActivityModal({
         <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
             <form id="createActivityForm" onSubmit={handleSubmit} className="flex flex-col gap-8">
             
-                {/* 1. TITLE & AMOUNT */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Activity Title</label>
-                        <input 
-                            autoFocus
-                            type="text" 
-                            placeholder="e.g. Dinner at Sushi Tei" 
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            className="w-full text-xl font-bold text-ui-black placeholder:text-gray-300 outline-none border-b-2 border-gray-100 focus:border-ui-accent-yellow py-2 transition-colors bg-transparent"
-                        />
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Amount (IDR)</label>
-                        <div className="flex items-center gap-2 border-b-2 border-gray-100 focus-within:border-ui-accent-yellow transition-colors py-2">
-                            <span className="text-xl font-bold text-gray-400">Rp</span>
-                            <input 
-                                type="text" 
-                                placeholder="0"
-                                value={amount}
-                                onChange={handleAmountChange}
-                                className="w-full text-2xl font-bold text-ui-black placeholder:text-gray-300 outline-none bg-transparent font-mono"
-                            />
-                        </div>
-                    </div>
+                {/* 1. TITLE */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Activity Title</label>
+                    <input 
+                        autoFocus
+                        type="text" 
+                        placeholder="e.g. Dinner at Sushi Tei" 
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full text-xl font-bold text-ui-black placeholder:text-gray-300 outline-none border-b-2 border-gray-100 focus:border-ui-accent-yellow py-2 transition-colors bg-transparent"
+                    />
                 </div>
 
                 {/* 2. CATEGORY */}
@@ -212,14 +199,14 @@ export default function NewActivityModal({
                             </label>
                         </div>
                         <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
-                            {participants.map((pName) => {
-                                const isSelected = payerName === pName;
-                                const avatarUrl = getAvatarUrl(pName);
-                                const bgColor = getAvatarColor(pName);
+                            {participants.map((contact) => {
+                                const isSelected = payerId === contact.id;
+                                const avatarUrl = getAvatarUrl(contact);
+                                const bgColor = getAvatarColor(contact.name);
                                 return (
                                     <div 
-                                        key={pName} 
-                                        onClick={() => setPayerName(pName)}
+                                        key={contact.id} 
+                                        onClick={() => setPayerId(contact.id)}
                                         className={`
                                             flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all
                                             ${isSelected 
@@ -229,10 +216,10 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={pName} className="w-full h-full object-cover" />
+                                            <img src={avatarUrl} alt={contact.name} className="w-full h-full object-cover" />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
-                                            {pName}
+                                            {contact.name}
                                         </span>
                                         {isSelected && <Check className="w-4 h-4 text-ui-black ml-auto" />}
                                     </div>
@@ -246,18 +233,18 @@ export default function NewActivityModal({
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Split Among</label>
                             <span className="text-[10px] font-bold bg-ui-accent-yellow/20 px-2 py-0.5 rounded-md text-ui-black">
-                                {splitAmong.length} People
+                                {splitAmongIds.length} People
                             </span>
                         </div>
-                        <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
-                            {participants.map((pName) => {
-                                const isSelected = splitAmong.includes(pName);
-                                const avatarUrl = getAvatarUrl(pName);
-                                const bgColor = getAvatarColor(pName);
+                        <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 no-scrollbar">
+                            {participants.map((contact) => {
+                                const isSelected = splitAmongIds.includes(contact.id);
+                                const avatarUrl = getAvatarUrl(contact);
+                                const bgColor = getAvatarColor(contact.name);
                                 return (
                                     <div 
-                                        key={pName}
-                                        onClick={() => handleToggleSplit(pName)} 
+                                        key={contact.id}
+                                        onClick={() => handleToggleSplit(contact.id)} 
                                         className={`
                                             flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all
                                             ${isSelected 
@@ -267,10 +254,10 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={pName} className="w-full h-full object-cover" />
+                                            <img src={avatarUrl} alt={contact.name} className="w-full h-full object-cover" />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
-                                            {pName}
+                                            {contact.name}
                                         </span>
                                         {isSelected && (
                                             <div className="ml-auto w-5 h-5 bg-ui-accent-yellow rounded-full flex items-center justify-center">
@@ -299,7 +286,7 @@ export default function NewActivityModal({
                 <button 
                     type="submit"
                     form="createActivityForm"
-                    disabled={!title || !amount || isLoading}
+                    disabled={!title || isLoading}
                     className="flex-2 h-12 rounded-xl bg-ui-black text-white font-bold shadow-lg shadow-black/20 hover:opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Activity")}

@@ -5,7 +5,7 @@ import EventList from "@/components/features/EventList";
 import { Item } from "@/lib/dummy-data";
 import NewActivityModal from "@/components/features/NewActivityModal";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, deleteActivity } from "@/lib/firestore";
+import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
 import { 
     ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus, Edit2, 
     Trash2, Check, Save, RotateCcw, 
@@ -66,6 +66,7 @@ const DualInput = ({ baseAmount, amountValue, percentValue, onUpdate }: DualInpu
 // 2. ITEM MODAL (Untuk Tambah/Edit Item di dalam Activity)
 const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants }: any) => {
     const [formData, setFormData] = useState<Item>(initialItem);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (isOpen) setFormData(initialItem);
@@ -82,15 +83,50 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
         }
     };
 
-    // Helper Avatar Url
-    const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
+    // Helper to get avatar URL
+    const getAvatarUrl = (participant: any) => {
+        if (typeof participant === 'string') {
+            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant}`;
+        }
+        const avatarName = participant?.avatarName;
+        if (avatarName?.startsWith("http")) return avatarName;
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || participant?.name || "user"}`;
+    };
+
+    // Helper to get participant name
+    const getParticipantName = (participant: any) => {
+        return typeof participant === 'string' ? participant : participant?.name;
+    };
+
+    const handleSaveClick = async () => {
+        // Validation
+        if (!formData.itemName.trim()) {
+            alert("Please fill in Item Name");
+            return;
+        }
+        if (formData.price <= 0) {
+            alert("Price must be greater than 0");
+            return;
+        }
+        if (formData.memberNames.length === 0) {
+            alert("Please select at least one person");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await onSave(formData);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                     <h3 className="font-bold text-lg text-ui-black">Manage Item</h3>
-                    <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+                    <button onClick={onClose} disabled={isSaving}><X className="w-5 h-5 text-gray-400" /></button>
                 </div>
 
                 <div className="flex flex-col gap-4">
@@ -102,6 +138,7 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                             className="w-full border-b border-gray-200 py-2 font-bold text-lg text-ui-black outline-none focus:border-ui-accent-yellow"
                             placeholder="e.g. Nasi Goreng"
                             autoFocus
+                            disabled={isSaving}
                         />
                     </div>
                     
@@ -114,8 +151,9 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                                     type="number"
                                     value={formData.price || ""}
                                     onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                                    className="w-full border-b border-gray-200 py-2 pl-6 font-bold text-ui-black outline-none focus:border-ui-accent-yellow"
+                                    className="w-full border-b border-gray-200 py-2 pl-6 font-bold text-ui-black outline-none focus:border-ui-accent-yellow disabled:opacity-50"
                                     placeholder="0"
+                                    disabled={isSaving}
                                 />
                             </div>
                         </div>
@@ -125,7 +163,8 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                                 type="number"
                                 value={formData.quantity}
                                 onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || 1 })}
-                                className="w-full border-b border-gray-200 py-2 text-center font-bold text-ui-black outline-none focus:border-ui-accent-yellow"
+                                className="w-full border-b border-gray-200 py-2 text-center font-bold text-ui-black outline-none focus:border-ui-accent-yellow disabled:opacity-50"
+                                disabled={isSaving}
                             />
                         </div>
                     </div>
@@ -133,15 +172,17 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
                         <div className="flex flex-wrap gap-2">
-                            {activityParticipants.map((name: string, idx: number) => {
-                                const isSelected = formData.memberNames.includes(name);
+                            {activityParticipants.map((participant: any, idx: number) => {
+                                const participantName = getParticipantName(participant);
+                                const isSelected = formData.memberNames.includes(participantName);
                                 return (
                                     <button 
                                         key={idx}
-                                        onClick={() => toggleMember(name)}
-                                        className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
+                                        onClick={() => !isSaving && toggleMember(participantName)}
+                                        disabled={isSaving}
+                                        className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden disabled:opacity-50 ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
                                     >
-                                        <img src={getAvatarUrl(name)} className="w-full h-full object-cover" />
+                                        <img src={getAvatarUrl(participant)} alt={participantName} className="w-full h-full object-cover" />
                                     </button>
                                 );
                             })}
@@ -150,10 +191,18 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                 </div>
 
                 <button 
-                    onClick={() => onSave(formData)}
-                    className="w-full py-3 bg-ui-accent-yellow rounded-xl font-bold text-ui-black mt-2 shadow-lg shadow-ui-accent-yellow/20"
+                    onClick={handleSaveClick}
+                    disabled={isSaving}
+                    className="w-full py-3 bg-ui-accent-yellow rounded-xl font-bold text-ui-black mt-2 shadow-lg shadow-ui-accent-yellow/20 hover:brightness-105 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                    Save Item
+                    {isSaving ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-ui-black border-t-transparent rounded-full animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        "Save Item"
+                    )}
                 </button>
             </div>
         </div>
@@ -283,7 +332,7 @@ const EventDetailColumn = ({
 };
 
 // --- COLUMN 3: ACTIVITY DETAIL (NOW WITH EDIT LOGIC) ---
-const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, events }: any) => {
+const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, events, userId }: any) => {
     const event = events.find((e: any) => e.id === eventId);
     const activity = event?.activities.find((a: any) => a.id === activityId);
 
@@ -301,6 +350,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalInitialItem, setModalInitialItem] = useState<Item | null>(null);
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+    const [itemIds, setItemIds] = useState<(string | null)[]>([]);
 
     // 
     // Sync state when activity changes
@@ -308,6 +358,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
         if (activity) {
             setIsEditing(false); // Default view mode
             setItems(JSON.parse(JSON.stringify(activity.items)));
+            setItemIds((activity.items || []).map((item: any) => item.id || null));
             // Reset Calculations (Asumsi data dummy belum nyimpen tax/discount global activity, kita default 0)
             setTaxPercent(10); // Default PPN 10% biar keliatan
             setDiscountAmount(0);
@@ -366,21 +417,72 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
         setIsModalOpen(true);
     };
 
-    const handleDeleteItem = (idx: number) => {
+    const handleDeleteItem = async (idx: number) => {
         if(confirm("Delete item?")) {
-            setItems(prev => prev.filter((_, i) => i !== idx));
+            try {
+                // Delete from Firebase if item has ID
+                if (itemIds[idx] && userId) {
+                    await deleteItem(userId, eventId, activityId, itemIds[idx]);
+                }
+                
+                // Delete from local state
+                setItems(prev => prev.filter((_, i) => i !== idx));
+                setItemIds(prev => prev.filter((_, i) => i !== idx));
+            } catch (error) {
+                console.error("Error deleting item:", error);
+                alert("Failed to delete item.");
+            }
         }
     };
 
-    const handleModalSave = (item: Item) => {
-        if (editingItemIndex !== null) {
-            const newItems = [...items];
-            newItems[editingItemIndex] = item;
-            setItems(newItems);
-        } else {
-            setItems([...items, item]);
+    const handleModalSave = async (item: Item) => {
+        try {
+            if (editingItemIndex !== null) {
+                // Update existing item
+                const itemId = itemIds[editingItemIndex];
+                if (itemId && userId) {
+                    // Update in Firebase
+                    await updateItem(userId, eventId, activityId, itemId, {
+                        itemName: item.itemName,
+                        price: item.price,
+                        quantity: item.quantity,
+                        memberNames: item.memberNames,
+                        discountAmount: item.discountAmount,
+                        taxPercentage: item.taxPercentage,
+                    });
+                }
+                
+                // Update local state
+                const newItems = [...items];
+                newItems[editingItemIndex] = item;
+                setItems(newItems);
+            } else {
+                // Create new item
+                if (userId) {
+                    const itemId = await createItem(userId, eventId, activityId, {
+                        itemName: item.itemName,
+                        price: item.price,
+                        quantity: item.quantity,
+                        memberNames: item.memberNames,
+                        discountAmount: item.discountAmount,
+                        taxPercentage: item.taxPercentage,
+                    });
+                    
+                    // Add to local state with new ID
+                    const newItem = { ...item, id: itemId };
+                    setItems([...items, newItem]);
+                    setItemIds([...itemIds, itemId]);
+                } else {
+                    // Fallback: add without Firebase
+                    setItems([...items, item]);
+                    setItemIds([...itemIds, null]);
+                }
+            }
+            setIsModalOpen(false);
+        } catch (error) {
+            console.error("Error saving item:", error);
+            alert("Failed to save item.");
         }
-        setIsModalOpen(false);
     };
 
     if (!activity) return null;
@@ -656,40 +758,87 @@ export default function DesktopDashboard() {
         }
     };
 
-    // ... (Handler Create/Edit Activity yg lama tetep sama)
     // Helper avatar
     const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
 
-    const handleCreateActivity = (data: { title: string; amount: number; category: string; payerName: string; splitAmong: string[]; }) => {
-        if (!selectedEventId) return;
-        setIsLoading(true);
-        setTimeout(() => {
-            const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
-            if (eventIndex === -1) return;
+    // Convert ParticipantSimple to Contact-like objects with IDs
+    const getParticipantsWithIds = (participants: any[]) => {
+        return participants.map((p, idx) => ({
+            id: `participant-${idx}-${p.name}`,
+            name: p.name,
+            avatarName: p.avatarName,
+            phoneNumber: "",
+            bankAccounts: []
+        })) as any[];
+    };
 
-            const newItems = data.splitAmong.map((participantName: any) => ({
-                itemName: "Shared Split", quantity: 1, price: Math.floor(data.amount / data.splitAmong.length),
-                discountAmount: 0, taxPercentage: 0, timestamp: Date.now(), memberNames: [participantName] 
+    const handleCreateActivity = async (data: { title: string; amount: number; category: string; payerId: string; splitAmongIds: string[]; }) => {
+        if (!selectedEventId || !userId) return;
+        setIsLoading(true);
+        
+        try {
+            // Get the participants array with IDs
+            const participantsWithIds = getParticipantsWithIds(activeEvent?.participants || []);
+            
+            // Map IDs back to names and avatars
+            const payerContact = participantsWithIds.find(p => p.id === data.payerId);
+            const payerName = payerContact?.name || "Unknown";
+            
+            const splitParticipants = data.splitAmongIds.map(id => {
+                const contact = participantsWithIds.find(p => p.id === id);
+                return {
+                    id: contact?.id || id,
+                    name: contact?.name || "Unknown",
+                    avatarName: contact?.avatarName || getAvatarUrl(contact?.name || "Unknown")
+                };
+            });
+
+            const formattedParticipants = splitParticipants.map(p => ({
+                name: p.name,
+                avatarName: p.avatarName
             }));
-            const formattedParticipants = data.splitAmong.map(name => ({ name: name, avatarName: getAvatarUrl(name) }));
+
+            const paidByData = {
+                name: payerName,
+                avatarName: payerContact?.avatarName || getAvatarUrl(payerName)
+            };
 
             if (editingActivity) {
-                // Update Existing Header
-                // @ts-ignore
-                const activities = events[eventIndex].activities;
-                const actIndex = activities.findIndex((a: any) => a.id === editingActivity.id);
-                if (actIndex >= 0) {
-                    activities[actIndex] = { ...activities[actIndex], title: data.title, payerName: data.payerName, participants: formattedParticipants, items: newItems, category: data.category };
-                }
+                // Update Existing Activity in Firebase
+                await updateActivity(userId, selectedEventId, editingActivity.id, {
+                    title: data.title,
+                    amount: data.amount,
+                    category: data.category,
+                    payerId: data.payerId,
+                    splitAmongIds: data.splitAmongIds,
+                    paidBy: paidByData,
+                    participants: formattedParticipants
+                });
             } else {
-                // Create New
-                const newActivity = { id: Math.random().toString(36).substr(2, 9), title: data.title, payerName: data.payerName, items: newItems, participants: formattedParticipants, category: data.category };
-                // @ts-ignore
-                events[eventIndex].activities.unshift(newActivity);
-                setSelectedActivityId(newActivity.id);
+                // Create New Activity in Firebase
+                await createActivity(userId, selectedEventId, {
+                    title: data.title,
+                    amount: data.amount,
+                    category: data.category,
+                    payerId: data.payerId,
+                    splitAmongIds: data.splitAmongIds,
+                    paidBy: paidByData,
+                    participants: formattedParticipants
+                });
             }
-            setIsLoading(false); setShowActivityModal(false); setEditingActivity(null); setRefreshKey(prev => prev + 1); 
-        }, 800);
+
+            // Refresh data from Firebase
+            await refreshEvents();
+            
+            setIsLoading(false); 
+            setShowActivityModal(false); 
+            setEditingActivity(null); 
+            setRefreshKey(prev => prev + 1);
+        } catch (error) {
+            console.error("Error creating/updating activity:", error);
+            alert("Failed to save activity. Please try again.");
+            setIsLoading(false);
+        }
     };
 
     const openCreateModal = () => { setEditingActivity(null); setShowActivityModal(true); };
@@ -741,6 +890,7 @@ export default function DesktopDashboard() {
                             onClose={() => setSelectedActivityId(null)}
                             onUpdateActivity={handleUpdateActivityDetail}
                             events={events}
+                            userId={userId}
                         />
                     </div>
                 </>
@@ -752,8 +902,7 @@ export default function DesktopDashboard() {
                     isOpen={showActivityModal}
                     onClose={() => setShowActivityModal(false)}
                     onSubmit={handleCreateActivity}
-                    // @ts-ignore
-                    participants={activeEvent.participants.map((p: any) => typeof p === 'string' ? p : p.name)}
+                    participants={getParticipantsWithIds(activeEvent.participants)}
                     isLoading={isLoading}
                     initialData={editingActivity}
                 />

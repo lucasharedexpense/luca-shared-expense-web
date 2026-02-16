@@ -347,6 +347,77 @@ export async function deleteEvent(
 }
 
 /**
+ * Create a new activity under users/{userId}/events/{eventId}/activities
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ * Returns the new activity ID
+ */
+export async function createActivity(
+  userId: string,
+  eventId: string,
+  data: {
+    title: string;
+    amount: number;
+    category: string;
+    payerId: string;
+    splitAmongIds: string[];
+    paidBy?: { name: string; avatarName: string };
+    participants?: { name: string; avatarName: string }[];
+  }
+): Promise<string> {
+  try {
+    const activitiesRef = collection(db, "users", userId, "events", eventId, "activities");
+    
+    const docRef = await addDoc(activitiesRef, {
+      title: data.title,
+      amount: data.amount,
+      category: data.category,
+      payerId: data.payerId,
+      splitAmongIds: data.splitAmongIds,
+      paidBy: data.paidBy || {},
+      participants: data.participants || [],
+      payerName: data.paidBy?.name || "",
+      categoryColorHex: "",
+      items: [],
+      createdAt: Date.now(),
+    });
+    
+    console.log(`✅ Created activity: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating activity:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing activity
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ */
+export async function updateActivity(
+  userId: string,
+  eventId: string,
+  activityId: string,
+  data: Partial<{
+    title: string;
+    amount: number;
+    category: string;
+    payerId: string;
+    splitAmongIds: string[];
+    paidBy: { name: string; avatarName: string };
+    participants: { name: string; avatarName: string }[];
+  }>
+): Promise<void> {
+  try {
+    const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
+    await updateDoc(activityRef, data);
+    console.log(`✅ Updated activity: ${activityId}`);
+  } catch (error) {
+    console.error("Error updating activity:", error);
+    throw error;
+  }
+}
+
+/**
  * Delete an activity from an event
  * Path: users/{userId}/events/{eventId}/activities/{activityId}
  */
@@ -361,6 +432,124 @@ export async function deleteActivity(
     console.log(`✅ Deleted activity: ${activityId}`);
   } catch (error) {
     console.error("Error deleting activity:", error);
+    throw error;
+  }
+}
+
+// ==================== CREATE / UPDATE / DELETE ITEM ====================
+
+/**
+ * Create a new item under users/{userId}/events/{eventId}/activities/{activityId}/items
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ * Returns the new item ID
+ */
+export async function createItem(
+  userId: string,
+  eventId: string,
+  activityId: string,
+  data: {
+    itemName: string;
+    price: number;
+    quantity: number;
+    memberNames: string[];
+    discountAmount?: number;
+    taxPercentage?: number;
+  }
+): Promise<string> {
+  try {
+    const itemsRef = collection(
+      db,
+      "users",
+      userId,
+      "events",
+      eventId,
+      "activities",
+      activityId,
+      "items"
+    );
+
+    const docRef = await addDoc(itemsRef, {
+      itemName: data.itemName,
+      price: data.price,
+      quantity: data.quantity,
+      memberNames: data.memberNames,
+      discountAmount: data.discountAmount || 0,
+      taxPercentage: data.taxPercentage || 0,
+      timestamp: Date.now(),
+    });
+
+    console.log(`✅ Created item: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating item:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing item
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ */
+export async function updateItem(
+  userId: string,
+  eventId: string,
+  activityId: string,
+  itemId: string,
+  data: Partial<{
+    itemName: string;
+    price: number;
+    quantity: number;
+    memberNames: string[];
+    discountAmount: number;
+    taxPercentage: number;
+  }>
+): Promise<void> {
+  try {
+    const itemRef = doc(
+      db,
+      "users",
+      userId,
+      "events",
+      eventId,
+      "activities",
+      activityId,
+      "items",
+      itemId
+    );
+    await updateDoc(itemRef, data);
+    console.log(`✅ Updated item: ${itemId}`);
+  } catch (error) {
+    console.error("Error updating item:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an item from an activity
+ * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ */
+export async function deleteItem(
+  userId: string,
+  eventId: string,
+  activityId: string,
+  itemId: string
+): Promise<void> {
+  try {
+    const itemRef = doc(
+      db,
+      "users",
+      userId,
+      "events",
+      eventId,
+      "activities",
+      activityId,
+      "items",
+      itemId
+    );
+    await deleteDoc(itemRef);
+    console.log(`✅ Deleted item: ${itemId}`);
+  } catch (error) {
+    console.error("Error deleting item:", error);
     throw error;
   }
 }
