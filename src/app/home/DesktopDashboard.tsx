@@ -12,6 +12,8 @@ import {
     Calculator
 } from "lucide-react";
 import SummaryModal from "@/components/features/SummaryModel";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // --- HELPER COMPONENTS ---
 
@@ -188,6 +190,40 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                             })}
                         </div>
                     </div>
+
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Tax %</label>
+                            <div className="relative">
+                                <input 
+                                    type="number"
+                                    value={formData.taxPercentage || ""}
+                                    onChange={(e) => setFormData({ ...formData, taxPercentage: parseFloat(e.target.value) || 0 })}
+                                    className="w-full border-b border-gray-200 py-2 font-bold text-ui-black outline-none focus:border-ui-accent-yellow disabled:opacity-50"
+                                    placeholder="0"
+                                    step="0.5"
+                                    min="0"
+                                    disabled={isSaving}
+                                />
+                                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Discount</label>
+                            <div className="relative">
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                                <input 
+                                    type="number"
+                                    value={formData.discountAmount || ""}
+                                    onChange={(e) => setFormData({ ...formData, discountAmount: parseFloat(e.target.value) || 0 })}
+                                    className="w-full border-b border-gray-200 py-2 pl-6 font-bold text-ui-black outline-none focus:border-ui-accent-yellow disabled:opacity-50"
+                                    placeholder="0"
+                                    min="0"
+                                    disabled={isSaving}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <button 
@@ -352,28 +388,55 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
     const [itemIds, setItemIds] = useState<(string | null)[]>([]);
 
-    // 
-    // Sync state when activity changes
+    // Real-time items listener from Firebase
+    useEffect(() => {
+        if (!userId || !eventId || !activityId) return;
+
+        const itemsRef = collection(
+            db,
+            "users",
+            userId,
+            "events",
+            eventId,
+            "activities",
+            activityId,
+            "items"
+        );
+
+        const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
+            const itemsList = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as Item[];
+            setItems(itemsList);
+            setItemIds(itemsList.map(item => item.id || null));
+        });
+
+        return () => unsubscribe();
+    }, [userId, eventId, activityId]);
+
+    // Initialize edit mode
     useEffect(() => {
         if (activity) {
-            setIsEditing(false); // Default view mode
-            setItems(JSON.parse(JSON.stringify(activity.items)));
-            setItemIds((activity.items || []).map((item: any) => item.id || null));
-            // Reset Calculations (Asumsi data dummy belum nyimpen tax/discount global activity, kita default 0)
-            setTaxPercent(10); // Default PPN 10% biar keliatan
+            setIsEditing(false);
+            setTaxPercent(10);
             setDiscountAmount(0);
         }
     }, [activity]);
 
-    // Calculations
+    // Calculations - Now based on items from Firebase
     const subTotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
-    
-    useEffect(() => {
-        const taxable = Math.max(0, subTotal - discountAmount);
-        setTaxAmount(taxable * (taxPercent / 100));
-    }, [subTotal, taxPercent, discountAmount]);
-
-    const grandTotal = subTotal + taxAmount - discountAmount;
+    const totalTaxAmount = useMemo(() => {
+        return items.reduce((acc: number, item: any) => {
+            const itemTotal = item.price * item.quantity;
+            const itemTax = (itemTotal * (item.taxPercentage || 0)) / 100;
+            return acc + itemTax;
+        }, 0);
+    }, [items]);
+    const totalDiscountAmount = useMemo(() => {
+        return items.reduce((acc: number, item: any) => acc + (item.discountAmount || 0), 0);
+    }, [items]);
+    const grandTotal = subTotal + totalTaxAmount - totalDiscountAmount;
 
     // Handlers
     const handleSave = () => {
@@ -535,6 +598,12 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                                             </div>
                                         ))}
                                     </div>
+                                    {((item.taxPercentage || 0) > 0 || (item.discountAmount || 0) > 0) && (
+                                        <div className="text-xs text-gray-400 mt-1 space-y-0.5">
+                                            {(item.taxPercentage || 0) > 0 && <div>Tax: {item.taxPercentage}%</div>}
+                                            {(item.discountAmount || 0) > 0 && <div>Discount: Rp{item.discountAmount.toLocaleString("id-ID")}</div>}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="py-4 px-2 text-center">
                                     <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-xs font-bold">
@@ -542,7 +611,12 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                                     </span>
                                 </td>
                                 <td className="py-4 px-6 text-right font-mono text-gray-600">
-                                    {new Intl.NumberFormat("id-ID").format(item.price * item.quantity)}
+                                    {(() => {
+                                        const itemSubtotal = item.price * item.quantity;
+                                        const itemTax = (itemSubtotal * (item.taxPercentage || 0)) / 100;
+                                        const itemFinal = itemSubtotal + itemTax - (item.discountAmount || 0);
+                                        return new Intl.NumberFormat("id-ID").format(itemFinal);
+                                    })()}
                                 </td>
                                 {isEditing && (
                                     <td className="pr-4 text-center">
@@ -577,24 +651,18 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                             <span className="text-gray-400">Subtotal</span>
                             <span className="font-mono">{new Intl.NumberFormat("id-ID").format(subTotal)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-400">Discount</span>
-                            <DualInput 
-                                baseAmount={subTotal} 
-                                percentValue={discountPercent} 
-                                amountValue={discountAmount} 
-                                onUpdate={(amt, pct) => { setDiscountAmount(amt); setDiscountPercent(pct); }} 
-                            />
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-400">Tax</span>
-                            <DualInput 
-                                baseAmount={Math.max(0, subTotal - discountAmount)} 
-                                percentValue={taxPercent} 
-                                amountValue={taxAmount} 
-                                onUpdate={(amt, pct) => { setTaxAmount(amt); setTaxPercent(pct); }} 
-                            />
-                        </div>
+                        {totalTaxAmount > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                              <span className="text-gray-400">Total Tax</span>
+                              <span className="font-mono">{new Intl.NumberFormat("id-ID").format(totalTaxAmount)}</span>
+                          </div>
+                        )}
+                        {totalDiscountAmount > 0 && (
+                          <div className="flex justify-between items-center text-xs">
+                              <span className="text-gray-400">Total Discount</span>
+                              <span className="font-mono">-{new Intl.NumberFormat("id-ID").format(totalDiscountAmount)}</span>
+                          </div>
+                        )}
                     </div>
                 )}
 
