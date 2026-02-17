@@ -809,10 +809,9 @@ export default function DesktopDashboard() {
                     title: data.title,
                     amount: data.amount,
                     category: data.category,
-                    payerId: data.payerId,
-                    splitAmongIds: data.splitAmongIds,
                     paidBy: paidByData,
-                    participants: formattedParticipants
+                    participants: formattedParticipants,
+                    payerName: payerName
                 });
             } else {
                 // Create New Activity in Firebase
@@ -820,10 +819,9 @@ export default function DesktopDashboard() {
                     title: data.title,
                     amount: data.amount,
                     category: data.category,
-                    payerId: data.payerId,
-                    splitAmongIds: data.splitAmongIds,
                     paidBy: paidByData,
-                    participants: formattedParticipants
+                    participants: formattedParticipants,
+                    payerName: payerName
                 });
             }
 

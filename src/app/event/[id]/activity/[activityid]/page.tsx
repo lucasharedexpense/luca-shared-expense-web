@@ -2,12 +2,14 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Edit2, Receipt, Sparkles, Trash2, User } from "lucide-react";
+import { Edit2, Receipt, Sparkles, Trash2, User, Plus } from "lucide-react";
 import { Item } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities } from "@/lib/firestore";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // --- 1. COMPONENT TERPISAH: RECEIPT ITEM ---
 // Kita buat komponen ini menerima props yang dibutuhkan saja
@@ -17,6 +19,10 @@ interface ReceiptItemProps {
 }
 
 function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
+    const itemTotal = (item.price * item.quantity) || 0;
+    const taxAmount = (itemTotal * (item.taxPercentage || 0)) / 100;
+    const finalTotal = itemTotal + taxAmount - (item.discountAmount || 0);
+
     return (
         <div className="flex flex-col gap-2">
             {/* Baris 1: Qty - Nama - Harga */}
@@ -34,11 +40,35 @@ function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
                         style: "currency", 
                         currency: "IDR", 
                         minimumFractionDigits: 0 
-                    }).format(item.price * item.quantity)}
+                    }).format(itemTotal)}
                 </span>
             </div>
 
-            {/* Baris 2: Avatar Pemakan */}
+            {/* Baris 2: Tax dan Discount */}
+            {((item.taxPercentage || 0) > 0 || (item.discountAmount || 0) > 0) && (
+                <div className="pl-8 flex flex-col gap-0.5 text-xs text-ui-dark-grey">
+                    {(item.taxPercentage || 0) > 0 && (
+                        <span>
+                            Tax ({item.taxPercentage}%): {new Intl.NumberFormat("id-ID", { 
+                                style: "currency", 
+                                currency: "IDR", 
+                                minimumFractionDigits: 0 
+                            }).format(taxAmount)}
+                        </span>
+                    )}
+                    {(item.discountAmount || 0) > 0 && (
+                        <span>
+                            Discount: -{new Intl.NumberFormat("id-ID", { 
+                                style: "currency", 
+                                currency: "IDR", 
+                                minimumFractionDigits: 0 
+                            }).format(item.discountAmount)}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Baris 3: Avatar Pemakan */}
             <div className="flex items-center gap-1 pl-8">
                 {item.memberNames.map((name, i) => (
                     <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white overflow-hidden shadow-sm">
@@ -62,6 +92,7 @@ export default function ActivityDetailPage() {
   // State
   const [eventData, setEventData] = useState<any>(null);
   const [activityData, setActivityData] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEqualSplit, setIsEqualSplit] = useState(false);
   
@@ -98,6 +129,32 @@ export default function ActivityDetailPage() {
     fetchData();
   }, [userId, eventId, activityId, authLoading]);
 
+  // Real-time listener for items
+  useEffect(() => {
+    if (!userId || !eventId || !activityId) return;
+
+    const itemsRef = collection(
+      db,
+      "users",
+      userId,
+      "events",
+      eventId,
+      "activities",
+      activityId,
+      "items"
+    );
+
+    const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
+      const itemsList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setItems(itemsList);
+    });
+
+    return () => unsubscribe();
+  }, [userId, eventId, activityId]);
+
   // Helper untuk cari avatar user berdasarkan nama
   const getAvatarByName = (name: string) => {
     // Cari di partisipan activity dulu
@@ -121,27 +178,34 @@ export default function ActivityDetailPage() {
   };
 
   // 3. HITUNG TOTAL OTOMATIS DARI ITEMS
-  const { subTotal, taxAmount, grandTotal, taxRate } = useMemo(() => {
-    if (!activityData?.items || activityData.items.length === 0) {
-        return { subTotal: 0, taxAmount: 0, grandTotal: 0, taxRate: 0 };
+  const { subTotal, taxAmount, discountAmount, grandTotal } = useMemo(() => {
+    if (!items || items.length === 0) {
+        return { subTotal: 0, taxAmount: 0, discountAmount: 0, grandTotal: 0 };
     }
-    
-    // 1. Ambil Tax Rate dari item pertama
-    const rate = activityData.items[0]?.taxPercentage || 0;
 
     // 2. Hitung Subtotal
-    const sub = activityData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+    const sub = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
     
-    // 3. Hitung Nominal Tax
-    const tax = sub * (rate / 100); 
+    // 3. Hitung Total Tax (sum of each item's tax)
+    const totalTax = items.reduce((acc: number, item: any) => {
+      const itemTotal = item.price * item.quantity;
+      const itemTax = (itemTotal * (item.taxPercentage || 0)) / 100;
+      return acc + itemTax;
+    }, 0);
+
+    // 4. Hitung Total Discount (sum of each item's discount)
+    const totalDiscount = items.reduce((acc: number, item: any) => acc + (item.discountAmount || 0), 0);
     
+    // 5. Hitung Grand Total
+    const total = sub + totalTax - totalDiscount;
+
     return {
       subTotal: sub,
-      taxAmount: tax,
-      grandTotal: sub + tax,
-      taxRate: rate // Kita return juga ratenya buat ditampilkan di UI
+      taxAmount: totalTax,
+      discountAmount: totalDiscount,
+      grandTotal: total
     };
-  }, [activityData]);
+  }, [items]);
 
   // --- HANDLING LOADING ---
   if (loading) {
@@ -226,10 +290,10 @@ export default function ActivityDetailPage() {
 
                 {/* List Items dari Firebase */}
                 <div className="flex flex-col gap-6 mb-8">
-                    {activityData?.items && activityData.items.length > 0 ? (
-                        activityData.items.map((item: any, idx: number) => (
+                    {items && items.length > 0 ? (
+                        items.map((item: any, idx: number) => (
                             <ReceiptItem 
-                                key={idx} 
+                                key={item.id} 
                                 item={item} 
                                 getAvatarByName={getAvatarByName} 
                             />
@@ -237,6 +301,16 @@ export default function ActivityDetailPage() {
                     ) : (
                         <p className="text-center text-xs text-gray-400 py-4">No items yet</p>
                     )}
+                </div>
+
+                {/* ADD ITEM BUTTON */}
+                <div className="flex justify-center mb-8">
+                    <button 
+                        onClick={() => router.push(`/event/${eventId}/activity/${activityId}/add-item`)}
+                        className="flex items-center gap-2 px-4 py-2 bg-ui-grey rounded-full text-xs font-bold text-ui-dark-grey hover:bg-ui-accent-yellow/20 hover:text-ui-black transition-colors"
+                    >
+                        <Plus className="w-4 h-4" /> Add Menu Item
+                    </button>
                 </div>
 
                 {/* Garis Putus-putus Divider */}
@@ -252,10 +326,18 @@ export default function ActivityDetailPage() {
                         <span>Subtotal</span>
                         <span className="">{formatCurrency(subTotal)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
-                        <span>Tax ({taxRate}%)</span>
-                        <span className="">{formatCurrency(taxAmount)}</span>
-                    </div>
+                    {taxAmount > 0 && (
+                      <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
+                          <span>Total Tax</span>
+                          <span className="">{formatCurrency(taxAmount)}</span>
+                      </div>
+                    )}
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
+                          <span>Total Discount</span>
+                          <span className="">-{formatCurrency(discountAmount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-lg font-bold text-ui-black mt-2">
                         <span>Total Bill</span>
                         <span className="">{formatCurrency(grandTotal)}</span>

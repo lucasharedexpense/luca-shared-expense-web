@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -11,11 +11,13 @@ import {
   Type,
   Check,
   X,
-  Loader2
+  Loader2,
+  ImagePlus
 } from "lucide-react";
 import { Contact, Event } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/auth-context";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { uploadEventImage } from "@/lib/firebase-storage";
 
 // Define the shape of data returned by this form
 export interface EventFormData {
@@ -23,6 +25,7 @@ export interface EventFormData {
    location: string;
    date: string;
    participantIds: string[]; // Only store contact IDs
+   imageUrl?: string; // Optional image URL
 }
 
 interface EventFormProps {
@@ -34,10 +37,16 @@ interface EventFormProps {
 export default function EventForm({ initialData, isEditing = false, onSubmit }: EventFormProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- FIREBASE CONTACTS STATE ---
   const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
+
+  // --- IMAGE STATE ---
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
+  const [uploading, setUploading] = useState(false);
 
   // Fetch contacts from Firebase
   useEffect(() => {
@@ -99,10 +108,41 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // --- HANDLERS ---
-   const handleSave = () => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+   const handleSave = async () => {
       if (!title || !date) {
          alert("Please fill in Title and Date!");
          return;
+      }
+
+      // Upload image if a new file was selected
+      let imageUrl = initialData?.imageUrl || "";
+      if (imageFile && user?.uid) {
+        try {
+          setUploading(true);
+          imageUrl = await uploadEventImage(user.uid, imageFile);
+        } catch (err) {
+          console.error("Image upload failed:", err);
+          alert("Failed to upload image. Event will be created without image.");
+          imageUrl = imagePreview || "";
+        } finally {
+          setUploading(false);
+        }
       }
 
       // Store only contact IDs
@@ -111,6 +151,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
          location,
          date,
          participantIds: selectedParticipants,
+         imageUrl,
       };
 
       onSubmit(formData);
@@ -189,7 +230,58 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
             </div>
 
-            {/* 3. Participants Section */}
+            {/* 3. Image Upload Section */}
+            <div className="flex flex-col gap-3 mt-2">
+               <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest">Event Image</label>
+               <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageSelect}
+                  className="hidden"
+               />
+               {imagePreview ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-ui-grey/20 group">
+                     <img 
+                        src={imagePreview} 
+                        alt="Event Preview" 
+                        className="w-full h-40 object-cover"
+                     />
+                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                        <button 
+                           type="button"
+                           onClick={() => fileInputRef.current?.click()}
+                           className="px-3 py-1.5 bg-white rounded-lg text-xs font-bold text-ui-black shadow-sm hover:brightness-110 transition-all active:scale-95"
+                        >
+                           Change
+                        </button>
+                        <button 
+                           type="button"
+                           onClick={removeImage}
+                           className="px-3 py-1.5 bg-ui-accent-red rounded-lg text-xs font-bold text-white shadow-sm hover:brightness-110 transition-all active:scale-95"
+                        >
+                           Remove
+                        </button>
+                     </div>
+                     {uploading && (
+                        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                           <Loader2 className="w-6 h-6 animate-spin text-ui-accent-yellow" />
+                        </div>
+                     )}
+                  </div>
+               ) : (
+                  <button
+                     type="button"
+                     onClick={() => fileInputRef.current?.click()}
+                     className="w-full py-8 rounded-2xl border-2 border-dashed border-ui-grey/30 flex flex-col items-center justify-center gap-2 text-ui-dark-grey/60 hover:border-ui-accent-yellow hover:text-ui-accent-yellow hover:bg-ui-accent-yellow/5 transition-all cursor-pointer group"
+                  >
+                     <ImagePlus className="w-6 h-6 group-hover:text-ui-accent-yellow" />
+                     <span className="text-xs font-medium">Click to add event image</span>
+                  </button>
+               )}
+            </div>
+
+            {/* 4. Participants Section */}
             <div className="flex flex-col gap-3 mt-4">
                <div className="flex justify-between items-end">
                   <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest flex items-center gap-2">

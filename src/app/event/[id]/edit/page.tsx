@@ -5,13 +5,16 @@ import { useRouter, useParams } from "next/navigation";
 import EventForm, { EventFormData } from "@/components/forms/EventForm";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, updateEvent } from "@/lib/firestore";
+import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { getUserProfile } from "@/lib/firebase-auth";
 
 export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
-  const { userId, loading: authLoading } = useAuth();
+  const { user, userId, loading: authLoading } = useAuth();
 
   const [eventData, setEventData] = useState<any>(null);
+  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 1. Get Event ID
@@ -42,6 +45,15 @@ export default function EditEventPage() {
     fetchEvent();
   }, [userId, eventId, authLoading]);
 
+  // 3. Fetch contacts
+  useEffect(() => {
+    if (userId) {
+      getContacts(userId)
+        .then((data) => setFirebaseContacts(data))
+        .catch((err) => console.error("Failed to fetch contacts:", err));
+    }
+  }, [userId]);
+
   // Loading state
   if (loading || authLoading) {
     return (
@@ -63,20 +75,42 @@ export default function EditEventPage() {
   }
 
   const handleUpdate = async (data: EventFormData) => {
-    if (!userId || !eventId) return;
+    if (!userId || !eventId || !user?.uid) return;
     try {
-      // Fetch latest contacts (simulate, should be passed down or fetched in real app)
-      // Here, eventData.participants should be updated to use the latest contact info by ID
-      const allContacts = eventData?.allContacts || [];
-      const participants = data.participantIds.map((id: string) => {
-        const contact = allContacts.find((c: any) => c.id === id);
-        return contact ? { name: contact.name, avatarName: contact.avatarName } : { name: "Unknown", avatarName: "" };
-      });
+      // Map participant IDs to participant objects using firebaseContacts
+      const participants = data.participantIds
+        .map((id) => {
+          const contact = firebaseContacts.find((c) => c.id === id);
+          return contact
+            ? {
+                name: contact.name,
+                avatarName: contact.avatarName || contact.name,
+              }
+            : null;
+        })
+        .filter((p) => p !== null) as Array<{ name: string; avatarName: string }>;
+
+      // Fetch current user's profile to get their correct avatar info
+      const userProfile = await getUserProfile(user.uid);
+      const currentUserParticipant = userProfile
+        ? {
+            name: userProfile.username || user.displayName || "You",
+            avatarName: userProfile.avatarName || userProfile.username || user.displayName || "You",
+          }
+        : {
+            name: user.displayName || "You",
+            avatarName: user.displayName || "You",
+          };
+
+      // Add the current user as a participant
+      participants.unshift(currentUserParticipant);
+
       await updateEvent(userId, eventId, {
         title: data.title,
         location: data.location,
         date: new Date(data.date),
         participants,
+        imageUrl: data.imageUrl || eventData?.imageUrl || "",
       });
       router.back();
     } catch (error) {

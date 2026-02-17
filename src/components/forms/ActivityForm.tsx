@@ -48,7 +48,6 @@ export default function ActivityForm({
 
   // --- STATE ---
   const [title, setTitle] = useState(initialData?.title || "");
-  const [amount, setAmount] = useState(initialData?.amount?.toString() || "");
   const [category, setCategory] = useState(initialData?.category || "food");
   
   // Default Payer: Orang pertama di list (atau user sendiri)
@@ -73,13 +72,13 @@ export default function ActivityForm({
 
   const handleSubmit = () => {
     if (!title) {
-        alert("Please fill Title and Amount");
+        alert("Please fill in Title");
         return;
     }
 
     onSubmit({
         title,
-        amount: parseInt(amount.replace(/\D/g, "")), // Bersihin non-digit
+        amount: 0, // Amount will be calculated from items
         category,
         payerId,
         splitAmongIds
@@ -106,20 +105,17 @@ export default function ActivityForm({
       <div className="flex-1 overflow-y-auto px-6 py-8 no-scrollbar">
          <div className="max-w-md mx-auto flex flex-col gap-8">
             
-            {/* 1. TITLE & AMOUNT (Big Inputs) */}
-            <div className="flex flex-col gap-6">
-                {/* Title */}
-               <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest">Activity Title</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Dinner at McD"
-                    className="w-full text-2xl font-bold text-ui-black placeholder:text-ui-dark-grey/50 outline-none bg-transparent border-b-2 border-ui-accent-yellow py-2 transition-colors"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    autoFocus={!isEditing}
-                  />
-               </div>
+            {/* 1. TITLE (Big Input) */}
+            <div className="flex flex-col gap-2">
+               <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest">Activity Title</label>
+               <input 
+                 type="text" 
+                 placeholder="e.g. Dinner at McD"
+                 className="w-full text-2xl font-bold text-ui-black placeholder:text-ui-dark-grey/50 outline-none bg-transparent border-b-2 border-ui-accent-yellow py-2 transition-colors"
+                 value={title}
+                 onChange={(e) => setTitle(e.target.value)}
+                 autoFocus={!isEditing}
+               />
             </div>
 
             {/* 2. CATEGORY (Horizontal Scroll) */}

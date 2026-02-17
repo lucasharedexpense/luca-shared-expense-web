@@ -358,10 +358,10 @@ export async function createActivity(
     title: string;
     amount: number;
     category: string;
-    payerId: string;
-    splitAmongIds: string[];
-    paidBy?: { name: string; avatarName: string };
-    participants?: { name: string; avatarName: string }[];
+    categoryColorHex?: string;
+    paidBy: { name: string; avatarName: string };
+    participants: { name: string; avatarName: string }[];
+    payerName: string;
   }
 ): Promise<string> {
   try {
@@ -371,14 +371,11 @@ export async function createActivity(
       title: data.title,
       amount: data.amount,
       category: data.category,
-      payerId: data.payerId,
-      splitAmongIds: data.splitAmongIds,
-      paidBy: data.paidBy || {},
-      participants: data.participants || [],
-      payerName: data.paidBy?.name || "",
-      categoryColorHex: "",
-      items: [],
-      createdAt: Date.now(),
+      categoryColorHex: data.categoryColorHex || "",
+      eventId: eventId,
+      paidBy: data.paidBy,
+      participants: data.participants,
+      payerName: data.payerName,
     });
     
     console.log(`✅ Created activity: ${docRef.id}`);
@@ -401,10 +398,10 @@ export async function updateActivity(
     title: string;
     amount: number;
     category: string;
-    payerId: string;
-    splitAmongIds: string[];
+    categoryColorHex: string;
     paidBy: { name: string; avatarName: string };
     participants: { name: string; avatarName: string }[];
+    payerName: string;
   }>
 ): Promise<void> {
   try {
