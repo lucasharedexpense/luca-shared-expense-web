@@ -1,15 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import EventForm, { EventFormData } from "@/components/forms/EventForm";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent } from "@/lib/firestore";
+import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { getUserProfile } from "@/lib/firebase-auth";
 
 export default function NewEventPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
+
+  // Fetch contacts from Firebase
+  useEffect(() => {
+    if (user?.uid) {
+      getContacts(user.uid)
+        .then((data) => setFirebaseContacts(data))
+        .catch((err) => console.error("Failed to fetch contacts:", err));
+    }
+  }, [user?.uid]);
 
   const handleCreate = async (data: EventFormData) => {
     if (!user?.uid || saving) return;
@@ -17,23 +29,40 @@ export default function NewEventPage() {
     try {
       setSaving(true);
 
-      // Build participants with avatar info
-      const participants = data.participants.map((p) => ({
-        name: p.name,
-        avatarName: p.avatarName || p.name,
-      }));
+      // Map participant IDs to participant objects using firebaseContacts
+      const participants = data.participantIds
+        .map((id) => {
+          const contact = firebaseContacts.find((c) => c.id === id);
+          return contact
+            ? {
+                name: contact.name,
+                avatarName: contact.avatarName || contact.name,
+              }
+            : null;
+        })
+        .filter((p) => p !== null) as Array<{ name: string; avatarName: string }>;
+
+      // Fetch current user's profile to get their correct avatar info
+      const userProfile = await getUserProfile(user.uid);
+      const currentUserParticipant = userProfile
+        ? {
+            name: userProfile.username || user.displayName || "You",
+            avatarName: userProfile.avatarName || userProfile.username || user.displayName || "You",
+          }
+        : {
+            name: user.displayName || "You",
+            avatarName: user.displayName || "You",
+          };
 
       // Add the current user as a participant
-      participants.unshift({
-        name: user.displayName || "You",
-        avatarName: user.displayName || "You",
-      });
+      participants.unshift(currentUserParticipant);
 
       await createEvent(user.uid, {
         title: data.title,
         location: data.location,
         date: data.date ? new Date(data.date) : new Date(),
         participants,
+        imageUrl: data.imageUrl || "",
       });
 
       router.push("/home");
