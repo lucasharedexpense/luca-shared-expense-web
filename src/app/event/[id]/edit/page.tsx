@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import EventForm, { EventFormData } from "@/components/forms/EventForm";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, updateEvent } from "@/lib/firestore";
+import { getEventsWithActivities, updateEvent, EventWithActivities } from "@/lib/firestore";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 import { getUserProfile } from "@/lib/firebase-auth";
 
@@ -13,7 +13,7 @@ export default function EditEventPage() {
   const params = useParams();
   const { user, userId, loading: authLoading } = useAuth();
 
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<EventWithActivities | null>(null);
   const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +50,7 @@ export default function EditEventPage() {
     if (userId) {
       getContacts(userId)
         .then((data) => setFirebaseContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err));
+        .catch((error) => console.error("Failed to fetch contacts:", error));
     }
   }, [userId]);
 
@@ -121,7 +121,7 @@ export default function EditEventPage() {
 
   return (
     <EventForm 
-        initialData={eventData} 
+        initialData={eventData as unknown as Parameters<typeof EventForm>[0]['initialData']}
         isEditing={true} 
         onSubmit={handleUpdate} 
     />

@@ -1,72 +1,70 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Image from "next/image";
 import EventList from "@/components/features/EventList";
-import { Item } from "@/lib/dummy-data";
 import NewActivityModal from "@/components/features/NewActivityModal";
+import type { Contact } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
+import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
 import { 
     ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus, Edit2, 
-    Trash2, Check, Save, RotateCcw, 
+    Trash2, Save, RotateCcw, 
     Calculator
 } from "lucide-react";
 import SummaryModal from "@/components/features/SummaryModel";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// --- HELPER COMPONENTS ---
+// ─── INTERFACES ───────────────────────────────────────────────────────────────
 
-// 1. DUAL INPUT (Untuk Tax & Discount)
-interface DualInputProps {
-    baseAmount: number;
-    amountValue: number;
-    percentValue: number;
-    onUpdate: (amount: number, percent: number) => void;
+interface Item {
+    id?: string;
+    itemName: string;
+    quantity: number;
+    price: number;
+    memberNames: string[];
+    discountAmount?: number;
+    taxPercentage?: number;
+    timestamp?: number;
 }
 
-const DualInput = ({ baseAmount, amountValue, percentValue, onUpdate }: DualInputProps) => {
-    const handlePercentChange = (val: string) => {
-        const p = parseFloat(val) || 0;
-        const a = baseAmount * (p / 100);
-        onUpdate(a, p);
-    };
-    const handleAmountChange = (val: string) => {
-        const cleanVal = val.replace(/\D/g, ""); 
-        const a = parseFloat(cleanVal) || 0;
-        const p = baseAmount > 0 ? (a / baseAmount) * 100 : 0;
-        onUpdate(a, p);
-    };
+interface Participant {
+    id?: string;
+    name: string;
+    avatarName?: string;
+    phoneNumber?: string;
+    bankAccounts?: unknown[];
+}
 
-    return (
-        <div className="flex gap-2 items-center bg-gray-800 rounded-lg p-1">
-            <div className="relative w-12">
-                <input 
-                    type="number"
-                    value={percentValue > 0 ? parseFloat(percentValue.toFixed(1)) : ""}
-                    onChange={(e) => handlePercentChange(e.target.value)}
-                    placeholder="0"
-                    className="w-full bg-transparent text-right text-xs font-bold text-white outline-none pr-3"
-                />
-                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">%</span>
-            </div>
-            <div className="w-px h-4 bg-gray-600"></div>
-            <div className="relative flex-1">
-                <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">Rp</span>
-                <input 
-                    type="text"
-                    value={amountValue > 0 ? amountValue.toLocaleString("id-ID") : ""}
-                    onChange={(e) => handleAmountChange(e.target.value)}
-                    placeholder="0"
-                    className="w-full bg-transparent text-right text-xs font-bold text-white outline-none pl-4"
-                />
-            </div>
-        </div>
-    );
+// Activity type aligns with firestore Activity
+type Activity = FirestoreActivity & {
+    items?: Item[];
 };
 
-// 2. ITEM MODAL (Untuk Tambah/Edit Item di dalam Activity)
-const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants }: any) => {
+
+
+interface ActivityFormData {
+    title: string;
+    amount: number;
+    category: string;
+    payerId: string;
+    splitAmongIds: string[];
+}
+
+// --- HELPER COMPONENTS ---
+
+// 1. ITEM MODAL (Untuk Tambah/Edit Item di dalam Activity)
+interface ItemModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (item: Item) => Promise<void>;
+    initialItem: Item;
+    activityParticipants: Participant[];
+}
+
+const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants }: ItemModalProps) => {
     const [formData, setFormData] = useState<Item>(initialItem);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -86,19 +84,14 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
     };
 
     // Helper to get avatar URL
-    const getAvatarUrl = (participant: any) => {
-        if (typeof participant === 'string') {
-            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${participant}`;
-        }
-        const avatarName = participant?.avatarName;
+    const getAvatarUrl = (participant: Participant): string => {
+        const avatarName = participant.avatarName;
         if (avatarName?.startsWith("http")) return avatarName;
-        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || participant?.name || "user"}`;
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || participant.name || "user"}`;
     };
 
     // Helper to get participant name
-    const getParticipantName = (participant: any) => {
-        return typeof participant === 'string' ? participant : participant?.name;
-    };
+    const getParticipantName = (participant: Participant): string => participant.name;
 
     const handleSaveClick = async () => {
         // Validation
@@ -174,7 +167,7 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
                         <div className="flex flex-wrap gap-2">
-                            {activityParticipants.map((participant: any, idx: number) => {
+                            {activityParticipants.map((participant: Participant, idx: number) => {
                                 const participantName = getParticipantName(participant);
                                 const isSelected = formData.memberNames.includes(participantName);
                                 return (
@@ -184,7 +177,14 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                                         disabled={isSaving}
                                         className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden disabled:opacity-50 ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
                                     >
-                                        <img src={getAvatarUrl(participant)} alt={participantName} className="w-full h-full object-cover" />
+                                        <Image
+                                            src={getAvatarUrl(participant)}
+                                            alt={participantName}
+                                            width={40}
+                                            height={40}
+                                            className="object-cover"
+                                            unoptimized
+                                        />
                                     </button>
                                 );
                             })}
@@ -247,11 +247,23 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
 
 
 // --- COLUMN 2: EVENT DETAIL ---
+interface EventDetailColumnProps {
+    eventId: string;
+    activeActivityId: string | null;
+    onActivityClick: (id: string) => void;
+    onClose: () => void;
+    onAddClick: () => void;
+    onEditActivity: (activity: Activity) => void;
+    onSummaryClick: () => void;
+    onDeleteActivity: (id: string) => void;
+    events: EventWithActivities[];
+}
+
 const EventDetailColumn = ({ 
     eventId, activeActivityId, onActivityClick, onClose, 
     onAddClick, onEditActivity, onSummaryClick, onDeleteActivity, events
-}: any) => {
-    const event = events.find((e: any) => e.id === eventId);
+}: EventDetailColumnProps) => {
+    const event = events.find((e) => e.id === eventId);
     if (!event) return null;
 
     return (
@@ -284,7 +296,7 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {event.activities.map((act: any) => {
+                {event.activities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -368,20 +380,23 @@ const EventDetailColumn = ({
 };
 
 // --- COLUMN 3: ACTIVITY DETAIL (NOW WITH EDIT LOGIC) ---
-const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, events, userId }: any) => {
-    const event = events.find((e: any) => e.id === eventId);
-    const activity = event?.activities.find((a: any) => a.id === activityId);
+interface ActivityDetailColumnProps {
+    eventId: string;
+    activityId: string;
+    onClose: () => void;
+    onUpdateActivity: (activity: Activity) => void;
+    events: EventWithActivities[];
+    userId: string | null;
+}
+
+const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, events, userId }: ActivityDetailColumnProps) => {
+    const event = events.find((e) => e.id === eventId);
+    const activity = event?.activities.find((a) => a.id === activityId);
 
     // --- STATE EDIT MODE ---
     const [isEditing, setIsEditing] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
     
-    // Tax & Discount States
-    const [taxPercent, setTaxPercent] = useState(0);
-    const [taxAmount, setTaxAmount] = useState(0);
-    const [discountAmount, setDiscountAmount] = useState(0);
-    const [discountPercent, setDiscountPercent] = useState(0);
-
     // Modal Item States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalInitialItem, setModalInitialItem] = useState<Item | null>(null);
@@ -409,64 +424,48 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 ...doc.data(),
             })) as Item[];
             setItems(itemsList);
-            setItemIds(itemsList.map(item => item.id || null));
+            setItemIds(itemsList.map(item => item.id ?? null));
         });
 
         return () => unsubscribe();
     }, [userId, eventId, activityId]);
 
-    // Initialize edit mode
-    useEffect(() => {
-        if (activity) {
-            setIsEditing(false);
-            setTaxPercent(10);
-            setDiscountAmount(0);
-        }
-    }, [activity]);
-
     // Calculations - Now based on items from Firebase
     const subTotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
     const totalTaxAmount = useMemo(() => {
-        return items.reduce((acc: number, item: any) => {
+        return items.reduce((acc: number, item: Item) => {
             const itemTotal = item.price * item.quantity;
-            const itemTax = (itemTotal * (item.taxPercentage || 0)) / 100;
+            const itemTax = (itemTotal * (item.taxPercentage ?? 0)) / 100;
             return acc + itemTax;
         }, 0);
     }, [items]);
     const totalDiscountAmount = useMemo(() => {
-        return items.reduce((acc: number, item: any) => acc + (item.discountAmount || 0), 0);
+        return items.reduce((acc: number, item: Item) => acc + (item.discountAmount ?? 0), 0);
     }, [items]);
     const grandTotal = subTotal + totalTaxAmount - totalDiscountAmount;
 
     // Handlers
     const handleSave = () => {
-        // Panggil fungsi parent untuk update DB
+        if (!activity) return;
         onUpdateActivity({
             ...activity,
-            items: items,
-            // Simpan logic tax/discount ke DB kalau strukturnya mendukung (di sini kita mock aja)
+            items: items as unknown as FirestoreActivity['items'],
         });
         setIsEditing(false);
     };
 
     const handleAddItem = () => {
+        if (!activity) return;
         setEditingItemIndex(null);
         
-        // --- FIX LOGIC DISINI ---
-        // Ambil participant pertama
-        const firstParticipant = activity?.participants[0];
-        
-        // Cek tipenya: kalau object ambil .name, kalau string ambil langsung
-        const defaultMemberName = typeof firstParticipant === 'object' 
-            ? firstParticipant?.name 
-            : firstParticipant;
+        const firstParticipant = activity.participants?.[0];
+        const defaultMemberName = firstParticipant?.name;
 
         setModalInitialItem({
             itemName: "", 
             quantity: 1, 
             price: 0,
-            // Gunakan defaultMemberName yang sudah pasti string
-            memberNames: [activity?.payerName || defaultMemberName || ""],
+            memberNames: [activity.payerName || defaultMemberName || ""],
             discountAmount: 0, 
             taxPercentage: 0, 
             timestamp: Date.now()
@@ -485,7 +484,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
             try {
                 // Delete from Firebase if item has ID
                 if (itemIds[idx] && userId) {
-                    await deleteItem(userId, eventId, activityId, itemIds[idx]);
+                    await deleteItem(userId, eventId, activityId, itemIds[idx]!);
                 }
                 
                 // Delete from local state
@@ -593,15 +592,22 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                                     {item.itemName}
                                     <div className="flex -space-x-1 mt-1">
                                         {item.memberNames.map((m, i) => (
-                                            <div key={i} className="w-4 h-4 rounded-full bg-gray-200 border border-white overflow-hidden">
-                                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${m}`} className="w-full h-full object-cover"/>
+                                            <div key={i} className="w-4 h-4 rounded-full bg-gray-200 border border-white overflow-hidden relative">
+                                                <Image
+                                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${m}`}
+                                                    alt={m}
+                                                    width={16}
+                                                    height={16}
+                                                    className="object-cover"
+                                                    unoptimized
+                                                />
                                             </div>
                                         ))}
                                     </div>
-                                    {((item.taxPercentage || 0) > 0 || (item.discountAmount || 0) > 0) && (
+                                    {((item.taxPercentage ?? 0) > 0 || (item.discountAmount ?? 0) > 0) && (
                                         <div className="text-xs text-gray-400 mt-1 space-y-0.5">
-                                            {(item.taxPercentage || 0) > 0 && <div>Tax: {item.taxPercentage}%</div>}
-                                            {(item.discountAmount || 0) > 0 && <div>Discount: Rp{item.discountAmount.toLocaleString("id-ID")}</div>}
+                                            {(item.taxPercentage ?? 0) > 0 && <div>Tax: {item.taxPercentage}%</div>}
+                                            {(item.discountAmount ?? 0) > 0 && <div>Discount: Rp{item.discountAmount!.toLocaleString("id-ID")}</div>}
                                         </div>
                                     )}
                                 </td>
@@ -613,8 +619,8 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                                 <td className="py-4 px-6 text-right font-mono text-gray-600">
                                     {(() => {
                                         const itemSubtotal = item.price * item.quantity;
-                                        const itemTax = (itemSubtotal * (item.taxPercentage || 0)) / 100;
-                                        const itemFinal = itemSubtotal + itemTax - (item.discountAmount || 0);
+                                        const itemTax = (itemSubtotal * (item.taxPercentage ?? 0)) / 100;
+                                        const itemFinal = itemSubtotal + itemTax - (item.discountAmount ?? 0);
                                         return new Intl.NumberFormat("id-ID").format(itemFinal);
                                     })()}
                                 </td>
@@ -676,7 +682,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                     
                     {isEditing ? (
                         <div className="flex gap-2">
-                            <button onClick={() => { setIsEditing(false); setItems(JSON.parse(JSON.stringify(activity.items))); }} className="p-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors">
+                            <button onClick={() => { setIsEditing(false); setItems(JSON.parse(JSON.stringify(activity.items ?? []))); }} className="p-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors">
                                 <RotateCcw className="w-5 h-5 text-gray-300" />
                             </button>
                             <button onClick={handleSave} className="flex items-center gap-2 px-6 py-3 bg-ui-accent-yellow text-ui-black rounded-xl text-xs font-bold hover:brightness-110 transition-all shadow-lg shadow-yellow-500/20">
@@ -691,9 +697,6 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 </div>
             </div>
 
-            {/* 
-                [Image of Modal UI Design]
-            */}
             {/* Modal di render disini biar ada di atas semua kolom */}
             {isModalOpen && modalInitialItem && (
                 <ItemModal 
@@ -701,7 +704,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                     onClose={() => setIsModalOpen(false)}
                     initialItem={modalInitialItem}
                     onSave={handleModalSave}
-                    activityParticipants={activity.participants}
+                    activityParticipants={activity.participants ?? []}
                 />
             )}
         </div>
@@ -709,24 +712,67 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
 };
 
 
+// --- DELETE CONFIRMATION MODAL ---
+interface DeleteConfirmationModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}
+
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: DeleteConfirmationModalProps) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div 
+                className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col items-center text-center"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+                    <Trash2 className="w-10 h-10 text-red-500" />
+                </div>
+                
+                <h3 className="text-2xl font-bold font-display text-ui-black mb-2">Delete Activity?</h3>
+                <p className="text-sm text-gray-500 mb-8 px-4 leading-relaxed">
+                    Are you sure you want to delete this activity? This action cannot be undone and will affect the final settlement.
+                </p>
+                
+                <div className="flex gap-3 w-full">
+                    <button 
+                        onClick={onClose} 
+                        className="flex-1 py-3.5 rounded-2xl font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={onConfirm} 
+                        className="flex-1 py-3.5 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                    >
+                        Yes, Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- MAIN LAYOUT ---
 export default function DesktopDashboard() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
-    const [events, setEvents] = useState<any[]>([]);
+    const [events, setEvents] = useState<EventWithActivities[]>([]);
     const [eventsLoading, setEventsLoading] = useState(true);
     const { userId, loading: authLoading } = useAuth();
 
     // State Modal & Refresh
     const [showActivityModal, setShowActivityModal] = useState(false);
-    const [editingActivity, setEditingActivity] = useState<any | null>(null);
+    const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
     // Fetch events from Firebase
-    const refreshEvents = async () => {
+    const refreshEvents = useCallback(async () => {
         if (authLoading || !userId) {
             if (!authLoading) setEvents([]);
             setEventsLoading(false);
@@ -742,62 +788,29 @@ export default function DesktopDashboard() {
         } finally {
             setEventsLoading(false);
         }
-    };
+    }, [userId, authLoading]);
 
     useEffect(() => {
         refreshEvents();
-    }, [userId, authLoading]);
+    }, [refreshEvents]);
 
-    const activeEvent = events.find((e: any) => e.id === selectedEventId);
+    // Suppress unused eventsLoading warning while it's reserved for a loading UI
+    void eventsLoading;
 
-    const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: any) => {
-        if (!isOpen) return null;
-        return (
-            <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div 
-                    className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col items-center text-center"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
-                        <Trash2 className="w-10 h-10 text-red-500" />
-                    </div>
-                    
-                    <h3 className="text-2xl font-bold font-display text-ui-black mb-2">Delete Activity?</h3>
-                    <p className="text-sm text-gray-500 mb-8 px-4 leading-relaxed">
-                        Are you sure you want to delete this activity? This action cannot be undone and will affect the final settlement.
-                    </p>
-                    
-                    <div className="flex gap-3 w-full">
-                        <button 
-                            onClick={onClose} 
-                            className="flex-1 py-3.5 rounded-2xl font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={onConfirm} 
-                            className="flex-1 py-3.5 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
-                        >
-                            Yes, Delete
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
-    }
+    const activeEvent = events.find((e) => e.id === selectedEventId);
 
-    // --- HANDLER UPDATE DB (Simulated) ---
-    const handleUpdateActivityDetail = (updatedActivity: any) => {
+    // --- HANDLER UPDATE DB ---
+    const handleUpdateActivityDetail = (updatedActivity: Activity) => {
         if (!selectedEventId) return;
-        const eventIndex = events.findIndex((e: any) => e.id === selectedEventId);
+        const eventIndex = events.findIndex((e) => e.id === selectedEventId);
         if (eventIndex === -1) return;
 
-        // @ts-ignore
-        const actIndex = events[eventIndex].activities.findIndex((a: any) => a.id === updatedActivity.id);
+        const actIndex = events[eventIndex].activities.findIndex((a) => a.id === updatedActivity.id);
         if (actIndex >= 0) {
-            // @ts-ignore
-            events[eventIndex].activities[actIndex] = updatedActivity;
-            setRefreshKey(prev => prev + 1); // Refresh UI
+            const updatedEvents = [...events];
+            updatedEvents[eventIndex].activities[actIndex] = updatedActivity as unknown as FirestoreActivity;
+            setEvents(updatedEvents);
+            setRefreshKey(prev => prev + 1);
         }
     };
 
@@ -830,34 +843,35 @@ export default function DesktopDashboard() {
     const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
 
     // Convert ParticipantSimple to Contact-like objects with IDs
-    const getParticipantsWithIds = (participants: any[]) => {
+    const getParticipantsWithIds = (participants: Participant[]): Contact[] => {
         return participants.map((p, idx) => ({
             id: `participant-${idx}-${p.name}`,
             name: p.name,
-            avatarName: p.avatarName,
+            avatarName: p.avatarName ?? "",
             phoneNumber: "",
-            bankAccounts: []
-        })) as any[];
+            bankAccounts: [],
+            userId: "",
+        }));
     };
 
-    const handleCreateActivity = async (data: { title: string; amount: number; category: string; payerId: string; splitAmongIds: string[]; }) => {
+    const handleCreateActivity = async (data: ActivityFormData) => {
         if (!selectedEventId || !userId) return;
         setIsLoading(true);
         
         try {
             // Get the participants array with IDs
-            const participantsWithIds = getParticipantsWithIds(activeEvent?.participants || []);
+            const participantsWithIds = getParticipantsWithIds(activeEvent?.participants ?? []);
             
             // Map IDs back to names and avatars
             const payerContact = participantsWithIds.find(p => p.id === data.payerId);
-            const payerName = payerContact?.name || "Unknown";
+            const payerName = payerContact?.name ?? "Unknown";
             
             const splitParticipants = data.splitAmongIds.map(id => {
                 const contact = participantsWithIds.find(p => p.id === id);
                 return {
-                    id: contact?.id || id,
-                    name: contact?.name || "Unknown",
-                    avatarName: contact?.avatarName || getAvatarUrl(contact?.name || "Unknown")
+                    id: contact?.id ?? id,
+                    name: contact?.name ?? "Unknown",
+                    avatarName: contact?.avatarName ?? getAvatarUrl(contact?.name ?? "Unknown")
                 };
             });
 
@@ -868,7 +882,7 @@ export default function DesktopDashboard() {
 
             const paidByData = {
                 name: payerName,
-                avatarName: payerContact?.avatarName || getAvatarUrl(payerName)
+                avatarName: payerContact?.avatarName ?? getAvatarUrl(payerName)
             };
 
             if (editingActivity) {
@@ -908,7 +922,7 @@ export default function DesktopDashboard() {
     };
 
     const openCreateModal = () => { setEditingActivity(null); setShowActivityModal(true); };
-    const openEditModal = (activity: any) => { setEditingActivity(activity); setShowActivityModal(true); };
+    const openEditModal = (activity: Activity) => { setEditingActivity(activity); setShowActivityModal(true); };
 
     return (
         <div className="flex h-[calc(100vh-64px)] w-full gap-5 p-6 relative overflow-hidden bg-gray-50/50">
@@ -951,6 +965,7 @@ export default function DesktopDashboard() {
                     <div className="xl:hidden absolute inset-0 bg-ui-black/20 backdrop-blur-[2px] z-10" onClick={() => setSelectedActivityId(null)} />
                     <div className="flex flex-col pt-14 z-20 absolute right-6 top-0 bottom-6 w-[65%] max-w-112.5 shadow-2xl xl:static xl:w-100 xl:shadow-none xl:pt-14 animate-in slide-in-from-right-20">
                         <ActivityDetailColumn 
+                            key={selectedActivityId}
                             eventId={selectedEventId}
                             activityId={selectedActivityId}
                             onClose={() => setSelectedActivityId(null)}
@@ -965,10 +980,11 @@ export default function DesktopDashboard() {
             {/* MODAL HEADER EDIT/CREATE */}
             {activeEvent && (
                 <NewActivityModal 
+                    key={editingActivity ? `edit-${editingActivity.id}` : 'new'}
                     isOpen={showActivityModal}
                     onClose={() => setShowActivityModal(false)}
                     onSubmit={handleCreateActivity}
-                    participants={getParticipantsWithIds(activeEvent.participants)}
+                    participants={getParticipantsWithIds(activeEvent.participants ?? [])}
                     isLoading={isLoading}
                     initialData={editingActivity}
                 />

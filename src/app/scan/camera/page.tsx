@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { AlertCircle, Image, Camera } from "lucide-react";
+import { AlertCircle, Image as ImageIcon, Camera } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { useScan } from "../scan-context";
 
@@ -90,7 +90,7 @@ export default function CameraPage() {
         stopCamera();
         router.push("/scan/upload");
       }, "image/jpeg");
-    } catch (err) {
+    } catch {
       setError("Failed to capture photo. Please try again.");
     }
   };
@@ -139,7 +139,7 @@ export default function CameraPage() {
                   onClick={handleUploadClick}
                   className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors"
                 >
-                  <Image className="w-6 h-6 text-ui-black" />
+                  <ImageIcon className="w-6 h-6 text-ui-black" />
                 </button>
 
                 {/* Capture Button */}

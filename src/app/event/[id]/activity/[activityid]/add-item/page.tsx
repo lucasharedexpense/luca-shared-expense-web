@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Plus, X, Check, Trash2 } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, createItem, deleteItem } from "@/lib/firestore";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import { getEventsWithActivities, createItem } from "@/lib/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function AddItemPage() {
@@ -25,8 +25,7 @@ export default function AddItemPage() {
   const [taxPercentage, setTaxPercentage] = useState("0");
 
   // Data loading
-  const [activity, setActivity] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [activity, setActivity] = useState<{ title: string; payerName: string; participants?: { name: string; avatarName?: string }[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +47,7 @@ export default function AddItemPage() {
         if (activityData) {
           setActivity(activityData);
           // Set default members to all activity participants
-          const participantNames = activityData.participants?.map((p: any) => p.name) || [];
+          const participantNames = activityData.participants?.map((p) => p.name) || [];
           setSelectedMembers(participantNames);
         }
       } catch (error) {
@@ -61,7 +60,7 @@ export default function AddItemPage() {
     fetchActivity();
   }, [userId, eventId, activityId, authLoading]);
 
-  // Real-time listener for items
+  // Real-time listener for items (kept for potential future display)
   useEffect(() => {
     if (!userId || !eventId || !activityId) return;
 
@@ -76,19 +75,15 @@ export default function AddItemPage() {
       "items"
     );
 
-    const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
-      const itemsList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setItems(itemsList);
+    const unsubscribe = onSnapshot(itemsRef, () => {
+      // Items loaded but not displayed in this page
     });
 
     return () => unsubscribe();
   }, [userId, eventId, activityId]);
 
   const getAvatarByName = (name: string) => {
-    const participant = activity?.participants?.find((p: any) => p.name === name);
+    const participant = activity?.participants?.find((p) => p.name === name);
     if (participant?.avatarName?.startsWith("http")) {
       return participant.avatarName;
     }
@@ -139,18 +134,6 @@ export default function AddItemPage() {
       alert("Failed to create item. Please try again.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm("Delete this item?")) return;
-    if (!userId || !eventId || !activityId) return;
-
-    try {
-      await deleteItem(userId, eventId, activityId, itemId);
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert("Failed to delete item");
     }
   };
 
@@ -291,7 +274,7 @@ export default function AddItemPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              {activity.participants?.map((participant: any) => {
+              {activity.participants?.map((participant) => {
                 const isSelected = selectedMembers.includes(participant.name);
                 return (
                   <div
@@ -305,6 +288,7 @@ export default function AddItemPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={getAvatarByName(participant.name)}
                           className="w-full h-full object-cover"

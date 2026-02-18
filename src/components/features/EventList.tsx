@@ -1,56 +1,70 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Search, Plus, CalendarClock, Edit2, Trash2 } from "lucide-react";
 import NewEventModal from "./NewEventModal";
 import AvatarStack from "@/components/ui/AvatarStack";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
+import type { EventWithActivities, ActivityItem } from "@/lib/firestore";
 import { getUserProfile } from "@/lib/firebase-auth";
 
-// Helper hitung total
-const getEventTotal = (event: any) => {
-  return event.activities.reduce((acc: number, act: any) => {
-     const actTotal = act.items.reduce((s: number, i: any) => s + (i.price * i.quantity), 0);
-     return acc + actTotal;
-  }, 0);
-};
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
+/** Shape expected by NewEventModal's initialData prop */
+interface EditableEvent {
+  id: string;
+  title: string;
+  date: string;
+  location?: string;
+  imageUrl?: string;
+  participants: { name: string; avatarName: string }[];
+}
 
 interface EventListProps {
   onEventClick: (eventId: string) => void;
   activeId?: string | null;
-  events?: any[];
+  events?: EventWithActivities[];
   onRefresh?: () => void;
 }
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+const getEventTotal = (event: EventWithActivities): number => {
+  return event.activities.reduce((acc, act) => {
+    const actTotal = (act.items ?? []).reduce(
+      (s: number, i: ActivityItem) => s + i.price * i.quantity,
+      0
+    );
+    return acc + actTotal;
+  }, 0);
+};
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
 
 export default function EventList({ onEventClick, activeId, events: providedEvents, onRefresh }: EventListProps) {
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [events, setEvents] = useState(providedEvents || []);
+  const [events, setEvents] = useState<EventWithActivities[]>(providedEvents ?? []);
 
   // Sync events when parent re-fetches
   useEffect(() => {
-    if (providedEvents) {
-      // Sort by createdAt descending (newest first)
-      const sorted = [...providedEvents].sort((a, b) => {
-        const aCreated = a.createdAt || 0;
-        const bCreated = b.createdAt || 0;
-        return bCreated - aCreated;
-      });
-      setEvents(sorted);
-    }
+    const source = providedEvents ?? [];
+    const sorted = [...source].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    setEvents(sorted);
   }, [providedEvents]);
 
   // --- STATE UNTUK EDIT ---
   // Menyimpan data event yang sedang diedit, atau null jika create baru
-  const [editingEvent, setEditingEvent] = useState<any | null>(null);
-  const [eventToDelete, setEventToDelete] = useState<any | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EditableEvent | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<EventWithActivities | null>(null);
 
   const filteredEvents = events.filter(e => 
-    e.title.toLowerCase().includes(search.toLowerCase())
+    e.title?.toLowerCase().includes(search.toLowerCase())
   );
 
   // HANDLER: Buka Modal Create
@@ -60,19 +74,35 @@ export default function EventList({ onEventClick, activeId, events: providedEven
   };
 
   // HANDLER: Buka Modal Edit
-  const openEditModal = (e: React.MouseEvent, event: any) => {
+  const openEditModal = (e: React.MouseEvent, event: EventWithActivities) => {
     e.stopPropagation();
-    setEditingEvent(event);
+    // Map EventWithActivities to the shape NewEventModal expects
+    const editable: EditableEvent = {
+      id: event.id,
+      title: event.title ?? event.name,
+      date: typeof event.date === "string"
+        ? event.date
+        : event.date instanceof Date
+          ? event.date.toLocaleDateString("en-GB")
+          : new Date((event.date as { toDate(): Date }).toDate()).toLocaleDateString("en-GB"),
+      location: event.location,
+      imageUrl: event.imageUrl,
+      participants: (event.participants ?? []).map((p) => ({
+        name: p.name,
+        avatarName: p.avatar ?? p.name,
+      })),
+    };
+    setEditingEvent(editable);
     setShowNewEventModal(true);
   };
 
   // HANDLER: Delete Event
-  const handleDeleteEvent = (e: React.MouseEvent, event: any) => {
+  const handleDeleteEvent = (e: React.MouseEvent, event: EventWithActivities) => {
     e.stopPropagation();
     setEventToDelete(event);
   };
 
-  const confirmDeleteEvent = async () => {
+  const confirmDeleteEvent = useCallback(async () => {
     if (!user?.uid || !eventToDelete) return;
     try {
       await deleteEvent(user.uid, eventToDelete.id);
@@ -83,10 +113,10 @@ export default function EventList({ onEventClick, activeId, events: providedEven
     } finally {
       setEventToDelete(null);
     }
-  };
+  }, [user?.uid, eventToDelete, onRefresh]);
 
   // HANDLER: Save (Create / Update) - Firebase
-  const handleSaveEvent = async (data: {
+  const handleSaveEvent = useCallback(async (data: {
     title: string;
     date: Date;
     location: string;
@@ -101,12 +131,12 @@ export default function EventList({ onEventClick, activeId, events: providedEven
       const userProfile = await getUserProfile(user.uid);
       const currentUserParticipant = userProfile
         ? {
-            name: userProfile.username || user.displayName || "You",
-            avatarName: userProfile.avatarName || userProfile.username || user.displayName || "You",
+            name: userProfile.username ?? user.displayName ?? "You",
+            avatarName: userProfile.avatarName ?? userProfile.username ?? user.displayName ?? "You",
           }
         : {
-            name: user.displayName || "You",
-            avatarName: user.displayName || "You",
+            name: user.displayName ?? "You",
+            avatarName: user.displayName ?? "You",
           };
 
       // Always include current user as first participant
@@ -142,7 +172,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
       setShowNewEventModal(false);
       setEditingEvent(null);
     }
-  };
+  }, [user?.uid, user?.displayName, editingEvent, onEventClick, onRefresh]);
 
   return (
     <>
@@ -192,8 +222,15 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                         >
                             {/* Event Image Thumbnail */}
                             {event.imageUrl && (
-                                <div className="w-full aspect-video overflow-hidden">
-                                    <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                                <div className="w-full aspect-video overflow-hidden relative">
+                                    <Image
+                                        src={event.imageUrl}
+                                        alt={event.title ?? event.name}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 400px"
+                                        className="object-cover"
+                                        unoptimized
+                                    />
                                 </div>
                             )}
 
@@ -209,7 +246,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                                     </h3>
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
                                         <CalendarClock className="w-3 h-3" />
-                                        <span>{typeof event.date === 'string' ? event.date : new Date(event.date).toLocaleDateString("en-GB")}</span>
+                                        <span>{typeof event.date === 'string' ? event.date : (event.date instanceof Date ? event.date : event.date.toDate()).toLocaleDateString("en-GB")}</span>
                                     </div>
                                 </div>
                                 
@@ -236,7 +273,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 pl-2">
                                 <AvatarStack
                                     avatars={
-                                      event.participants?.map((p: any) => {
+                                      event.participants?.map((p) => {
                                         // If avatarName is a URL, use it directly
                                         if (p.avatarName && typeof p.avatarName === "string" && p.avatarName.startsWith("http")) {
                                           return p.avatarName;

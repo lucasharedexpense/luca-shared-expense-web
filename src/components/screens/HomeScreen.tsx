@@ -1,17 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities } from "@/lib/firestore";
+import { getEventsWithActivities, EventWithActivities } from "@/lib/firestore";
 
 export default function HomeScreen() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventWithActivities[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [navIndex, setNavIndex] = useState(1);
   const router = useRouter();
   const { userId, loading: authLoading } = useAuth();
 
@@ -50,7 +49,7 @@ export default function HomeScreen() {
   }, [userId, authLoading, loadData]);
 
   const filteredEvents = events.filter((e) =>
-    e.title.toLowerCase().includes(searchQuery.toLowerCase())
+    e.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

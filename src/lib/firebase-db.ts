@@ -7,18 +7,20 @@ import {
   getDocs,
   getDoc,
   query,
-  where,
-  Query,
+  DocumentData,
   QueryConstraint,
 } from "firebase/firestore";
 import { db } from "./firebase";
+
+/** A Firestore document with its id field included */
+type FirestoreDoc = DocumentData & { id: string };
 
 /**
  * Add a document to Firestore
  */
 export const addDocument = async (
   collectionName: string,
-  data: Record<string, any>
+  data: DocumentData
 ): Promise<string> => {
   try {
     const docRef = await addDoc(collection(db, collectionName), {
@@ -37,7 +39,7 @@ export const addDocument = async (
 export const getDocument = async (
   collectionName: string,
   docId: string
-): Promise<Record<string, any> | null> => {
+): Promise<FirestoreDoc | null> => {
   try {
     const docRef = doc(db, collectionName, docId);
     const docSnap = await getDoc(docRef);
@@ -56,7 +58,7 @@ export const getDocument = async (
  */
 export const getDocuments = async (
   collectionName: string
-): Promise<Record<string, any>[]> => {
+): Promise<FirestoreDoc[]> => {
   try {
     const querySnapshot = await getDocs(collection(db, collectionName));
     return querySnapshot.docs.map((doc) => ({
@@ -75,7 +77,7 @@ export const getDocuments = async (
 export const queryDocuments = async (
   collectionName: string,
   constraints: QueryConstraint[]
-): Promise<Record<string, any>[]> => {
+): Promise<FirestoreDoc[]> => {
   try {
     const q = query(collection(db, collectionName), ...constraints);
     const querySnapshot = await getDocs(q);
@@ -95,7 +97,7 @@ export const queryDocuments = async (
 export const updateDocument = async (
   collectionName: string,
   docId: string,
-  data: Record<string, any>
+  data: DocumentData
 ): Promise<void> => {
   try {
     const docRef = doc(db, collectionName, docId);

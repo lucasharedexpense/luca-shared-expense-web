@@ -29,29 +29,22 @@ function formatDateToDDMMYYYY(date: Date): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/**
- * Parse various date formats into a JS Date
- */
-function parseDateSafe(dateInput: any): Date {
-  if (!dateInput) return new Date();
-  if (dateInput instanceof Date) return dateInput;
-  if (typeof dateInput?.toDate === "function") return dateInput.toDate();
-  if (typeof dateInput === "object" && "seconds" in dateInput) {
-    return new Date(dateInput.seconds * 1000);
-  }
-  if (typeof dateInput === "string") {
-    // Handle DD/MM/YYYY
-    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (ddmmyyyy) {
-      return new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
-    }
-    const parsed = new Date(dateInput);
-    if (!isNaN(parsed.getTime())) return parsed;
-  }
-  return new Date();
+// ==================== TYPE DEFINITIONS ====================
+
+export interface ActivityItem {
+  itemName: string;
+  price: number;
+  quantity: number;
+  memberNames: string[];
+  discountAmount?: number;
+  taxPercentage?: number;
+  timestamp?: number;
 }
 
-// ==================== TYPE DEFINITIONS ====================
+export interface ActivityParticipant {
+  name: string;
+  avatarName?: string;
+}
 
 export interface Activity {
   id: string;
@@ -60,13 +53,15 @@ export interface Activity {
   payerName: string;
   total: number;
   categoryColorHex?: string;
-  items?: any[];
-  participants?: any[];
+  items?: ActivityItem[];
+  participants?: ActivityParticipant[];
 }
 
 export interface Participant {
   name: string;
   avatar?: string;
+  avatarName?: string;
+  userId?: string;
 }
 
 export interface Event {
@@ -76,6 +71,7 @@ export interface Event {
   date: Timestamp | string | Date;
   imageUrl: string;
   settlementResultJson: string;
+  createdAt?: number;
   participants?: Participant[];
   title?: string; // Alias for name
 }
@@ -195,13 +191,10 @@ export async function getEventsWithActivities(
       }
     );
 
-    // Step 3: Wait for all parallel fetches to complete
-    let eventsWithActivities = await Promise.all(eventsWithActivitiesPromises);
-
-    // Sort by createdAt descending (newest first)
-    eventsWithActivities = eventsWithActivities.sort((a, b) => {
-      const aCreated = a.createdAt || 0;
-      const bCreated = b.createdAt || 0;
+    // Step 3: Wait for all parallel fetches to complete, sorted by createdAt descending
+    const eventsWithActivities = (await Promise.all(eventsWithActivitiesPromises)).sort((a, b) => {
+      const aCreated = a.createdAt ?? 0;
+      const bCreated = b.createdAt ?? 0;
       return bCreated - aCreated;
     });
 
@@ -223,7 +216,6 @@ export async function getEventWithActivities(
   eventId: string
 ): Promise<EventWithActivities | null> {
   try {
-    const eventDocRef = doc(db, "users", userId, "events", eventId);
     const activitiesRef = collection(
       db,
       "users",
@@ -265,7 +257,7 @@ export interface CreateEventData {
   location?: string;
   date: Date | string;
   imageUrl?: string;
-  participants: { name: string; avatarName: string }[];
+  participants: { name: string; avatarName?: string }[];
 }
 
 /**
@@ -306,15 +298,19 @@ export async function updateEvent(
 ): Promise<void> {
   try {
     const eventRef = doc(db, "users", userId, "events", eventId);
-    const updateData: Record<string, any> = {};
-    
-    if (data.title !== undefined) {
-      updateData.title = data.title;
-    }
+    const updateData: Partial<{
+      title: string;
+      location: string;
+      date: string;
+      imageUrl: string;
+      participants: { name: string; avatarName?: string }[];
+    }> = {};
+
+    if (data.title !== undefined) updateData.title = data.title;
     if (data.location !== undefined) updateData.location = data.location;
     if (data.date !== undefined) {
-      updateData.date = typeof data.date === "string" 
-        ? data.date 
+      updateData.date = typeof data.date === "string"
+        ? data.date
         : formatDateToDDMMYYYY(data.date);
     }
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;

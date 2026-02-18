@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -14,10 +15,15 @@ import {
   Loader2,
   ImagePlus
 } from "lucide-react";
-import { Contact, Event } from "@/lib/dummy-data";
+import type { Event } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/auth-context";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 import { uploadEventImage } from "@/lib/firebase-storage";
+
+/** Minimal shape for Firestore Timestamp objects */
+interface FirestoreTimestamp {
+  toDate(): Date;
+}
 
 // Define the shape of data returned by this form
 export interface EventFormData {
@@ -70,7 +76,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
       try {
         let d: Date;
         if (typeof initialData.date === 'object' && initialData.date !== null && 'toDate' in initialData.date) {
-          d = (initialData.date as any).toDate();
+          d = (initialData.date as FirestoreTimestamp).toDate();
         } else if (typeof initialData.date === 'string') {
           // Handle DD/MM/YYYY format from Firebase
           const ddmmyyyy = initialData.date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -157,7 +163,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
       onSubmit(formData);
    };
 
-   const toggleParticipant = (contact: Contact) => {
+   const toggleParticipant = (contact: ContactData) => {
       const exists = selectedParticipants.includes(contact.id);
       if (exists) {
          setSelectedParticipants((prev) => prev.filter((id) => id !== contact.id));
@@ -242,11 +248,16 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                />
                {imagePreview ? (
                   <div className="relative rounded-2xl overflow-hidden border border-ui-grey/20 group">
-                     <img 
-                        src={imagePreview} 
-                        alt="Event Preview" 
-                        className="w-full h-40 object-cover"
-                     />
+                     <div className="relative w-full h-40">
+                        <Image
+                           src={imagePreview}
+                           alt="Event Preview"
+                           fill
+                           sizes="100vw"
+                           className="object-cover"
+                           unoptimized
+                        />
+                     </div>
                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                         <button 
                            type="button"
@@ -285,7 +296,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
             <div className="flex flex-col gap-3 mt-4">
                <div className="flex justify-between items-end">
                   <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest flex items-center gap-2">
-                     <Users className="w-3 h-3" /> Who's Joining?
+                     <Users className="w-3 h-3" /> Who&apos;s Joining?
                   </label>
                   <span className="text-xs bg-ui-accent-yellow/20 text-ui-dark-grey px-2 py-1 rounded-full font-bold">
                      {selectedParticipants.length} people
@@ -301,16 +312,19 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                     <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
                  </button>
 
-                          {selectedParticipants.map((id, idx) => {
+                          {selectedParticipants.map((id) => {
                              const contact = firebaseContacts.find((c) => c.id === id);
                              if (!contact) return null;
                              return (
                                 <div key={id} className="relative group shrink-0 animate-in fade-in zoom-in duration-200">
                                    <div className="w-12 h-12 rounded-full overflow-hidden border border-ui-grey">
-                                      <img
+                                      <Image
                                          src={contact.avatarName?.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`}
                                          alt={contact.name}
-                                         className="w-full h-full object-cover"
+                                         width={48}
+                                         height={48}
+                                         className="object-cover"
+                                         unoptimized
                                       />
                                    </div>
                                    {/* Remove Badge (Hover) */}
@@ -367,13 +381,17 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                      return (
                         <div 
                            key={contact.id}
-                           onClick={() => toggleParticipant(contact as unknown as Contact)}
+                           onClick={() => toggleParticipant(contact)}
                            className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-colors border ${isSelected ? 'bg-ui-accent-yellow/10 border-ui-accent-yellow' : 'hover:bg-ui-grey/5 border-transparent'}`}
                         >
                            <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
-                              <img 
-                                 src={contact.avatarName.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`} 
-                                 className="w-full h-full object-cover"
+                              <Image 
+                                 src={contact.avatarName.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`}
+                                 alt={contact.name}
+                                 width={40}
+                                 height={40}
+                                 className="object-cover"
+                                 unoptimized
                               />
                            </div>
                            

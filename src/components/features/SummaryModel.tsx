@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { X, ArrowRight, Check, ChevronDown, ChevronUp, Share2, Receipt } from "lucide-react";
-import { calculateSummary } from "@/lib/settlement-logic";
+import { calculateSummary, ConsumptionDetail } from "@/lib/settlement-logic";
+import { EventWithActivities } from "@/lib/firestore";
 
 // Helper Avatar (Sama kayak sebelumnya)
 const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
@@ -14,7 +16,7 @@ const formatCurrency = (amount: number) =>
 interface SummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  event: any;
+  event: EventWithActivities;
 }
 
 export default function SummaryModal({ isOpen, onClose, event }: SummaryModalProps) {
@@ -23,7 +25,11 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
   // Calculate Data
   const summaryData = useMemo(() => {
       if (!event) return null;
-      return calculateSummary(event);
+      return calculateSummary({
+        ...event,
+        participants: event.participants ?? [],
+        activities: event.activities.map((a) => ({ ...a, items: a.items ?? [] })),
+      });
   }, [event]);
 
   if (!isOpen || !summaryData) return null;
@@ -98,7 +104,7 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                                     {/* Transfer Flow */}
                                     <div className="flex items-center gap-4 flex-1">
                                         <div className="flex flex-col items-center gap-1 min-w-15">
-                                            <img src={getAvatarUrl(item.fromName)} className="w-10 h-10 rounded-full bg-gray-100 object-cover" />
+                                            <Image src={getAvatarUrl(item.fromName)} alt={item.fromName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
                                             <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.fromName}</span>
                                         </div>
                                         
@@ -112,7 +118,7 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                                         </div>
 
                                         <div className="flex flex-col items-center gap-1 min-w-15">
-                                            <img src={getAvatarUrl(item.toName)} className="w-10 h-10 rounded-full bg-gray-100 object-cover" />
+                                            <Image src={getAvatarUrl(item.toName)} alt={item.toName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
                                             <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.toName}</span>
                                         </div>
                                     </div>
@@ -146,7 +152,7 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
 }
 
 // Sub-component for Consumption Details
-const ConsumptionCard = ({ detail }: { detail: any }) => {
+const ConsumptionCard = ({ detail }: { detail: ConsumptionDetail }) => {
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -156,7 +162,7 @@ const ConsumptionCard = ({ detail }: { detail: any }) => {
         >
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <img src={getAvatarUrl(detail.userName)} className="w-10 h-10 rounded-full bg-gray-100 object-cover" />
+                    <Image src={getAvatarUrl(detail.userName)} alt={detail.userName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
                     <div>
                         <h4 className="font-bold text-sm text-ui-black">{detail.userName}</h4>
                         <p className="text-xs text-gray-400">{detail.items.length} items consumed</p>
@@ -170,7 +176,7 @@ const ConsumptionCard = ({ detail }: { detail: any }) => {
 
             {expanded && (
                 <div className="mt-4 pt-4 border-t border-gray-50 flex flex-col gap-2 animate-in slide-in-from-top-2">
-                    {detail.items.map((item: any, i: number) => (
+                    {detail.items.map((item, i: number) => (
                         <div key={i} className="flex justify-between items-center text-xs">
                             <span className="text-gray-600">{item.itemName}</span>
                             <span className="text-gray-400">{formatCurrency(item.splitAmount)}</span>

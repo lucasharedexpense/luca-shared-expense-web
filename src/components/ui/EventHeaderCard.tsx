@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { 
   ArrowLeft, 
   Edit2, 
@@ -32,7 +33,7 @@ export default function EventHeaderCard({
   const participantAvatars = event.participants?.map((p) => p.avatarName) || [];
 
   // Check if event has an imageUrl
-  const hasImage = !!(event as any).imageUrl;
+  const hasImage = !!event.imageUrl;
 
   return (
     <div className="relative w-full h-60 rounded-3xl overflow-hidden shadow-sm shrink-0">
@@ -40,10 +41,12 @@ export default function EventHeaderCard({
       {/* --- 1. BACKGROUND (Image or Yellow) --- */}
       {hasImage ? (
         <>
-          <img 
-            src={(event as any).imageUrl} 
+          <Image 
+            src={event.imageUrl} 
             alt={event.title} 
-            className="absolute inset-0 w-full h-full object-cover z-0"
+            fill
+            className="absolute inset-0 object-cover z-0"
+            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 z-0" />
         </>

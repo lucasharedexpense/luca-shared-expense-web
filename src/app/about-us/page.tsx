@@ -7,8 +7,7 @@ import {
   Code, 
   Globe, 
   Instagram, 
-  Info, 
-  Check 
+  Info
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons"; // Asumsi file icon yang dibuat sebelumnya
 

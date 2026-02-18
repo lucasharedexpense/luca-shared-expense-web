@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -47,7 +48,8 @@ const SettingsGroupContainer = ({ title, children }: { title: string, children: 
 );
 
 // --- COMPONENT: AVATAR SELECTION MODAL ---
-const AvatarSelectionModal = ({ isOpen, onClose, onSelect }: any) => {
+interface AvatarSelectionModalProps { isOpen: boolean; onClose: () => void; onSelect: (seed: string) => void; }
+const AvatarSelectionModal = ({ isOpen, onClose, onSelect }: AvatarSelectionModalProps) => {
   if (!isOpen) return null;
   
   // Dummy list avatar options (Simulasi Seed Dicebear)
@@ -67,7 +69,7 @@ const AvatarSelectionModal = ({ isOpen, onClose, onSelect }: any) => {
               onClick={() => onSelect(seed)}
               className="aspect-square rounded-full overflow-hidden bg-gray-50 border-2 border-transparent hover:border-ui-accent-yellow hover:scale-105 transition-all shadow-sm"
             >
-              <img src={getAvatarUrl(seed)} className="w-full h-full object-cover" alt={seed} />
+              <Image src={getAvatarUrl(seed)} width={80} height={80} className="w-full h-full object-cover" alt={seed} unoptimized />
             </button>
           ))}
         </div>
@@ -77,7 +79,31 @@ const AvatarSelectionModal = ({ isOpen, onClose, onSelect }: any) => {
 };
 
 // --- COMPONENT: CHANGE PASSWORD MODAL ---
-const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
+interface InputFieldProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  onClearError: () => void;
+}
+const InputField = ({ label, value, onChange, show, onToggle, onClearError }: InputFieldProps) => (
+    <div className="relative">
+      <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">{label}</label>
+      <input 
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => { onChange(e.target.value); onClearError(); }}
+          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-ui-accent-yellow focus:ring-1 focus:ring-ui-accent-yellow transition-all"
+      />
+      <button onClick={onToggle} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+);
+
+interface ChangePasswordModalProps { isOpen: boolean; onClose: () => void; onConfirm: (oldPass: string, newPass: string) => void; }
+const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: ChangePasswordModalProps) => {
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -108,21 +134,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
     setShowPass(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const InputField = ({ label, value, onChange, show, onToggle }: any) => (
-      <div className="relative">
-        <label className="text-xs font-bold text-gray-400 ml-1 mb-1 block">{label}</label>
-        <input 
-            type={show ? "text" : "password"}
-            value={value}
-            onChange={(e) => { onChange(e.target.value); setError(""); }}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-ui-accent-yellow focus:ring-1 focus:ring-ui-accent-yellow transition-all"
-        />
-        <button onClick={onToggle} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
-            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in zoom-in-95">
@@ -133,9 +144,9 @@ const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
         <p className="text-sm text-gray-500 mb-6">Enter your current and new password.</p>
 
         <div className="flex flex-col gap-4">
-            <InputField label="Current Password" value={oldPass} onChange={setOldPass} show={showPass.old} onToggle={() => toggleShow('old')} />
-            <InputField label="New Password" value={newPass} onChange={setNewPass} show={showPass.new} onToggle={() => toggleShow('new')} />
-            <InputField label="Confirm Password" value={confirmPass} onChange={setConfirmPass} show={showPass.confirm} onToggle={() => toggleShow('confirm')} />
+            <InputField label="Current Password" value={oldPass} onChange={setOldPass} show={showPass.old} onToggle={() => toggleShow('old')} onClearError={() => setError("")} />
+            <InputField label="New Password" value={newPass} onChange={setNewPass} show={showPass.new} onToggle={() => toggleShow('new')} onClearError={() => setError("")} />
+            <InputField label="Confirm Password" value={confirmPass} onChange={setConfirmPass} show={showPass.confirm} onToggle={() => toggleShow('confirm')} onClearError={() => setError("")} />
             
             {error && (
                 <div className="flex items-center gap-2 text-red-500 bg-red-50 p-3 rounded-xl">
@@ -159,7 +170,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onConfirm }: any) => {
 };
 
 // --- COMPONENT: CONFIRMATION MODAL ---
-const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose, isDanger = false, confirmText = "Yes" }: any) => {
+interface ConfirmModalProps { isOpen: boolean; title: string; message: string; onConfirm: () => void; onClose: () => void; isDanger?: boolean; confirmText?: string; }
+const ConfirmModal = ({ isOpen, title, message, onConfirm, onClose, isDanger = false, confirmText = "Yes" }: ConfirmModalProps) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
@@ -295,7 +307,7 @@ export default function AccountSettingsPage() {
       // 2. For each event, update the participant entry for the user
       await Promise.all(events.map(async (event) => {
         if (!event.participants) return;
-        const updatedParticipants = event.participants.map((p: any) => {
+        const updatedParticipants = event.participants.map((p) => {
           if (
             (p.userId && p.userId === authUser.uid) ||
             (!p.userId && (p.name === authUser.displayName || p.name === authUser.email || p.name === userProfile?.username))
@@ -337,9 +349,10 @@ export default function AccountSettingsPage() {
     try {
       await changePassword(oldP, newP);
       setToastMessage("Password updated successfully");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating password:", error);
-      setErrorMessage(error.message || "Failed to update password");
+      const errMsg = error instanceof Error ? error.message : "Failed to update password";
+      setErrorMessage(errMsg);
     } finally {
       setIsLoading(false);
     }
@@ -352,9 +365,10 @@ export default function AccountSettingsPage() {
       await deleteAccount();
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting account:", error);
-      setErrorMessage(error.message || "Failed to delete account");
+      const errMsg = error instanceof Error ? error.message : "Failed to delete account";
+      setErrorMessage(errMsg);
       setIsLoading(false);
     }
   };
@@ -423,10 +437,13 @@ export default function AccountSettingsPage() {
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center mb-4">
                 <div className="relative group cursor-pointer" onClick={() => setShowAvatarModal(true)}>
                     <div className="w-28 h-28 rounded-full bg-gray-50 p-1 overflow-hidden shadow-inner">
-                         <img 
+                         <Image 
                             src={getAvatarUrl(userProfile.avatar)} 
+                            width={112}
+                            height={112}
                             className="w-full h-full object-cover rounded-full" 
                             alt="Profile"
+                            unoptimized
                          />
                     </div>
                     {/* Edit Badge */}

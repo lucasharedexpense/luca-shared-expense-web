@@ -19,13 +19,54 @@ export interface ConsumptionDetail {
     }[];
 }
 
-export const calculateSummary = (event: any) => {
+// ─── Input shape interfaces ────────────────────────────────────────────────────
+
+interface SummaryItem {
+    itemName: string;
+    price: number;
+    quantity: number;
+    discountAmount?: number;
+    taxPercentage?: number;
+    memberNames: string[];
+}
+
+interface SummaryActivity {
+    title: string;
+    payerName: string;
+    items: SummaryItem[];
+}
+
+/** Participants may arrive as plain strings or objects with a name property */
+type EventParticipant = string | { name: string };
+
+interface SummaryEvent {
+    participants: EventParticipant[];
+    activities: SummaryActivity[];
+}
+
+// ─── Output shape interface ────────────────────────────────────────────────────
+
+interface Balance {
+    name: string;
+    amount: number;
+}
+
+export interface SummaryResult {
+    totalExpense: number;
+    settlements: Settlement[];
+    consumptionDetails: ConsumptionDetail[];
+    balances: Balance[];
+}
+
+// ─── Main function ─────────────────────────────────────────────────────────────
+
+export const calculateSummary = (event: SummaryEvent): SummaryResult => {
     const consumptionMap: Record<string, number> = {};
     const paidMap: Record<string, number> = {};
     const detailsMap: Record<string, ConsumptionDetail> = {};
 
     // 1. Init Data Peserta
-    event.participants.forEach((p: any) => {
+    event.participants.forEach((p: EventParticipant) => {
         // Handle participant object vs string
         const name = typeof p === 'string' ? p : p.name;
         consumptionMap[name] = 0;
@@ -36,14 +77,14 @@ export const calculateSummary = (event: any) => {
     let totalExpense = 0;
 
     // 2. Loop Activity & Items
-    event.activities.forEach((activity: any) => {
+    event.activities.forEach((activity: SummaryActivity) => {
         let activityTotal = 0;
 
-        activity.items.forEach((item: any) => {
+        activity.items.forEach((item: SummaryItem) => {
             // Kalkulasi Harga Item + Tax - Discount
-            const itemPriceTotal = (item.price * item.quantity);
-            const discount = item.discountAmount || 0;
-            const tax = itemPriceTotal * ((item.taxPercentage || 0) / 100);
+            const itemPriceTotal = item.price * item.quantity;
+            const discount = item.discountAmount ?? 0;
+            const tax = itemPriceTotal * ((item.taxPercentage ?? 0) / 100);
             const finalItemTotal = itemPriceTotal - discount + tax;
 
             activityTotal += finalItemTotal;
@@ -80,16 +121,16 @@ export const calculateSummary = (event: any) => {
     });
 
     // 3. Hitung Balance (Paid - Consumed)
-    const balances: { name: string; amount: number }[] = [];
+    const balances: Balance[] = [];
     Object.keys(consumptionMap).forEach(name => {
-        const balance = paidMap[name] - consumptionMap[name];
+        const balance = (paidMap[name] ?? 0) - (consumptionMap[name] ?? 0);
         balances.push({ name, amount: balance });
     });
 
     // 4. Generate Settlements (Greedy Algo)
     const settlements: Settlement[] = [];
-    let debtors = balances.filter(b => b.amount < -1).sort((a, b) => a.amount - b.amount);
-    let creditors = balances.filter(b => b.amount > 1).sort((a, b) => b.amount - a.amount);
+    const debtors = balances.filter(b => b.amount < -1).sort((a, b) => a.amount - b.amount);
+    const creditors = balances.filter(b => b.amount > 1).sort((a, b) => b.amount - a.amount);
 
     let i = 0; 
     let j = 0;

@@ -50,7 +50,8 @@ const FaqItem = ({ question, answer }: { question: string, answer: string }) => 
 };
 
 // --- COMPONENT: CONTACT ACTION ITEM ---
-const ContactActionItem = ({ icon, title, subtitle, onClick }: any) => {
+interface ContactActionItemProps { icon: React.ReactNode; title: string; subtitle: string; onClick: () => void; }
+const ContactActionItem = ({ icon, title, subtitle, onClick }: ContactActionItemProps) => {
   return (
     <button 
         onClick={onClick}
@@ -150,7 +151,7 @@ export default function HelpSupportPage() {
                         ))
                     ) : (
                         <div className="p-5 text-center text-sm text-gray-400">
-                            No topics found for "{searchQuery}"
+                            No topics found for &ldquo;{searchQuery}&rdquo;
                         </div>
                     )}
                 </div>

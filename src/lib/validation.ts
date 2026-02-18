@@ -4,7 +4,6 @@
 
 // Regex patterns
 const EMAIL_REGEX = /[a-zA-Z0-9+._%\-]{1,256}@[a-zA-Z0-9][a-zA-Z0-9\-]{0,64}(\.[a-zA-Z0-9][a-zA-Z0-9\-]{0,25})+/;
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[$@#!.])[A-Za-z\d$@#!.]{8,}$/;
 const DANGEROUS_CHARS_REGEX = /[<>"';&|\\`]/;
 
 /**

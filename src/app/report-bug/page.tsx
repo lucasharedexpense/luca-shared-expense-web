@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bug, ImagePlus, Check, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Bug, ImagePlus, Check, Loader2 } from "lucide-react";
 
 // --- COMPONENT: CUSTOM TEXT FIELD ---
 interface LucaTextFieldProps extends React.InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> {

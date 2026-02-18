@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Upload, AlertCircle, X, Loader2 } from "lucide-react";
 import Header from "@/components/ui/Header";
@@ -56,7 +57,7 @@ export default function UploadPage() {
         setError(null);
         router.push("/scan/result");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to scan receipt. Please try again.");
       setReceiptData(null);
     } finally {
@@ -98,7 +99,7 @@ export default function UploadPage() {
             {preview ? (
               <div className="space-y-4">
                 <div className="relative w-full max-h-64 rounded-xl overflow-hidden bg-gray-100">
-                  <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                  <Image src={preview} alt="Preview" fill className="object-cover" unoptimized />
                 </div>
                 <div className="flex gap-3">
                   <button

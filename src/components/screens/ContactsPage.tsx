@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { 
-  Search, 
   Plus, 
   X, 
   Phone, 
@@ -21,7 +21,7 @@ import { ContactData, getContacts, addContact, updateContact, deleteContact } fr
 import SearchBar from "../ui/SearchBar";
 
 // --- HELPER: Random Color ---
-const getAvatarColor = (name: String) => {
+const getAvatarColor = (name: string) => {
   const colors = ["bg-red-400", "bg-blue-400", "bg-green-400", "bg-orange-400", "bg-purple-400", "bg-teal-400"];
   return colors[name.length % colors.length];
 };
@@ -127,13 +127,15 @@ export default function ContactsPage() {
     try {
       if (editingContact) {
         // Update existing contact
-        const { id, ...updateData } = contactData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _updateId, ...updateData } = contactData;
         await updateContact(authUser.uid, editingContact.id, updateData);
         setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...contactData, id: editingContact.id } : c));
         setToastMessage("Contact updated successfully");
       } else {
         // Add new contact
-        const { id, ...newData } = contactData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _newId, ...newData } = contactData;
         const newId = await addContact(authUser.uid, newData);
         setContacts(prev => [...prev, { ...contactData, id: newId }]);
         setToastMessage("Contact added successfully");
@@ -309,7 +311,7 @@ function ContactItem({ contact, onClick }: { contact: ContactData; onClick: () =
       className="flex items-center gap-4 hover:bg-gray-50 rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
     >
       <div className={`w-12 h-12 rounded-full border border-ui-grey/20 overflow-hidden shrink-0 ${getAvatarColor(contact.name)}`}>
-         <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover" />
+         <Image src={avatarSrc} alt={contact.name} width={48} height={48} className="w-full h-full object-cover" unoptimized />
       </div>
       <div className="flex-1 min-w-0">
          <h4 className="font-medium text-ui-black text-[16px] truncate">{contact.name}</h4>
@@ -369,7 +371,7 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: { contact: ContactD
             <div className="px-6 pb-8 -mt-12 flex flex-col items-center">
                {/* Big Avatar */}
                <div className="w-24 h-24 rounded-full border-4 z-10 border-ui-white bg-ui-grey overflow-hidden shadow-md mb-4">
-                  <img src={avatarSrc} className="w-full h-full object-cover" />
+                  <Image src={avatarSrc} alt={contact.name} width={96} height={96} className="w-full h-full object-cover" unoptimized />
                </div>
 
                <h2 className="text-2xl font-bold text-ui-black font-display text-center">{contact.name}</h2>
@@ -386,7 +388,7 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: { contact: ContactD
 
                   {/* Bank Accounts List */}
                   {contact.bankAccounts && contact.bankAccounts.length > 0 ? (
-                     contact.bankAccounts.map((bank: any, idx: number) => (
+                     contact.bankAccounts.map((bank: ContactData["bankAccounts"][number], idx: number) => (
                         <div key={idx} className="bg-ui-grey p-4 rounded-xl flex items-center gap-4">
                            <CreditCard className="w-5 h-5 text-ui-dark-grey" />
                            <div className="flex-1">
@@ -428,7 +430,7 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
    
    // --- STATE BANK ACCOUNTS ---
    // Kita simpan list bank di state lokal dulu sebelum di-save
-   const [bankAccounts, setBankAccounts] = useState<any[]>(initialData?.bankAccounts || []);
+   const [bankAccounts, setBankAccounts] = useState<ContactData["bankAccounts"]>(initialData?.bankAccounts || []);
    
    // State untuk input bank baru
    const [newBankName, setNewBankName] = useState("");
@@ -438,7 +440,7 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
    // If editing, use the existing avatar URL directly; otherwise generate a random one
    const [useExistingAvatar, setUseExistingAvatar] = useState(!!initialData?.avatarName);
    const [tempAvatarSeed, setTempAvatarSeed] = useState(
-      `user_${Math.floor(Math.random() * 1000)}`
+      () => `user_${Math.floor(Math.random() * 1000)}`
    );
 
    const getAvatarUrl = (seed: string) => 
@@ -513,10 +515,13 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
                <div className="flex flex-col items-center pt-8 pb-6 px-6 bg-linear-to-b from-ui-accent-yellow/10 to-transparent shrink-0">
                   <div className="relative group cursor-pointer" onClick={handleRandomizeAvatar}>
                      <div className="w-24 h-24 rounded-full border-4 border-ui-white bg-ui-grey/10 overflow-hidden shadow-md">
-                        <img 
+                        <Image 
                            src={displayedAvatar} 
                            alt="Avatar Preview" 
+                           width={96}
+                           height={96}
                            className="w-full h-full object-cover"
+                           unoptimized
                         />
                      </div>
                      <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

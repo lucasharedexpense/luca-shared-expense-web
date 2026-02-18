@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import ActivityForm, { ActivityFormData } from "@/components/forms/ActivityForm";
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, createActivity } from "@/lib/firestore";
+import { getEventsWithActivities, createActivity, EventWithActivities } from "@/lib/firestore";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 
 export default function AddActivityPage() {
@@ -12,7 +12,7 @@ export default function AddActivityPage() {
   const params = useParams();
   const { userId, loading: authLoading } = useAuth();
   
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<EventWithActivities | null>(null);
   const [contacts, setContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,9 +75,8 @@ export default function AddActivityPage() {
   }
 
   // Map event participants to Contact format for the form
-  const eventParticipants = eventData.participants?.map((p: any) => {
-    const contact = contacts.find((c) => c.name === p.name);
-    return {
+  const eventParticipants: Array<{ id: string; name: string; avatarName: string }> = eventData.participants?.map((p: { name: string; avatarName?: string }) => {
+    const contact = contacts.find((c) => c.name === p.name);    return {
       id: contact?.id || p.name,
       name: p.name,
       avatarName: p.avatarName || p.name,

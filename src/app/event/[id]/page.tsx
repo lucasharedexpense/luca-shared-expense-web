@@ -1,23 +1,23 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, deleteActivity, deleteEvent } from "@/lib/firestore";
+import { getEventsWithActivities, deleteActivity, deleteEvent, EventWithActivities } from "@/lib/firestore";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 
 // --- HELPER: FORMAT DATE ---
-const formatDate = (dateInput: any): string => {
+const formatDate = (dateInput: string | Date | { toDate(): Date } | { seconds: number; nanoseconds?: number } | number | null | undefined): string => {
   if (!dateInput) return "";
   let date: Date;
   
   if (dateInput instanceof Date) {
     date = dateInput;
-  } else if (typeof dateInput.toDate === "function") {
-    date = dateInput.toDate();
+  } else if (typeof dateInput === "object" && "toDate" in dateInput && typeof (dateInput as { toDate(): Date }).toDate === "function") {
+    date = (dateInput as { toDate(): Date }).toDate();
   } else if (typeof dateInput === "object" && "seconds" in dateInput) {
     date = new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds || 0) / 1000000);
   } else if (typeof dateInput === "string") {
@@ -52,11 +52,11 @@ const getCategoryIcon = (category: string) => {
 };
 
 // --- HELPER: HITUNG TOTAL BILL DARI ITEMS ---
-const getActivityTotal = (activity: any) => {
+const getActivityTotal = (activity: { items?: { price: number; quantity: number; discountAmount?: number; taxPercentage?: number }[] }) => {
   if (!activity.items || activity.items.length === 0) return 0;
 
   // 1. Hitung Subtotal (Harga * Qty - Diskon per Item)
-  const subTotal = activity.items.reduce((acc: number, item: any) => {
+  const subTotal = activity.items.reduce((acc: number, item) => {
     const itemTotal = (item.price * item.quantity) - (item.discountAmount || 0);
     return acc + itemTotal;
   }, 0);
@@ -75,10 +75,9 @@ export default function EventDetailPage() {
   const { userId, loading: authLoading } = useAuth();
   
   // State
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<EventWithActivities | null>(null);
   const [loading, setLoading] = useState(true);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteEvent, setShowDeleteEvent] = useState(false);
   
   // Unwrap ID
@@ -108,20 +107,20 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     fetchEvent();
+    // fetchEvent is defined outside useEffect intentionally; deps are sufficient
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, eventId, authLoading]);
 
   // Delete activity handler
   const confirmDeleteActivity = async () => {
     if (!userId || !eventId || !activityToDelete) return;
     try {
-      setDeleting(true);
       await deleteActivity(userId, eventId, activityToDelete);
       await fetchEvent(); // Refresh data
     } catch (error) {
       console.error("Error deleting activity:", error);
       alert("Failed to delete activity.");
     } finally {
-      setDeleting(false);
       setActivityToDelete(null);
     }
   };
@@ -177,7 +176,7 @@ export default function EventDetailPage() {
            event={{
              ...eventData,
              date: formatDate(eventData.date),
-           }}
+           } as unknown as Parameters<typeof EventHeaderCard>[0]['event']}
            onBackClick={() => router.back()}
            onEditClick={() => router.push(`/event/${eventId}/edit`)}
            onDeleteClick={() => setShowDeleteEvent(true)}
@@ -197,7 +196,7 @@ export default function EventDetailPage() {
             </div>
          ) : (
             <div className="flex flex-col gap-3">
-               {eventData.activities.map((activity: any, index: number) => {
+               {eventData.activities.map((activity, index) => {
                  
                  // Kalkulasi Total Real-time
                  const totalBill = getActivityTotal(activity);
