@@ -64,7 +64,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
   const [eventToDelete, setEventToDelete] = useState<EventWithActivities | null>(null);
 
   const filteredEvents = events.filter(e => 
-    e.title.toLowerCase().includes(search.toLowerCase())
+    e.title?.toLowerCase().includes(search.toLowerCase())
   );
 
   // HANDLER: Buka Modal Create
@@ -246,7 +246,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                                     </h3>
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
                                         <CalendarClock className="w-3 h-3" />
-                                        <span>{typeof event.date === 'string' ? event.date : new Date(event.date).toLocaleDateString("en-GB")}</span>
+                                        <span>{typeof event.date === 'string' ? event.date : (event.date instanceof Date ? event.date : event.date.toDate()).toLocaleDateString("en-GB")}</span>
                                     </div>
                                 </div>
                                 

@@ -7,6 +7,7 @@ import NewActivityModal from "@/components/features/NewActivityModal";
 import type { Contact } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
+import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
 import { 
     ChevronRight, X, ArrowLeft, Receipt, UserCircle, Plus, Edit2, 
     Trash2, Save, RotateCcw, 
@@ -37,22 +38,12 @@ interface Participant {
     bankAccounts?: unknown[];
 }
 
-interface Activity {
-    id: string;
-    title: string;
-    amount: number;
-    category: string;
-    payerName: string;
+// Activity type aligns with firestore Activity
+type Activity = FirestoreActivity & {
     items?: Item[];
-    participants: Participant[];
-}
+};
 
-interface DashboardEvent {
-    id: string;
-    title: string;
-    activities: Activity[];
-    participants: Participant[];
-}
+
 
 interface ActivityFormData {
     title: string;
@@ -265,7 +256,7 @@ interface EventDetailColumnProps {
     onEditActivity: (activity: Activity) => void;
     onSummaryClick: () => void;
     onDeleteActivity: (id: string) => void;
-    events: DashboardEvent[];
+    events: EventWithActivities[];
 }
 
 const EventDetailColumn = ({ 
@@ -305,7 +296,7 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {event.activities.map((act: Activity) => {
+                {event.activities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -394,7 +385,7 @@ interface ActivityDetailColumnProps {
     activityId: string;
     onClose: () => void;
     onUpdateActivity: (activity: Activity) => void;
-    events: DashboardEvent[];
+    events: EventWithActivities[];
     userId: string | null;
 }
 
@@ -458,7 +449,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
         if (!activity) return;
         onUpdateActivity({
             ...activity,
-            items,
+            items: items as unknown as FirestoreActivity['items'],
         });
         setIsEditing(false);
     };
@@ -467,7 +458,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
         if (!activity) return;
         setEditingItemIndex(null);
         
-        const firstParticipant = activity.participants[0];
+        const firstParticipant = activity.participants?.[0];
         const defaultMemberName = firstParticipant?.name;
 
         setModalInitialItem({
@@ -713,7 +704,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                     onClose={() => setIsModalOpen(false)}
                     initialItem={modalInitialItem}
                     onSave={handleModalSave}
-                    activityParticipants={activity.participants}
+                    activityParticipants={activity.participants ?? []}
                 />
             )}
         </div>
@@ -768,7 +759,7 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm }: DeleteConfirmat
 export default function DesktopDashboard() {
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
     const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
-    const [events, setEvents] = useState<DashboardEvent[]>([]);
+    const [events, setEvents] = useState<EventWithActivities[]>([]);
     const [eventsLoading, setEventsLoading] = useState(true);
     const { userId, loading: authLoading } = useAuth();
 
@@ -790,7 +781,7 @@ export default function DesktopDashboard() {
         try {
             setEventsLoading(true);
             const data = await getEventsWithActivities(userId);
-            setEvents(data as unknown as DashboardEvent[]);
+            setEvents(data);
         } catch (error) {
             console.error("Error loading events:", error);
             setEvents([]);
@@ -817,7 +808,7 @@ export default function DesktopDashboard() {
         const actIndex = events[eventIndex].activities.findIndex((a) => a.id === updatedActivity.id);
         if (actIndex >= 0) {
             const updatedEvents = [...events];
-            updatedEvents[eventIndex].activities[actIndex] = updatedActivity;
+            updatedEvents[eventIndex].activities[actIndex] = updatedActivity as unknown as FirestoreActivity;
             setEvents(updatedEvents);
             setRefreshKey(prev => prev + 1);
         }
@@ -993,7 +984,7 @@ export default function DesktopDashboard() {
                     isOpen={showActivityModal}
                     onClose={() => setShowActivityModal(false)}
                     onSubmit={handleCreateActivity}
-                    participants={getParticipantsWithIds(activeEvent.participants)}
+                    participants={getParticipantsWithIds(activeEvent.participants ?? [])}
                     isLoading={isLoading}
                     initialData={editingActivity}
                 />

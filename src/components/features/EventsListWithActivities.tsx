@@ -14,7 +14,9 @@ interface EventsListProps {
  * Safely convert various date formats to JS Date object
  * Handles: Firestore Timestamp, JS Date, string, number, serialized Timestamp
  */
-function getSafeDate(dateInput: any): Date {
+type DateInput = string | Date | { toDate(): Date } | { seconds: number; nanoseconds?: number } | number | null | undefined;
+
+function getSafeDate(dateInput: DateInput): Date {
   // Case 1: Null or undefined
   if (!dateInput) {
     return new Date();
@@ -26,8 +28,8 @@ function getSafeDate(dateInput: any): Date {
   }
 
   // Case 3: Firestore Timestamp with .toDate() method
-  if (typeof dateInput.toDate === "function") {
-    return dateInput.toDate();
+  if (typeof dateInput === "object" && typeof (dateInput as { toDate?: unknown }).toDate === "function") {
+    return (dateInput as { toDate(): Date }).toDate();
   }
 
   // Case 4: Serialized Firestore Timestamp (has seconds and nanoseconds)
@@ -37,7 +39,7 @@ function getSafeDate(dateInput: any): Date {
     "nanoseconds" in dateInput
   ) {
     // Convert Firestore Timestamp format to JS Date
-    return new Date(dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000);
+    return new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds ?? 0) / 1000000);
   }
 
   // Case 5: String or number timestamp
@@ -61,7 +63,6 @@ function getSafeDate(dateInput: any): Date {
   }
 
   // Fallback: return current date if unable to parse
-  console.warn("Unable to parse date:", dateInput);
   return new Date();
 }
 
@@ -245,6 +246,7 @@ function ParticipantsAvatarStack({
           title={participant.name}
         >
           {participant.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={participant.avatar}
               alt={participant.name}

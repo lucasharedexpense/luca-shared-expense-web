@@ -14,12 +14,6 @@ import {
 import { validateEmail, getPasswordError } from "@/lib/validation";
 import { loginWithEmail, signInWithGoogle } from "@/lib/firebase-auth";
 
-// --- VALIDATION UTILS ---
-const ValidationUtils = {
-  isValidEmail: (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-  isValidPassword: (password: string) => password.length >= 6
-};
-
 // --- COMPONENT: CUSTOM INPUT FORM ---
 interface CustomInputProps {
   value: string;
@@ -286,7 +280,7 @@ export default function LoginPage() {
 
         <div className="mt-8 text-center">
             <p className="text-sm font-medium text-ui-black">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <button 
                     onClick={() => router.push("/auth/signup")}
                     className="text-ui-accent-yellow font-bold hover:underline"

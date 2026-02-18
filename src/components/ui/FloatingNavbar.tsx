@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Plus, Home, Contacts, Scan } from "./Icons";
-import { ScanLine, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface FloatingNavbarProps {

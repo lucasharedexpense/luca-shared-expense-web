@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { X, Calendar, Type, Loader2, Search, Check, MapPin, ImagePlus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
@@ -11,12 +12,6 @@ import { uploadEventImage } from "@/lib/firebase-storage";
 const getAvatarColor = (name: string) => {
   const colors = ["bg-red-100", "bg-blue-100", "bg-green-100", "bg-orange-100", "bg-purple-100", "bg-teal-100"];
   return colors[name.length % colors.length];
-};
-
-// Helper: Get avatar src
-const getAvatarSrc = (avatarName: string) => {
-  if (avatarName?.startsWith("http")) return avatarName;
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
 };
 
 // Helper: Alphabetical sort, non-alphabetic at bottom
@@ -286,10 +281,13 @@ export default function NewEventModal({
                 />
                 {imagePreview ? (
                     <div className="relative rounded-xl overflow-hidden border border-gray-100 group">
-                        <img 
+                        <Image 
                             src={imagePreview} 
                             alt="Preview" 
+                            width={600}
+                            height={144}
                             className="w-full h-36 object-cover"
+                            unoptimized
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                             <button 
@@ -381,6 +379,7 @@ export default function NewEventModal({
                             >
                               <div className="relative shrink-0">
                                 <div className={`w-9 h-9 rounded-full overflow-hidden border border-gray-100 ${bgColor}`}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover"/>
                                 </div>
                                 {isSelected && (

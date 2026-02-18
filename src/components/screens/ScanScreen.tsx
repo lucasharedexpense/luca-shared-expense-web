@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Camera, AlertCircle, X } from "lucide-react";
+import { Camera, AlertCircle } from "lucide-react";
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -12,7 +12,7 @@ export default function ScanPage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const pathname = usePathname();
 
-  const stopCamera = () => {
+  const stopCameraMedia = () => {
     if (streamRef.current) {
       const tracks = streamRef.current.getTracks();
       tracks.forEach((track) => track.stop());
@@ -21,7 +21,6 @@ export default function ScanPage() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    setCameraActive(false);
   };
 
   useEffect(() => {
@@ -72,13 +71,13 @@ export default function ScanPage() {
     if (pathname === "/scan/camera") {
       startCamera();
     } else {
-      stopCamera();
+      stopCameraMedia();
     }
 
     // Cleanup: Stop camera when component unmounts or pathname changes
     return () => {
       isMounted = false;
-      stopCamera();
+      stopCameraMedia();
     };
   }, [pathname]);
 

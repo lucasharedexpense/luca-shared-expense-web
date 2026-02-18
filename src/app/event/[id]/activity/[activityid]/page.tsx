@@ -2,8 +2,11 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Edit2, Receipt, Sparkles, Trash2, User, Plus } from "lucide-react";
+import { Edit2, Trash2, Plus } from "lucide-react";
 import { Item } from "@/lib/dummy-data";
+
+// Item as stored in Firestore includes an `id` field from doc.id
+type ItemWithId = Item & { id: string };
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities } from "@/lib/firestore";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
@@ -14,14 +17,13 @@ import { db } from "@/lib/firebase";
 // --- 1. COMPONENT TERPISAH: RECEIPT ITEM ---
 // Kita buat komponen ini menerima props yang dibutuhkan saja
 interface ReceiptItemProps {
-    item: Item;
+    item: ItemWithId;
     getAvatarByName: (name: string) => string;
 }
 
 function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
     const itemTotal = (item.price * item.quantity) || 0;
     const taxAmount = (itemTotal * (item.taxPercentage || 0)) / 100;
-    const finalTotal = itemTotal + taxAmount - (item.discountAmount || 0);
 
     return (
         <div className="flex flex-col gap-2">
@@ -72,6 +74,7 @@ function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
             <div className="flex items-center gap-1 pl-8">
                 {item.memberNames.map((name, i) => (
                     <div key={i} className="w-5 h-5 rounded-full bg-gray-100 border border-white overflow-hidden shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
                             src={getAvatarByName(name)} 
                             className="w-full h-full object-cover" 
@@ -90,9 +93,9 @@ export default function ActivityDetailPage() {
   const { userId, loading: authLoading } = useAuth();
   
   // State
-  const [eventData, setEventData] = useState<any>(null);
-  const [activityData, setActivityData] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [eventData, setEventData] = useState<{ id: string; participants?: { name: string; avatarName?: string }[] } | null>(null);
+  const [activityData, setActivityData] = useState<{ id: string; title: string; payerName: string; category?: string; participants?: { name: string; avatarName?: string }[] } | null>(null);
+  const [items, setItems] = useState<ItemWithId[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEqualSplit, setIsEqualSplit] = useState(false);
   
@@ -112,8 +115,8 @@ export default function ActivityDetailPage() {
       try {
         setLoading(true);
         const allEvents = await getEventsWithActivities(userId);
-        const event = allEvents.find((e: any) => e.id === eventId);
-        const activity = event?.activities.find((a: any) => a.id === activityId);
+        const event = allEvents.find((e) => e.id === eventId);
+        const activity = event?.activities.find((a) => a.id === activityId);
         
         setEventData(event || null);
         setActivityData(activity || null);
@@ -148,7 +151,7 @@ export default function ActivityDetailPage() {
       const itemsList = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      }));
+      })) as unknown as ItemWithId[];
       setItems(itemsList);
     });
 
@@ -158,7 +161,7 @@ export default function ActivityDetailPage() {
   // Helper untuk cari avatar user berdasarkan nama
   const getAvatarByName = (name: string) => {
     // Cari di partisipan activity dulu
-    const participant = activityData?.participants?.find((p: any) => p.name === name);
+    const participant = activityData?.participants?.find((p) => p.name === name);
     if (participant) {
       return participant.avatarName?.startsWith("http") 
         ? participant.avatarName 
@@ -166,7 +169,7 @@ export default function ActivityDetailPage() {
     }
     
     // Kalau ga ada, cari di event level
-    const eventParticipant = eventData?.participants?.find((p: any) => p.name === name);
+    const eventParticipant = eventData?.participants?.find((p) => p.name === name);
     if (eventParticipant) {
       return eventParticipant.avatarName?.startsWith("http")
         ? eventParticipant.avatarName
@@ -184,17 +187,17 @@ export default function ActivityDetailPage() {
     }
 
     // 2. Hitung Subtotal
-    const sub = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+    const sub = items.reduce((acc: number, item) => acc + (item.price * item.quantity), 0);
     
     // 3. Hitung Total Tax (sum of each item's tax)
-    const totalTax = items.reduce((acc: number, item: any) => {
+    const totalTax = items.reduce((acc: number, item) => {
       const itemTotal = item.price * item.quantity;
       const itemTax = (itemTotal * (item.taxPercentage || 0)) / 100;
       return acc + itemTax;
     }, 0);
 
     // 4. Hitung Total Discount (sum of each item's discount)
-    const totalDiscount = items.reduce((acc: number, item: any) => acc + (item.discountAmount || 0), 0);
+    const totalDiscount = items.reduce((acc: number, item) => acc + (item.discountAmount || 0), 0);
     
     // 5. Hitung Grand Total
     const total = sub + totalTax - totalDiscount;
@@ -239,9 +242,10 @@ export default function ActivityDetailPage() {
                 {/* 1. BAGIAN AVATAR */}
                 {/* Tambahkan: flex-1, min-w-0, overflow-x-auto */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                    {activityData?.participants?.map((p: any, idx: number) => (
+                    {activityData?.participants?.map((p, idx) => (
                         <div key={idx} className="flex flex-col items-center shrink-0">
                             <div className="inline-block h-10 w-10 rounded-full ring-2 ring-white bg-gray-100 overflow-hidden">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img 
                                     src={getAvatarByName(p.name)} 
                                     className="w-full h-full object-cover"
@@ -261,7 +265,6 @@ export default function ActivityDetailPage() {
                         checked={isEqualSplit}
                         onChange={(val) => {
                             setIsEqualSplit(val);
-                            console.log("Split Mode:", val ? "Equal" : "Itemized");
                         }}
                     />
                 </div>
@@ -291,7 +294,7 @@ export default function ActivityDetailPage() {
                 {/* List Items dari Firebase */}
                 <div className="flex flex-col gap-6 mb-8">
                     {items && items.length > 0 ? (
-                        items.map((item: any, idx: number) => (
+                        items.map((item) => (
                             <ReceiptItem 
                                 key={item.id} 
                                 item={item} 

@@ -542,7 +542,7 @@ export default function ActivityEditPage() {
                                 baseAmount={Math.max(0, subTotal - globalDiscountAmount)}
                                 percentValue={taxPercent}
                                 amountValue={taxAmount}
-                                onUpdate={(amt, pct) => { setTaxAmount(amt); setTaxPercent(pct); }}
+                                onUpdate={(_amt, pct) => { setTaxPercent(pct); }}
                              />
                         </div>
                     </div>

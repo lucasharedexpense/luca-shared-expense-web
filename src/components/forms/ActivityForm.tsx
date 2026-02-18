@@ -13,7 +13,11 @@ import {
   Check,
   Wallet
 } from "lucide-react";
-import { Contact } from "@/lib/dummy-data";
+interface EventParticipant {
+  id: string;
+  name: string;
+  avatarName?: string;
+}
 
 // --- DUMMY CATEGORIES ---
 const CATEGORIES = [
@@ -47,7 +51,7 @@ const getAvatarUrl = (contact: { avatarName?: string; name: string }): string =>
 
 interface ActivityFormProps {
   initialData?: InitialActivityData;
-  eventParticipants: Contact[]; // WAJIB: Kita butuh list orang yg ada di event ini
+  eventParticipants: EventParticipant[]; // WAJIB: Kita butuh list orang yg ada di event ini
   isEditing?: boolean;
   onSubmit: (data: ActivityFormData) => void;
 }

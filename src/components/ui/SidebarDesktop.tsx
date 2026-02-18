@@ -10,19 +10,15 @@ import {
   Flag, 
   Info, 
   HelpCircle, 
-  LogOut, 
-  ChevronDown, 
-  ChevronUp,
+  LogOut,
   Users,       // Icon untuk Contacts
-  ScanLine,    // Icon untuk Scan/New
-  Plus         // Icon alternatif untuk New Event
+  ScanLine    // Icon untuk Scan/New
 } from "lucide-react";
 import { LucaLogo } from "./Icons";
 
 export default function SidebarDesktop() {
   const router = useRouter();
   const pathname = usePathname();
-  const [expandAccount, setExpandAccount] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const isActive = (path: string) => pathname === path;
@@ -171,7 +167,13 @@ export default function SidebarDesktop() {
 }
 
 // Komponen NavItem (Biar rapi)
-function NavItem({ icon, text, onClick, active }: any) {
+interface NavItemProps {
+    icon: React.ReactNode;
+    text: string;
+    onClick: () => void;
+    active: boolean;
+}
+function NavItem({ icon, text, onClick, active }: NavItemProps) {
     return (
         <button 
             onClick={onClick}

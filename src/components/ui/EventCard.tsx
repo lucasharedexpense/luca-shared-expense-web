@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { MapPin, Calendar, Receipt } from "lucide-react";
+import Image from "next/image";
+import { MapPin, Calendar } from "lucide-react";
 import AvatarStack from "./AvatarStack";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 import { useAuth } from "@/lib/auth-context";
@@ -9,7 +10,9 @@ import { useAuth } from "@/lib/auth-context";
 // ==================== TYPES ====================
 
 interface Participant {
-  id: string;
+  id?: string;
+  name?: string;
+  avatarName?: string;
 }
 
 interface Activity {
@@ -25,7 +28,7 @@ interface EventCardProps {
     id: string;
     name: string;
     location: string;
-    date: any;
+    date: string | Date | { toDate(): Date } | { seconds: number; nanoseconds: number } | null;
     imageUrl?: string;
     participants?: Participant[];
     activities?: Activity[];
@@ -35,10 +38,14 @@ interface EventCardProps {
 
 // ==================== SAFE DATE ====================
 
-function getSafeDate(dateInput: any): Date {
+type DateInput = string | Date | { toDate(): Date } | { seconds: number; nanoseconds: number } | null | undefined;
+
+function getSafeDate(dateInput: DateInput): Date {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
-  if (typeof dateInput?.toDate === "function") return dateInput.toDate();
+  if (typeof dateInput === "object" && "toDate" in dateInput && typeof (dateInput as { toDate(): Date }).toDate === "function") {
+    return (dateInput as { toDate(): Date }).toDate();
+  }
 
   if (
     typeof dateInput === "object" &&
@@ -50,8 +57,10 @@ function getSafeDate(dateInput: any): Date {
     );
   }
 
-  const parsed = new Date(dateInput);
-  if (!isNaN(parsed.getTime())) return parsed;
+  if (typeof dateInput === "string" || typeof dateInput === "number") {
+    const parsed = new Date(dateInput);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
 
   return new Date();
 }
@@ -104,10 +113,12 @@ export default function EventCard({ data, onClick }: EventCardProps) {
       {/* IMAGE */}
       {data.imageUrl && (
         <div className="w-full aspect-video relative overflow-hidden">
-          <img
+          <Image
             src={data.imageUrl}
             alt={data.name}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
+            unoptimized
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
         </div>

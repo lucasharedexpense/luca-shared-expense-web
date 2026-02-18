@@ -60,6 +60,8 @@ export interface Activity {
 export interface Participant {
   name: string;
   avatar?: string;
+  avatarName?: string;
+  userId?: string;
 }
 
 export interface Event {
@@ -255,7 +257,7 @@ export interface CreateEventData {
   location?: string;
   date: Date | string;
   imageUrl?: string;
-  participants: { name: string; avatarName: string }[];
+  participants: { name: string; avatarName?: string }[];
 }
 
 /**
@@ -301,7 +303,7 @@ export async function updateEvent(
       location: string;
       date: string;
       imageUrl: string;
-      participants: { name: string; avatarName: string }[];
+      participants: { name: string; avatarName?: string }[];
     }> = {};
 
     if (data.title !== undefined) updateData.title = data.title;

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -56,10 +57,13 @@ const AvatarSelectionModal = ({ isOpen, onClose, currentSelection, onSelect }: A
                                     isSelected ? "ring-4 ring-ui-accent-yellow" : "hover:ring-2 hover:ring-gray-300"
                                 }`}
                             >
-                                <img 
+                                <Image 
                                     src={getAvatarUrl(seed)} 
                                     alt={seed} 
-                                    className="w-full h-full object-cover" 
+                                    width={80}
+                                    height={80}
+                                    className="w-full h-full object-cover"
+                                    unoptimized
                                 />
                                 {isSelected && (
                                     <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -141,7 +145,7 @@ export default function FillProfilePage() {
         
         <div className="mt-8 text-center mb-10">
             <h1 className="text-3xl font-bold font-display text-ui-black mb-2">
-                What's your name?
+                What&apos;s your name?
             </h1>
             <p className="text-sm font-medium text-ui-dark-grey">
                 We want to know you more!
@@ -155,10 +159,13 @@ export default function FillProfilePage() {
                 className="w-36 h-36 rounded-full bg-ui-grey overflow-hidden relative group transition-all hover:brightness-95 active:scale-95 shadow-sm"
             >
                 {selectedAvatar ? (
-                    <img 
+                    <Image 
                         src={getAvatarUrl(selectedAvatar)} 
                         alt="Avatar" 
+                        width={144}
+                        height={144}
                         className="w-full h-full object-cover"
+                        unoptimized
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
