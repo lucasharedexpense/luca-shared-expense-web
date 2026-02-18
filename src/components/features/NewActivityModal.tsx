@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import Image from "next/image";
 import { 
   X, Loader2, Utensils, Car, Ticket, ShoppingBag, 
   MoreHorizontal, Wallet, Check 
 } from "lucide-react";
-import { Contact } from "@/lib/dummy-data";
+import type { Contact } from "@/lib/dummy-data";
 
 // --- DUMMY CATEGORIES (Sama kayak sebelumnya) ---
 const CATEGORIES = [
@@ -16,11 +17,10 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' },
 ];
 
-const getAvatarUrl = (contact: any) => {
-    // Support both Contact objects and contact data objects
-    const avatarName = contact?.avatarName || contact?.name;
+const getAvatarUrl = (contact: Contact) => {
+    const avatarName = contact?.avatarName ?? contact?.name;
     if (avatarName?.startsWith("http")) return avatarName;
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName ?? "user"}`;
 };
 
 const getAvatarColor = (name: string) => {
@@ -40,8 +40,52 @@ interface NewActivityModalProps {
   }) => void;
   participants: Contact[];
   isLoading?: boolean;
-  // --- NEW PROP: INITIAL DATA ---
-  initialData?: any; 
+  initialData?: InitialActivityData | null;
+}
+
+// ─── INITIAL DATA SHAPE ───────────────────────────────────────────────────────
+
+interface ActivityItemData {
+  price: number;
+  quantity: number;
+}
+
+interface InitialActivityData {
+  title: string;
+  items?: ActivityItemData[];
+  category?: string;
+  payerId?: string;
+  splitAmongIds?: string[];
+}
+
+// ─── FORM STATE ───────────────────────────────────────────────────────────────
+
+interface FormState {
+  title: string;
+  amount: string;
+  category: string;
+  payerId: string;
+  splitAmongIds: string[];
+}
+
+function buildFormState(data: InitialActivityData | null, contacts: Contact[]): FormState {
+  if (data) {
+    const total = data.items?.reduce((acc, item) => acc + item.price * item.quantity, 0) ?? 0;
+    return {
+      title: data.title,
+      amount: total > 0 ? new Intl.NumberFormat("id-ID").format(total) : "",
+      category: data.category ?? "food",
+      payerId: data.payerId ?? "",
+      splitAmongIds: data.splitAmongIds ?? [],
+    };
+  }
+  return {
+    title: "",
+    amount: "",
+    category: "food",
+    payerId: contacts[0]?.id ?? "",
+    splitAmongIds: contacts.map((p) => p.id),
+  };
 }
 
 export default function NewActivityModal({ 
@@ -53,74 +97,34 @@ export default function NewActivityModal({
   initialData = null
 }: NewActivityModalProps) {
   
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("food");
-  const [payerId, setPayerId] = useState("");
-  const [splitAmongIds, setSplitAmongIds] = useState<string[]>([]);
-
-  // --- EFFECT: POPULATE FORM IF EDITING ---
-  useEffect(() => {
-    if (isOpen) {
-        if (initialData) {
-            // MODE EDIT
-            setTitle(initialData.title);
-            
-            // Hitung total amount dari items yang ada
-            const total = initialData.items?.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0) || 0;
-            setAmount(new Intl.NumberFormat("id-ID").format(total));
-            
-            // Set fields lainnya (Asumsi category default 'food' kalau ga ada di data dummy)
-            setCategory(initialData.category || "food"); 
-            setPayerId(initialData.payerId || "");
-            setSplitAmongIds(initialData.splitAmongIds || []); // List contact IDs
-        } else {
-            // MODE CREATE (RESET)
-            setTitle("");
-            setAmount("");
-            setCategory("food");
-            if (participants.length > 0) {
-                setPayerId(participants[0].id); 
-                setSplitAmongIds(participants.map(p => p.id)); 
-            }
-        }
-    }
-  }, [isOpen, initialData, participants]);
+  const [form, setForm] = useState<FormState>(() => buildFormState(initialData ?? null, participants));
+  // Form state is initialized from props. The parent should pass a `key` prop
+  // (e.g. key={initialData?.title ?? 'new'}) to remount this component when
+  // switching between create/edit modes, avoiding setState-in-effect.
 
   if (!isOpen) return null;
 
   const handleToggleSplit = (id: string) => {
-    if (splitAmongIds.includes(id)) {
-      if (splitAmongIds.length > 1) { 
-        setSplitAmongIds(prev => prev.filter(p => p !== id));
+    if (form.splitAmongIds.includes(id)) {
+      if (form.splitAmongIds.length > 1) {
+        setForm(prev => ({ ...prev, splitAmongIds: prev.splitAmongIds.filter(p => p !== id) }));
       }
     } else {
-      setSplitAmongIds(prev => [...prev, id]);
+      setForm(prev => ({ ...prev, splitAmongIds: [...prev.splitAmongIds, id] }));
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = parseInt(amount.replace(/\D/g, "")) || 0;
-    
-    if (!title.trim()) return;
-    
+    const numericAmount = parseInt(form.amount.replace(/\D/g, "")) || 0;
+    if (!form.title.trim()) return;
     onSubmit({
-        title,
+        title: form.title,
         amount: numericAmount,
-        category,
-        payerId,
-        splitAmongIds
+        category: form.category,
+        payerId: form.payerId,
+        splitAmongIds: form.splitAmongIds,
     });
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value.replace(/\D/g, "");
-      if (val) {
-          setAmount(new Intl.NumberFormat("id-ID").format(parseInt(val)));
-      } else {
-          setAmount("");
-      }
   };
 
   return (
@@ -155,8 +159,8 @@ export default function NewActivityModal({
                         autoFocus
                         type="text" 
                         placeholder="e.g. Dinner at Sushi Tei" 
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
+                        value={form.title}
+                        onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
                         className="w-full text-xl font-bold text-ui-black placeholder:text-gray-300 outline-none border-b-2 border-gray-100 focus:border-ui-accent-yellow py-2 transition-colors bg-transparent"
                     />
                 </div>
@@ -166,21 +170,20 @@ export default function NewActivityModal({
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category</label>
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                         {CATEGORIES.map((cat) => {
-                            const isSelected = category === cat.id;
                             return (
                                 <button
                                     key={cat.id}
                                     type="button"
-                                    onClick={() => setCategory(cat.id)}
+                                    onClick={() => setForm(prev => ({ ...prev, category: cat.id }))}
                                     className={`
                                         flex items-center gap-2 px-4 py-3 rounded-2xl transition-all border shrink-0
-                                        ${isSelected 
+                                        ${form.category === cat.id 
                                             ? 'bg-ui-black text-white border-ui-black shadow-lg scale-105' 
                                             : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
                                         }
                                     `}
                                 >
-                                    <div className={`p-1 rounded-full ${isSelected ? 'bg-white/20' : cat.color}`}>
+                                    <div className={`p-1 rounded-full ${form.category === cat.id ? 'bg-white/20' : cat.color}`}>
                                         <cat.icon className="w-4 h-4" />
                                     </div>
                                     <span className="text-sm font-bold whitespace-nowrap">{cat.name}</span>
@@ -200,13 +203,13 @@ export default function NewActivityModal({
                         </div>
                         <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
                             {participants.map((contact) => {
-                                const isSelected = payerId === contact.id;
+                                const isSelected = form.payerId === contact.id;
                                 const avatarUrl = getAvatarUrl(contact);
                                 const bgColor = getAvatarColor(contact.name);
                                 return (
                                     <div 
                                         key={contact.id} 
-                                        onClick={() => setPayerId(contact.id)}
+                                        onClick={() => setForm(prev => ({ ...prev, payerId: contact.id }))}
                                         className={`
                                             flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all
                                             ${isSelected 
@@ -216,7 +219,7 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={contact.name} className="w-full h-full object-cover" />
+                                            <Image src={avatarUrl} alt={contact.name} width={32} height={32} className="object-cover" unoptimized />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
                                             {contact.name}
@@ -233,12 +236,12 @@ export default function NewActivityModal({
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Split Among</label>
                             <span className="text-[10px] font-bold bg-ui-accent-yellow/20 px-2 py-0.5 rounded-md text-ui-black">
-                                {splitAmongIds.length} People
+                                {form.splitAmongIds.length} People
                             </span>
                         </div>
                         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 no-scrollbar">
                             {participants.map((contact) => {
-                                const isSelected = splitAmongIds.includes(contact.id);
+                                const isSelected = form.splitAmongIds.includes(contact.id);
                                 const avatarUrl = getAvatarUrl(contact);
                                 const bgColor = getAvatarColor(contact.name);
                                 return (
@@ -254,7 +257,7 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={contact.name} className="w-full h-full object-cover" />
+                                            <Image src={avatarUrl} alt={contact.name} width={32} height={32} className="object-cover" unoptimized />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
                                             {contact.name}
@@ -286,7 +289,7 @@ export default function NewActivityModal({
                 <button 
                     type="submit"
                     form="createActivityForm"
-                    disabled={!title || isLoading}
+                    disabled={!form.title || isLoading}
                     className="flex-2 h-12 rounded-xl bg-ui-black text-white font-bold shadow-lg shadow-black/20 hover:opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Activity")}

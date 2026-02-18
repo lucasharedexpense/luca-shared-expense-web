@@ -12,7 +12,7 @@ import {
   reauthenticateWithCredential,
   deleteUser,
 } from "firebase/auth";
-import { addDocument, getDocuments, queryDocuments, updateDocument, deleteDocument } from "./firebase-db";
+import { addDocument, queryDocuments, updateDocument, deleteDocument } from "./firebase-db";
 import { where } from "firebase/firestore";
 
 // ============================================================================

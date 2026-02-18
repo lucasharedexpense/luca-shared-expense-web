@@ -23,25 +23,13 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   // Callback Actions
-  onDashboardClick?: () => void;
-  onAccountSettingsClick?: () => void;
   onLogoutClick?: () => void;
-  onSettingsClick?: () => void;
-  onReportBugClick?: () => void;
-  onAboutUsClick?: () => void;
-  onHelpSupportClick?: () => void;
 }
 
 export default function Sidebar({
   isOpen,
   onClose,
-  onDashboardClick,
-  onAccountSettingsClick,
   onLogoutClick,
-  onSettingsClick,
-  onReportBugClick,
-  onAboutUsClick,
-  onHelpSupportClick,
 }: SidebarProps) {
   
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);

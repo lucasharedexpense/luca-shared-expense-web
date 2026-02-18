@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -110,8 +111,8 @@ const PasswordChangeModal = ({ isOpen, onClose, onSubmit }: { isOpen: boolean; o
       try {
         await onSubmit(values.old, values.new);
         setValues({ old: "", new: "", confirm: "" });
-      } catch (err: any) {
-        setError(err.message || "Failed to update password");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to update password");
       } finally {
         setIsLoading(false);
       }
@@ -244,7 +245,7 @@ export default function SettingsPage() {
       await changePassword(oldPass, newPass);
       setShowPasswordModal(false);
       setToastMessage("Password updated successfully");
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error; // Let modal handle the error display
     }
   };
@@ -304,7 +305,7 @@ export default function SettingsPage() {
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center text-center mb-4">
                 <div className="w-20 h-20 rounded-full bg-gray-100 p-1 mb-4 overflow-hidden">
                     {user.avatar ? (
-                        <img src={getAvatarUrl(user.avatar)} className="w-full h-full object-cover rounded-full" alt="Avatar" />
+                        <Image src={getAvatarUrl(user.avatar)} className="w-full h-full object-cover rounded-full" alt="Avatar" width={80} height={80} unoptimized />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
                             <UserIcon className="w-8 h-8" />

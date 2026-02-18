@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -31,8 +32,21 @@ export interface ActivityFormData {
   splitAmongIds: string[];
 }
 
+interface InitialActivityData {
+  title?: string;
+  category?: string;
+  payerId?: string;
+  splitAmongIds?: string[];
+}
+
+const getAvatarUrl = (contact: { avatarName?: string; name: string }): string => {
+  const seed = contact.avatarName ?? contact.name;
+  if (seed.startsWith("http")) return seed;
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+};
+
 interface ActivityFormProps {
-  initialData?: any;
+  initialData?: InitialActivityData;
   eventParticipants: Contact[]; // WAJIB: Kita butuh list orang yg ada di event ini
   isEditing?: boolean;
   onSubmit: (data: ActivityFormData) => void;
@@ -159,7 +173,7 @@ export default function ActivityForm({
                            >
                                <div className={`w-14 h-14 rounded-full p-1 border-2 ${isSelected ? 'border-ui-accent-yellow' : 'border-transparent'}`}>
                                    <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
-                                       <img src={participant.avatarName} className="w-full h-full object-cover" />
+                                       <Image src={getAvatarUrl(participant)} alt={participant.name} width={56} height={56} className="object-cover" unoptimized />
                                    </div>
                                </div>
                                <span className={`text-xs font-bold text-center w-16 truncate ${isSelected ? 'text-ui-black' : 'text-ui-dark-grey'}`}>
@@ -191,7 +205,7 @@ export default function ActivityForm({
                            >
                                <div className="flex items-center gap-3">
                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                                       <img src={participant.avatarName} className="w-full h-full object-cover" />
+                                       <Image src={getAvatarUrl(participant)} alt={participant.name} width={40} height={40} className="object-cover" unoptimized />
                                    </div>
                                    <span className="font-bold text-sm text-ui-black">{participant.name}</span>
                                </div>

@@ -94,9 +94,9 @@ export default function VerifyEmailPage() {
 
   // OTP state
   const [otpValue, setOtpValue] = useState("");
+
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [isInitialSend, setIsInitialSend] = useState(true);
 
   // Feedback state
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +159,6 @@ export default function VerifyEmailPage() {
       // Set cooldown
       const remaining = getResendCooldownRemaining(emailToSend);
       setCooldown(remaining > 0 ? remaining : 60);
-      setIsInitialSend(false);
     } else {
       setError(result.message);
     }

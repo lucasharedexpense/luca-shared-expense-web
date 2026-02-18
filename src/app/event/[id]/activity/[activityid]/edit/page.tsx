@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Trash2, Plus, Check, X, Pencil, Users } from "lucide-react";
 import { MOCK_DATABASE, Item } from "@/lib/dummy-data"; // Pastikan path import ini benar
@@ -68,11 +69,9 @@ interface ParticipantsModalProps {
 }
 
 const ParticipantsModal = ({ isOpen, onClose, allEventParticipants, selectedNames, onSave }: ParticipantsModalProps) => {
+    // State is initialized from props. Parent passes key={String(isOpen)+selectedNames.join()}
+    // to remount this component when it opens, avoiding setState-in-effect.
     const [tempSelected, setTempSelected] = useState<string[]>(selectedNames);
-
-    useEffect(() => {
-        if (isOpen) setTempSelected(selectedNames);
-    }, [isOpen, selectedNames]);
 
     if (!isOpen) return null;
 
@@ -102,9 +101,12 @@ const ParticipantsModal = ({ isOpen, onClose, allEventParticipants, selectedName
                                 className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-ui-accent-yellow bg-ui-accent-yellow/5' : 'border-gray-100 hover:bg-gray-50'}`}
                             >
                                 <div className="relative shrink-0">
-                                    <img 
+                                    <Image 
                                         src={p.avatarName.startsWith("http") ? p.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} 
-                                        className="w-10 h-10 rounded-full object-cover bg-gray-200" 
+                                        alt={p.name}
+                                        width={40} height={40}
+                                        className="w-10 h-10 rounded-full object-cover bg-gray-200"
+                                        unoptimized
                                     />
                                     {isSelected && <div className="absolute -bottom-1 -right-1 bg-ui-accent-yellow rounded-full p-0.5 border-2 border-white"><Check className="w-3 h-3 text-black" /></div>}
                                 </div>
@@ -136,11 +138,9 @@ interface ItemModalProps {
 }
 
 const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants, getAvatarByName }: ItemModalProps) => {
+    // State is initialized from props. Parent passes key={editingItemIndex ?? 'new'}
+    // to remount this component when switching items, avoiding setState-in-effect.
     const [formData, setFormData] = useState<Item>(initialItem);
-
-    useEffect(() => {
-        if (isOpen) setFormData(initialItem);
-    }, [isOpen, initialItem]);
 
     if (!isOpen) return null;
 
@@ -210,7 +210,7 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants,
                                         onClick={() => toggleMember(name)}
                                         className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
                                     >
-                                        <img src={getAvatarByName(name)} className="w-full h-full object-cover" />
+                                        <Image src={getAvatarByName(name)} alt={name} width={40} height={40} className="w-full h-full object-cover" unoptimized />
                                     </button>
                                 );
                             })}
@@ -241,16 +241,16 @@ export default function ActivityEditPage() {
   const eventData = MOCK_DATABASE.events.find((e) => e.id === eventId);
   const originalActivity = eventData?.activities.find((a) => a.id === activityId);
 
-  // States
-  const [title, setTitle] = useState("");
-  const [payerName, setPayerName] = useState("");
-  const [items, setItems] = useState<Item[]>([]);
-  
-  // Selected People for THIS Activity (Subset dari Event Participants)
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]); 
-  
-  const [taxPercent, setTaxPercent] = useState(0);
-  const [taxAmount, setTaxAmount] = useState(0);
+  // States initialized directly from originalActivity to avoid setState-in-effect
+  const [title, setTitle] = useState(() => originalActivity?.title ?? "");
+  const [payerName, setPayerName] = useState(() => originalActivity?.payerName ?? "");
+  const [items, setItems] = useState<Item[]>(() =>
+    originalActivity ? JSON.parse(JSON.stringify(originalActivity.items)) : []
+  );
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(() =>
+    originalActivity?.participants.map(p => p.name) ?? []
+  );
+  const [taxPercent, setTaxPercent] = useState(() => originalActivity?.items[0]?.taxPercentage ?? 10);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
   const [globalDiscountAmount, setGlobalDiscountAmount] = useState(0);
 
@@ -266,30 +266,15 @@ export default function ActivityEditPage() {
     name: ""
   });
 
-  // Init Data Effect
-  useEffect(() => {
-    if (originalActivity) {
-      setTitle(originalActivity.title);
-      setPayerName(originalActivity.payerName);
-      setItems(JSON.parse(JSON.stringify(originalActivity.items)));
-      
-      // Ambil nama partisipan langsung dari data activity di DB
-      const participantNames = originalActivity.participants.map(p => p.name);
-      setSelectedParticipants(participantNames);
-      
-      const initialTaxRate = originalActivity.items[0]?.taxPercentage || 10;
-      setTaxPercent(initialTaxRate);
-    }
-  }, [originalActivity]);
-
   // Calculations
-  const subTotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  }, [items]);
+  const subTotal = useMemo(() =>
+    items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+  , [items]);
 
-  useEffect(() => {
-     const taxableAmount = Math.max(0, subTotal - globalDiscountAmount); 
-     setTaxAmount(taxableAmount * (taxPercent / 100));
+  // Derive taxAmount directly — no setState in effect needed
+  const taxAmount = useMemo(() => {
+    const taxableAmount = Math.max(0, subTotal - globalDiscountAmount);
+    return taxableAmount * (taxPercent / 100);
   }, [subTotal, taxPercent, globalDiscountAmount]);
 
   const grandTotal = subTotal + taxAmount - globalDiscountAmount;
@@ -394,7 +379,7 @@ export default function ActivityEditPage() {
                         {/* Map dari state selectedParticipants (bukan dummy) */}
                         {selectedParticipants.map((name, idx) => (
                             <div key={idx} className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-gray-200 overflow-hidden">
-                                <img src={getAvatarByName(name)} className="w-full h-full object-cover" />
+                                <Image src={getAvatarByName(name)} alt={name} width={32} height={32} className="w-full h-full object-cover" unoptimized />
                             </div>
                         ))}
                      </div>
@@ -426,11 +411,7 @@ export default function ActivityEditPage() {
                         >
                             {/* Avatar Kecil */}
                             <div className="w-5 h-5 rounded-full overflow-hidden border border-white shadow-sm">
-                                <img 
-                                    src={getAvatarByName(payerName)} 
-                                    alt="Payer"
-                                    className="w-full h-full object-cover"
-                                />
+                                <Image src={getAvatarByName(payerName)} alt="Payer" width={20} height={20} className="w-full h-full object-cover" unoptimized />
                             </div>
                             
                             {/* Nama Payer */}
@@ -469,10 +450,7 @@ export default function ActivityEditPage() {
                                                 }}
                                                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${payerName === name ? 'bg-ui-accent-yellow/10 text-black' : 'hover:bg-gray-50 text-gray-600'}`}
                                             >
-                                                <img 
-                                                    src={getAvatarByName(name)} 
-                                                    className="w-6 h-6 rounded-full object-cover bg-gray-100"
-                                                />
+                                                <Image src={getAvatarByName(name)} alt={name} width={24} height={24} className="w-6 h-6 rounded-full object-cover bg-gray-100" unoptimized />
                                                 <span className={`text-xs ${payerName === name ? 'font-bold' : 'font-medium'}`}>
                                                     {name}
                                                 </span>
@@ -506,7 +484,7 @@ export default function ActivityEditPage() {
                                         <div className="flex items-center gap-1 mt-1">
                                             {item.memberNames.map((name, i) => (
                                                 <div key={i} className="w-4 h-4 rounded-full bg-gray-100 border border-white overflow-hidden">
-                                                    <img src={getAvatarByName(name)} className="w-full h-full object-cover" />
+                                                    <Image src={getAvatarByName(name)} alt={name} width={16} height={16} className="w-full h-full object-cover" unoptimized />
                                                 </div>
                                             ))}
                                         </div>
@@ -593,9 +571,10 @@ export default function ActivityEditPage() {
       {/* MODALS */}
       {isModalOpen && modalInitialItem && (
         <ItemModal 
+            key={editingItemIndex ?? 'new'}
             isOpen={isModalOpen}
             initialItem={modalInitialItem}
-            activityParticipants={selectedParticipants} // Hanya orang yg terpilih di activity
+            activityParticipants={selectedParticipants}
             getAvatarByName={getAvatarByName}
             onClose={() => setIsModalOpen(false)}
             onSave={handleModalSave}
@@ -604,9 +583,10 @@ export default function ActivityEditPage() {
 
       {isParticipantModalOpen && (
         <ParticipantsModal 
+            key={selectedParticipants.join(",")}
             isOpen={isParticipantModalOpen}
             onClose={() => setIsParticipantModalOpen(false)}
-            allEventParticipants={eventData?.participants || []} // Pool dari seluruh Event
+            allEventParticipants={eventData?.participants || []}
             selectedNames={selectedParticipants}
             onSave={setSelectedParticipants}
         />
