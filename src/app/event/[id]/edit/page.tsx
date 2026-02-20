@@ -120,7 +120,7 @@ export default function EditEventPage() {
         
         // Convert Firestore Timestamp to number if needed
         if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
-          eventCreatedAt = (createdAtData as any).toMillis();
+          eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
         } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
           eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
         } else if (typeof createdAtData === 'number') {

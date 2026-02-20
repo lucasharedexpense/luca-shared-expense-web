@@ -2,7 +2,9 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import SidebarDesktop from "@/components/ui/SidebarDesktop"; // Import Sidebar Desktop tadi
+import dynamic from "next/dynamic";
+// Render SidebarDesktop only on the client to avoid SSR/CSR markup mismatch
+const SidebarDesktop = dynamic(() => import("@/components/ui/SidebarDesktop"), { ssr: false });
 import MobileLayout from "@/components/layout/MobileLayout"; // Layout lama kamu (untuk mobile)
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {

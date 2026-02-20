@@ -112,7 +112,7 @@ export default function NewEventModal({
         }
         setSearchContact("");
     }
-  }, [isOpen, initialData, user?.displayName]);
+  }, [isOpen, initialData, user?.displayName, contacts]);
 
   if (!isOpen) return null;
 
