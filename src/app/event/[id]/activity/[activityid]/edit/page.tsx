@@ -201,16 +201,21 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants,
                     {/* Participant Selector (Dynamic from Activity Participants) */}
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-4">
                             {activityParticipants.map((name, idx) => {
                                 const isSelected = formData.memberNames.includes(name);
                                 return (
                                     <button 
                                         key={idx}
                                         onClick={() => toggleMember(name)}
-                                        className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
+                                        className="flex flex-col items-center gap-2 cursor-pointer transition-opacity"
                                     >
-                                        <Image src={getAvatarByName(name)} alt={name} width={40} height={40} className="w-full h-full object-cover" unoptimized />
+                                        <div className={`relative w-12 h-12 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}>
+                                            <Image src={getAvatarByName(name)} alt={name} width={48} height={48} className="w-full h-full object-cover" unoptimized />
+                                        </div>
+                                        <span className={`text-xs font-semibold text-center transition-opacity ${isSelected ? 'text-ui-black opacity-100' : 'opacity-50'}`}>
+                                            {name}
+                                        </span>
                                     </button>
                                 );
                             })}

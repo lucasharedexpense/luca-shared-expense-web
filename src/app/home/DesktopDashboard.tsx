@@ -166,7 +166,7 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
 
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-4">
                             {activityParticipants.map((participant: Participant, idx: number) => {
                                 const participantName = getParticipantName(participant);
                                 const isSelected = formData.memberNames.includes(participantName);
@@ -175,16 +175,21 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants 
                                         key={idx}
                                         onClick={() => !isSaving && toggleMember(participantName)}
                                         disabled={isSaving}
-                                        className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden disabled:opacity-50 ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
+                                        className="flex flex-col items-center gap-2 cursor-pointer transition-opacity disabled:opacity-50"
                                     >
-                                        <Image
-                                            src={getAvatarUrl(participant)}
-                                            alt={participantName}
-                                            width={40}
-                                            height={40}
-                                            className="object-cover"
-                                            unoptimized
-                                        />
+                                        <div className={`relative w-12 h-12 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}>
+                                            <Image
+                                                src={getAvatarUrl(participant)}
+                                                alt={participantName}
+                                                width={48}
+                                                height={48}
+                                                className="object-cover"
+                                                unoptimized
+                                            />
+                                        </div>
+                                        <span className={`text-xs font-semibold text-center transition-opacity ${isSelected ? 'text-ui-black opacity-100' : 'opacity-50'}`}>
+                                            {participantName}
+                                        </span>
                                     </button>
                                 );
                             })}
