@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, deleteEvent, EventWithActivities } from "@/lib/firestore";
+import { getContacts, updateContact } from "@/lib/firebase-contacts";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
@@ -129,6 +130,52 @@ export default function EventDetailPage() {
   const confirmDeleteEvent = async () => {
     if (!userId || !eventId) return;
     try {
+      const allContacts = await getContacts(userId);
+      let eventCreatedAt: number = 0;
+      const createdAtData = eventData?.createdAt ?? 0;
+      
+      // Convert Firestore Timestamp to number if needed
+      if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+        eventCreatedAt = (createdAtData as any).toMillis();
+      } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+        eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+      } else if (typeof createdAtData === 'number') {
+        eventCreatedAt = createdAtData;
+      }
+
+      console.log("\n=== DELETING EVENT ===");
+      console.log("Event createdAt:", eventCreatedAt, typeof eventCreatedAt);
+      console.log("Event createdAt as string:", String(eventCreatedAt));
+
+      const participantNames = (eventData?.participants ?? []).map(p => p.name);
+
+      if (participantNames.length > 0) {
+        const updatePromises = allContacts
+          .filter(contact => participantNames.includes(contact.name))
+          .map(contact => {
+            console.log(`\nContact: ${contact.name}`);
+            console.log("Before - isEvent array:", JSON.stringify(contact.isEvent));
+            
+            const eventCreatedAtStr = String(eventCreatedAt);
+            const updatedIsEvent = contact.isEvent.filter(event => {
+              const eventCreatedAtFromDb = String(event.eventCreatedAt);
+              const shouldKeep = eventCreatedAtFromDb !== eventCreatedAtStr;
+              console.log(`  Comparing: "${eventCreatedAtFromDb}" !== "${eventCreatedAtStr}" ? ${shouldKeep}`);
+              return shouldKeep;
+            });
+            
+            console.log("After - isEvent array:", JSON.stringify(updatedIsEvent));
+            console.log("Removed", contact.isEvent.length - updatedIsEvent.length, "entries");
+            return updateContact(userId, contact.id, { isEvent: updatedIsEvent });
+          });
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log("=== Event deleted and contacts updated ===");
+        }
+      }
+
+      // Delete the event
       await deleteEvent(userId, eventId);
       router.replace("/home");
     } catch (error) {

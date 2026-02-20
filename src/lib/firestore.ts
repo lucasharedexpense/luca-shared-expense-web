@@ -119,6 +119,7 @@ function docToEvent(doc: QueryDocumentSnapshot<DocumentData>): Event {
     imageUrl: data.imageUrl || "",
     settlementResultJson: data.settlementResultJson || "{}",
     participants: data.participants || [],
+    createdAt: data.createdAt || 0,
   };
 }
 

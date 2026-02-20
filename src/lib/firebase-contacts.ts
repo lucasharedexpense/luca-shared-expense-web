@@ -23,13 +23,14 @@ export interface ContactData {
   avatarName: string;
   bankAccounts: {
     accountNumber: string;
-    bankLogo: string;
     bankName: string;
   }[];
-  description: string;
   name: string;
   phoneNumber: string;
-  userId: string;
+  isEvent: Array<{
+    eventCreatedAt: number; // Timestamp of when the event was created
+    stillEvent: 0 | 1; // 0 = not in event, 1 = in event
+  }>;
 }
 
 // ==================== HELPERS ====================
@@ -61,10 +62,9 @@ export const getContacts = async (uid: string): Promise<ContactData[]> => {
       id: doc.id,
       avatarName: doc.data().avatarName || "",
       bankAccounts: doc.data().bankAccounts || [],
-      description: doc.data().description || "",
       name: doc.data().name || "",
       phoneNumber: doc.data().phoneNumber || "",
-      userId: doc.data().userId || "",
+      isEvent: doc.data().isEvent || [],
     }));
   } catch (error) {
     console.error("Error fetching contacts:", error);
@@ -85,6 +85,7 @@ export const addContact = async (
     const contactsRef = collection(db, "users", userDocId, "contacts");
     const docRef = await addDoc(contactsRef, {
       ...data,
+      isEvent: data.isEvent || [],  // Ensure isEvent is always initialized
       createdAt: new Date(),
     });
     return docRef.id;

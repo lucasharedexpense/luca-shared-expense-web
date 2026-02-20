@@ -152,6 +152,16 @@ export default function ContactsPage() {
 
   const handleDeleteContact = async () => {
     if (!selectedContact || !authUser) return;
+    
+    // Check if contact is currently in any event
+    const isInEvent = selectedContact.isEvent.some((event) => event.stillEvent === 1);
+    
+    if (isInEvent) {
+      setErrorMessage("Cannot delete contact: This contact is currently participating in one or more events");
+      setIsDeleteConfirmOpen(false);
+      return;
+    }
+    
     setIsSaving(true);
     try {
       await deleteContact(authUser.uid, selectedContact.id);
@@ -271,6 +281,7 @@ export default function ContactsPage() {
       {isDeleteConfirmOpen && (
          <DeleteConfirmModal 
             name={selectedContact?.name || ""}
+            isInEvent={selectedContact?.isEvent.some((event) => event.stillEvent === 1) ?? false}
             onClose={() => setIsDeleteConfirmOpen(false)}
             onConfirm={handleDeleteContact}
             isDeleting={isSaving}
@@ -316,7 +327,7 @@ function ContactItem({ contact, onClick }: { contact: ContactData; onClick: () =
       <div className="flex-1 min-w-0">
          <h4 className="font-medium text-ui-black text-[16px] truncate">{contact.name}</h4>
          <p className="text-sm text-ui-dark-grey truncate font-medium">
-            {contact.phoneNumber || contact.description || "No details"}
+            {contact.phoneNumber || "No phone"}
          </p>
       </div>
     </div>
@@ -325,17 +336,31 @@ function ContactItem({ contact, onClick }: { contact: ContactData; onClick: () =
 
 // (Modal Components sama seperti sebelumnya, letakkan di bawah file ini)
 // ... DetailModal, ContactFormModal, DeleteConfirmModal ...
-function DeleteConfirmModal({ name, onClose, onConfirm, isDeleting }: { name: string; onClose: () => void; onConfirm: () => void; isDeleting?: boolean }) {
+function DeleteConfirmModal({ name, isInEvent, onClose, onConfirm, isDeleting }: { name: string; isInEvent?: boolean; onClose: () => void; onConfirm: () => void; isDeleting?: boolean }) {
     return (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-ui-white w-full max-w-xs rounded-2xl p-6 shadow-2xl">
                <h3 className="text-lg font-bold text-ui-black mb-2">Hapus Contact?</h3>
-               <p className="text-sm text-ui-dark-grey mb-6">
-                  Apakah Anda yakin ingin menghapus <b>{name}</b>?
-               </p>
+               
+               {isInEvent ? (
+                  <div className="mb-6">
+                     <div className="flex gap-3 rounded-xl bg-ui-accent-red/10 p-3 mb-3">
+                        <AlertTriangle className="w-5 h-5 text-ui-accent-red shrink-0 mt-0.5" />
+                        <p className="text-sm text-ui-accent-red font-medium">
+                           <b>{name}</b> is currently participating in an event and cannot be deleted.
+                        </p>
+                     </div>
+                     <p className="text-xs text-ui-dark-grey">Remove this contact from the event first to delete.</p>
+                  </div>
+               ) : (
+                  <p className="text-sm text-ui-dark-grey mb-6">
+                     Apakah Anda yakin ingin menghapus <b>{name}</b>?
+                  </p>
+               )}
+               
                <div className="flex gap-3">
                   <button onClick={onClose} disabled={isDeleting} className="flex-1 py-3 rounded-xl bg-ui-grey font-semibold text-sm disabled:opacity-50">Batal</button>
-                  <button onClick={onConfirm} disabled={isDeleting} className="flex-1 py-3 rounded-xl bg-ui-accent-red text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button onClick={onConfirm} disabled={isDeleting || isInEvent} className="flex-1 py-3 rounded-xl bg-ui-accent-red text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                     {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
                     Hapus
                   </button>
@@ -375,9 +400,6 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: { contact: ContactD
                </div>
 
                <h2 className="text-2xl font-bold text-ui-black font-display text-center">{contact.name}</h2>
-               {contact.description && (
-                  <p className="text-sm text-ui-dark-grey mt-1 text-center">{contact.description}</p>
-               )}
 
                {/* Info Cards */}
                <div className="w-full flex flex-col gap-3 mb-8">
@@ -426,7 +448,6 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: { contact: ContactD
 function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialData: ContactData | null; onClose: () => void; onSave: (data: ContactData) => void; isSaving?: boolean }) {
    const [name, setName] = useState(initialData?.name || "");
    const [phone, setPhone] = useState(initialData?.phoneNumber || "");
-   const [description, setDescription] = useState(initialData?.description || "");
    
    // --- STATE BANK ACCOUNTS ---
    // Kita simpan list bank di state lokal dulu sebelum di-save
@@ -462,8 +483,7 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
       
       const newAccount = {
          bankName: newBankName,
-         accountNumber: newRekening,
-         bankLogo: newBankName // Buat simplifikasi, logo pake nama bank aja
+         accountNumber: newRekening
       };
       
       setBankAccounts([...bankAccounts, newAccount]);
@@ -485,10 +505,9 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
          id: initialData?.id || "",
          name,
          phoneNumber: phone,
-         description,
          avatarName: displayedAvatar, 
          bankAccounts: bankAccounts,
-         userId: initialData?.userId || "",
+         isEvent: initialData?.isEvent || [],
       };
       onSave(newContact);
    };
@@ -567,15 +586,6 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
                      </div>
                   </div>
 
-                  {/* Description Input */}
-                  <div className="space-y-1.5">
-                     <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-wider ml-1">Description</label>
-                     <textarea 
-                        className="w-full bg-ui-grey p-4 rounded-2xl outline-none focus:bg-white focus:ring-2 ring-ui-accent-yellow/50 border border-transparent focus:border-ui-accent-yellow/20 text-ui-black font-medium transition-all placeholder:text-ui-dark-grey/40 resize-none min-h-[80px]"
-                        value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Notes about this contact..."
-                     />
-                  </div>
-
                   {/* --- BANK ACCOUNTS SECTION --- */}
                   <div className="space-y-3 pt-2">
                      <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-wider ml-1 flex items-center gap-2">
@@ -619,7 +629,8 @@ function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialD
                         <div className="bg-ui-grey rounded-xl">
                            <input 
                               placeholder="No. Rekening" 
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               className="flex-[1.5] ps-5 p-2.5 w-full rounded-xl text-sm outline-none border border-ui-grey/20 focus:border-ui-accent-yellow transition-colors placeholder:text-ui-dark-grey text-ui-black font-mono"
                               value={newRekening}
                               onChange={(e) => setNewRekening(e.target.value)}

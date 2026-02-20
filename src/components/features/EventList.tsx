@@ -8,6 +8,7 @@ import AvatarStack from "@/components/ui/AvatarStack";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
+import { getContacts, updateContact, ContactData } from "@/lib/firebase-contacts";
 import type { EventWithActivities, ActivityItem } from "@/lib/firestore";
 import { getUserProfile } from "@/lib/firebase-auth";
 
@@ -50,6 +51,16 @@ export default function EventList({ onEventClick, activeId, events: providedEven
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [events, setEvents] = useState<EventWithActivities[]>(providedEvents ?? []);
+  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
+
+  // Fetch contacts from Firebase
+  useEffect(() => {
+    if (user?.uid) {
+      getContacts(user.uid)
+        .then((data) => setFirebaseContacts(data))
+        .catch((err) => console.error("Failed to fetch contacts:", err));
+    }
+  }, [user?.uid]);
 
   // Sync events when parent re-fetches
   useEffect(() => {
@@ -105,6 +116,52 @@ export default function EventList({ onEventClick, activeId, events: providedEven
   const confirmDeleteEvent = useCallback(async () => {
     if (!user?.uid || !eventToDelete) return;
     try {
+      const allContacts = await getContacts(user.uid);
+      let eventCreatedAt: number = 0;
+      const createdAtData = eventToDelete.createdAt ?? 0;
+      
+      // Convert Firestore Timestamp to number if needed
+      if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+        eventCreatedAt = (createdAtData as any).toMillis();
+      } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+        eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+      } else if (typeof createdAtData === 'number') {
+        eventCreatedAt = createdAtData;
+      }
+
+      console.log("\n=== DELETING EVENT ===");
+      console.log("Event createdAt:", eventCreatedAt, typeof eventCreatedAt);
+      console.log("Event createdAt as string:", String(eventCreatedAt));
+
+      const participantNames = (eventToDelete.participants ?? []).map(p => p.name);
+
+      if (participantNames.length > 0) {
+        const updatePromises = allContacts
+          .filter(contact => participantNames.includes(contact.name))
+          .map(contact => {
+            console.log(`\nContact: ${contact.name}`);
+            console.log("Before - isEvent array:", JSON.stringify(contact.isEvent));
+            
+            const eventCreatedAtStr = String(eventCreatedAt);
+            const updatedIsEvent = contact.isEvent.filter(event => {
+              const eventCreatedAtFromDb = String(event.eventCreatedAt);
+              const shouldKeep = eventCreatedAtFromDb !== eventCreatedAtStr;
+              console.log(`  Comparing: "${eventCreatedAtFromDb}" !== "${eventCreatedAtStr}" ? ${shouldKeep}`);
+              return shouldKeep;
+            });
+            
+            console.log("After - isEvent array:", JSON.stringify(updatedIsEvent));
+            console.log("Removed", contact.isEvent.length - updatedIsEvent.length, "entries");
+            return updateContact(user.uid, contact.id, { isEvent: updatedIsEvent });
+          });
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log("=== Event deleted and contacts updated ===");
+        }
+      }
+
+      // Delete the event
       await deleteEvent(user.uid, eventToDelete.id);
       onRefresh?.();
     } catch (error) {
@@ -155,10 +212,95 @@ export default function EventList({ onEventClick, activeId, events: providedEven
 
       if (editingEvent) {
         // --- UPDATE EXISTING EVENT ---
+        // Get the full event data from events array to get createdAt
+        const fullEventData = events.find(e => e.id === editingEvent.id);
+        let eventCreatedAt: number = 0;
+        const createdAtData = fullEventData?.createdAt ?? 0;
+        
+        // Convert Firestore Timestamp to number if needed
+        if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+          eventCreatedAt = (createdAtData as any).toMillis();
+        } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+          eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+        } else if (typeof createdAtData === 'number') {
+          eventCreatedAt = createdAtData;
+        }
+
+        // Get old participants from existing event data
+        const oldParticipantNames = (fullEventData?.participants ?? []).map(p => p.name);
+        const newParticipantNames = allParticipants.map(p => p.name);
+
+        // Find removed and added participants
+        const removedParticipants = oldParticipantNames.filter(name => !newParticipantNames.includes(name));
+        const addedParticipants = newParticipantNames.filter(name => !oldParticipantNames.includes(name));
+
+        // Update contacts' isEvent array
+        if (removedParticipants.length > 0 || addedParticipants.length > 0) {
+          try {
+            // Fetch fresh contact data to ensure we have the latest isEvent array
+            const latestContacts = await getContacts(user.uid);
+            const updatePromises: Promise<void>[] = [];
+
+            // For removed participants: remove from isEvent array
+            removedParticipants.forEach(name => {
+              const contact = latestContacts.find(c => c.name === name);
+              if (contact) {
+                const updatedIsEvent = contact.isEvent.filter((event: any) => event.eventCreatedAt !== eventCreatedAt);
+                updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+              }
+            });
+
+            // For added participants: add new entry to isEvent
+            addedParticipants.forEach(name => {
+              const contact = latestContacts.find(c => c.name === name);
+              if (contact) {
+                const updatedIsEvent = [
+                  ...contact.isEvent,
+                  { eventCreatedAt, stillEvent: 1 as const },
+                ];
+                updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+              }
+            });
+
+            if (updatePromises.length > 0) {
+              await Promise.all(updatePromises);
+            }
+          } catch (err) {
+            console.error("Failed to update participant isEvent:", err);
+          }
+        }
+
         await updateEvent(user.uid, editingEvent.id, eventPayload);
       } else {
         // --- CREATE NEW EVENT ---
+        const eventCreatedAt = Date.now();
+        
+        // Create the event first
         const newId = await createEvent(user.uid, eventPayload);
+
+        // Then update all non-current participants' isEvent array
+        const participantNames = data.participants.map(p => p.name);
+        if (participantNames.length > 0) {
+          try {
+            // Fetch fresh contact data to ensure we have the latest isEvent array
+            const latestContacts = await getContacts(user.uid);
+            
+            const updatePromises = participantNames.map((name) => {
+              const contact = latestContacts.find((c) => c.name === name);
+              if (!contact) return Promise.resolve();
+
+              const updatedIsEvent = [
+                ...contact.isEvent,
+                { eventCreatedAt, stillEvent: 1 as const },
+              ];
+              return updateContact(user.uid, contact.id, { isEvent: updatedIsEvent });
+            });
+            await Promise.all(updatePromises);
+          } catch (err) {
+            console.error("Failed to update participant isEvent:", err);
+          }
+        }
+
         onEventClick(newId);
       }
 
@@ -172,7 +314,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
       setShowNewEventModal(false);
       setEditingEvent(null);
     }
-  }, [user?.uid, user?.displayName, editingEvent, onEventClick, onRefresh]);
+  }, [user?.uid, user?.displayName, editingEvent, firebaseContacts, onEventClick, onRefresh]);
 
   return (
     <>
