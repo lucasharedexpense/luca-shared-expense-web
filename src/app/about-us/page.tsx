@@ -13,11 +13,11 @@ import { LucaLogo } from "@/components/ui/Icons"; // Asumsi file icon yang dibua
 
 // --- DATA: TEAM MEMBERS ---
 const TEAM_MEMBERS = [
-  { name: "Beben Rafli Luhut Tua Sianipar", role: "Full Stack Developer, Scrum Master" },
-  { name: "Jeremy Emmanuel Susilo", role: "Full Stack Developer, DevOps Engineer" },
-  { name: "Made Abel Surya Mahotama", role: "Full Stack Developer, Backend Developer" },
-  { name: "Michael Kevin Pratama", role: "Full Stack Developer, UI/UX Designer" },
-  { name: "Steven Kukilo Seto", role: "Full Stack Developer, Product Owner" },
+  { name: "Beben Rafli Luhut Tua Sianipar", role: "Full Stack Developer, Scrum Master", src: "/assets/beben.jpeg" },
+  { name: "Jeremy Emmanuel Susilo", role: "Full Stack Developer, DevOps Engineer", src: "/assets/jeremy.jpeg" },
+  { name: "Made Abel Surya Mahotama", role: "Full Stack Developer, Backend Developer", src: "/assets/abel.jpeg" },
+  { name: "Michael Kevin Pratama", role: "Full Stack Developer, UI/UX Designer", src: "/assets/kevin.jpeg" },
+  { name: "Steven Kukilo Seto", role: "Full Stack Developer, Product Owner", src: "/assets/steven.jpeg" },
 ];
 
 // --- SUB-COMPONENTS ---
@@ -55,10 +55,14 @@ const TechItem = ({ tech, description }: { tech: string, description: string }) 
   </div>
 );
 
-const TeamMemberCard = ({ name, role }: { name: string, role: string }) => (
+const TeamMemberCard = ({ name, role, src }: { name: string, role: string, src: string }) => (
   <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col items-center text-center shadow-sm h-full hover:shadow-md transition-shadow">
-    <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
-        <Info className="w-8 h-8" />
+    <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
+        <img 
+          src={src} 
+          alt="Profile" 
+          className="w-full h-full object-cover" 
+        />
     </div>
     <h3 className="text-sm font-bold text-ui-black mb-5 md:mb-0">{name}</h3>
     <p className="text-xs text-ui-dark-grey mb-5 h-8 flex items-center justify-center">{role}</p>
@@ -158,7 +162,7 @@ export default function AboutUsPage() {
                         
                         return (
                             <div key={idx} className={isLastAndOdd ? "col-span-2 max-w-[50%] mx-auto w-full" : ""}>
-                                <TeamMemberCard name={member.name} role={member.role} />
+                                <TeamMemberCard name={member.name} role={member.role} src={member.src} />
                             </div>
                         );
                     })}
