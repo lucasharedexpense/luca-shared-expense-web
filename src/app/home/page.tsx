@@ -5,7 +5,7 @@ import HomeScreen from "@/components/screens/HomeScreen";
 // --- MAIN PAGE ---
 export default function HomePage() {
   return (
-    <>
+    <div suppressHydrationWarning>
         {/* TAMPILAN MOBILE (Hidden di md keatas) */}
         <div className="md:hidden">
             <HomeScreen />
@@ -15,6 +15,6 @@ export default function HomePage() {
         <div className="hidden md:block w-full h-full">
             <DesktopDashboard />
         </div>
-    </>
+    </div>
   );
 }
