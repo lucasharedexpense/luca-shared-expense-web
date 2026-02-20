@@ -345,23 +345,7 @@ export default function SettingsPage() {
                 />
             </SettingsGroupContainer>
 
-            {/* 3. GROUP: PREFERENCES */}
-            <SettingsGroupContainer title="Preferences">
-                <SettingsItem 
-                    icon={<Globe className="w-5 h-5" />}
-                    title="Language"
-                    subtitle="English (US)"
-                    onClick={() => console.log("Language")}
-                />
-                <SettingsItem 
-                    icon={<Moon className="w-5 h-5" />}
-                    title="Theme"
-                    subtitle="System Default"
-                    onClick={() => console.log("Theme")}
-                />
-            </SettingsGroupContainer>
-
-            {/* 4. GROUP: SUPPORT */}
+            {/* 3. GROUP: SUPPORT */}
             <SettingsGroupContainer title="Support">
                 <SettingsItem 
                     icon={<HelpCircle className="w-5 h-5" />}
