@@ -121,24 +121,45 @@ export default function CameraPage() {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // Wait for video to be ready
-        const loadPromise = new Promise<void>((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
+        // If metadata is already available (can happen if browser is fast), resolve immediately
+        if (videoRef.current.readyState >= 1) {
+          console.log("[Camera] ✓ Metadata already available");
+        } else {
+          // Wait for video metadata to be ready
+          const loadPromise = new Promise<void>((resolve, reject) => {
+            const video = videoRef.current!;
+            const onMeta = () => {
               console.log("[Camera] ✓ Video metadata loaded");
-              console.log(`[Camera] Video dimensions: ${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`);
+              console.log(`[Camera] Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+              video.removeEventListener("loadedmetadata", onMeta);
+              video.removeEventListener("error", onErr);
               resolve();
             };
-          }
-        });
+            const onErr = (e: Event) => {
+              video.removeEventListener("loadedmetadata", onMeta);
+              video.removeEventListener("error", onErr);
+              reject(new Error("Video element error: " + (e as ErrorEvent).message));
+            };
+            video.addEventListener("loadedmetadata", onMeta);
+            video.addEventListener("error", onErr);
+          });
 
-        // Timeout if video doesn't load
-        const timeoutPromise = new Promise<void>((_, reject) => {
-          setTimeout(() => reject(new Error("Video loading timeout")), 10000);
-        });
+          // Timeout if video doesn't load
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            setTimeout(() => reject(new Error("Video loading timeout after 10s")), 10000);
+          });
 
-        await Promise.race([loadPromise, timeoutPromise]);
-        
+          await Promise.race([loadPromise, timeoutPromise]);
+        }
+
+        // Explicitly call play() — required by some browsers even with autoPlay
+        try {
+          await videoRef.current.play();
+          console.log("[Camera] ✓ Video playing");
+        } catch (playErr) {
+          console.warn("[Camera] play() failed (non-fatal):", playErr);
+        }
+
         setIsLoading(false);
         console.log("[Camera] === Camera initialization complete ===");
       }
@@ -239,94 +260,125 @@ export default function CameraPage() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-screen w-full bg-ui-background">
+    <div className="flex flex-col h-screen w-full bg-ui-background overflow-hidden">
       <Header variant="SCAN" onLeftIconClick={() => router.push("/home")} />
 
-      {/* CONTENT */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-6">
-        <div className="max-w-2xl mx-auto h-full flex flex-col">
-          {cameraError ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-4">
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-md w-full">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <p className="text-sm font-bold text-red-700 mb-3">Camera Access Issue</p>
-                <p className="text-sm text-red-600 mb-6 leading-relaxed">{cameraError}</p>
-                
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => {
-                      console.log("[Camera] User clicked Try Again");
-                      setRetryCount(prev => prev + 1);
-                    }}
-                    className="w-full px-4 py-3 bg-ui-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all"
-                  >
-                    🔄 Try Again
-                  </button>
-                  <button
-                    onClick={handleUploadClick}
-                    className="w-full px-4 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 transition-all"
-                  >
-                    📁 Upload File Instead
-                  </button>
-                </div>
-                
-                {/* Quick tips */}
-                <div className="mt-4 pt-4 border-t border-red-200">
-                  <p className="text-xs text-gray-600 mb-2 font-semibold">Quick Tips:</p>
-                  <ul className="text-xs text-gray-600 space-y-1 text-left">
-                    <li>• Close Zoom, Teams, or other camera apps</li>
-                    <li>• Check browser permissions (🔒 icon)</li>
-                    <li>• Try a different browser</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          ) : isLoading ? (
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-                <div className="w-16 h-16 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-sm font-semibold text-ui-black">Initializing Camera...</p>
-                <p className="text-xs text-gray-500 mt-2">Please allow camera access if prompted</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex-1 bg-black rounded-2xl overflow-hidden mb-6 shadow-lg">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              </div>
+      {/* CONTENT — flex-1 fills remaining viewport height */}
+      <div className="flex-1 relative overflow-hidden">
 
-              {/* CAMERA CONTROLS */}
-              <div className="flex items-center justify-center gap-6 pb-6">
-                {/* Upload Icon Button */}
+        {/* ── Error state ── */}
+        {cameraError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-4 bg-ui-background">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-md w-full">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-sm font-bold text-red-700 mb-3">Camera Access Issue</p>
+              <p className="text-sm text-red-600 mb-6 leading-relaxed">{cameraError}</p>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    console.log("[Camera] User clicked Try Again");
+                    setRetryCount(prev => prev + 1);
+                  }}
+                  className="w-full px-4 py-3 bg-ui-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all"
+                >
+                  🔄 Try Again
+                </button>
                 <button
                   onClick={handleUploadClick}
-                  className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors"
-                  aria-label="Upload image from gallery"
+                  className="w-full px-4 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 transition-all"
                 >
-                  <ImageIcon className="w-6 h-6 text-ui-black" />
+                  📁 Upload File Instead
                 </button>
-
-                {/* Capture Button */}
-                <button
-                  onClick={handleCapturePhoto}
-                  className="w-16 h-16 bg-ui-accent-yellow rounded-full flex items-center justify-center shadow-lg hover:brightness-105 active:scale-95 transition-all"
-                  aria-label="Capture photo"
-                >
-                  <Camera className="w-8 h-8 text-ui-black" />
-                </button>
-
-                {/* Spacer for alignment */}
-                <div className="w-14"></div>
               </div>
-            </>
-          )}
+
+              {/* Quick tips */}
+              <div className="mt-4 pt-4 border-t border-red-200">
+                <p className="text-xs text-gray-600 mb-2 font-semibold">Quick Tips:</p>
+                <ul className="text-xs text-gray-600 space-y-1 text-left">
+                  <li>• Close Zoom, Teams, or other camera apps</li>
+                  <li>• Check browser permissions (🔒 icon)</li>
+                  <li>• Try a different browser</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Loading state ── */}
+        {!cameraError && isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-ui-background">
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+              <div className="w-16 h-16 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-sm font-semibold text-ui-black">Initializing Camera...</p>
+              <p className="text-xs text-gray-500 mt-2">Please allow camera access if prompted</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Video + Controls ──
+            Single <video> element (ref must only exist once).
+            Mobile  : video fills entire area, controls float over the bottom.
+            Desktop : padded rounded card with controls row below. */}
+        <div className={`absolute inset-0 flex flex-col ${!cameraError && !isLoading ? "" : "invisible pointer-events-none"}`}>
+
+          {/* Video container:
+              mobile  → fills entire remaining area (no rounding, no margin)
+              desktop → centered card with max-width, rounded corners */}
+          <div className="flex-1 relative bg-black overflow-hidden md:max-w-2xl md:w-full md:mx-auto md:mt-6 md:rounded-2xl md:shadow-lg">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+
+            {/* ── Mobile overlay gradient ── */}
+            <div className="md:hidden absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+
+            {/* ── Mobile floating controls ── */}
+            <div className="md:hidden absolute bottom-8 left-0 right-0 flex items-center justify-center gap-8 px-6">
+              <button
+                onClick={handleUploadClick}
+                className="w-14 h-14 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                aria-label="Upload image from gallery"
+              >
+                <ImageIcon className="w-6 h-6 text-ui-black" />
+              </button>
+              <button
+                onClick={handleCapturePhoto}
+                className="w-[4.5rem] h-[4.5rem] bg-ui-accent-yellow rounded-full flex items-center justify-center shadow-xl active:scale-95 transition-all"
+                aria-label="Capture photo"
+              >
+                <Camera className="w-9 h-9 text-ui-black" />
+              </button>
+              {/* Spacer for alignment */}
+              <div className="w-14 h-14" />
+            </div>
+          </div>
+
+          {/* ── Desktop controls row (below card) ── */}
+          <div className="hidden md:flex items-center justify-center gap-6 py-5 max-w-2xl mx-auto w-full px-5">
+            <button
+              onClick={handleUploadClick}
+              className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors"
+              aria-label="Upload image from gallery"
+            >
+              <ImageIcon className="w-6 h-6 text-ui-black" />
+            </button>
+            <button
+              onClick={handleCapturePhoto}
+              className="w-16 h-16 bg-ui-accent-yellow rounded-full flex items-center justify-center shadow-lg hover:brightness-105 active:scale-95 transition-all"
+              aria-label="Capture photo"
+            >
+              <Camera className="w-8 h-8 text-ui-black" />
+            </button>
+            <div className="w-14" />
+          </div>
+
         </div>
+
       </div>
 
       {/* Hidden Canvas */}
