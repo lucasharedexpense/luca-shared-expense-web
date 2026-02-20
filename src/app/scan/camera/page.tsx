@@ -13,10 +13,22 @@ export default function CameraPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const { setFile, setPreview, setError, setReceiptData } = useScan();
+  const { setFile, setPreview, setError, setReceiptData, setTargetEventId, setTargetActivityId } = useScan();
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [retryCount, setRetryCount] = React.useState(0);
+
+  // Read optional target activity params from URL (set when navigating from an activity page)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const eventId = params.get("eventId");
+      const activityId = params.get("activityId");
+      setTargetEventId(eventId ?? null);
+      setTargetActivityId(activityId ?? null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Function to stop ALL camera streams globally
   const stopAllCameraStreams = React.useCallback(async () => {

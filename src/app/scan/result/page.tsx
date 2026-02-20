@@ -158,7 +158,7 @@ function AddToActivitySheet({ isOpen, onClose, onSuccess, userId }: AddToActivit
 
 export default function ResultPage() {
   const router = useRouter();
-  const { receiptData, reset } = useScan();
+  const { receiptData, reset, targetEventId, targetActivityId } = useScan();
   const { userId } = useAuth();
 
   const [showSheet, setShowSheet] = useState(false);
@@ -166,11 +166,12 @@ export default function ResultPage() {
   const [addSuccess, setAddSuccess] = useState(false);
 
   // Handle redirect when no receipt data is available
+  // Skip redirect if addSuccess is true — we're about to navigate to activity page
   useEffect(() => {
-    if (!receiptData) {
+    if (!receiptData && !addSuccess) {
       router.push("/scan/camera");
     }
-  }, [receiptData, router]);
+  }, [receiptData, addSuccess, router]);
 
   const formatCurrency = (value: string | null): string => {
     if (!value) return "-";
@@ -184,7 +185,12 @@ export default function ResultPage() {
 
   const handleScanAnother = () => {
     reset();
-    router.push("/scan/camera");
+    // If we came from an activity, go back to camera with same target params
+    if (targetEventId && targetActivityId) {
+      router.push(`/scan/camera?eventId=${targetEventId}&activityId=${targetActivityId}`);
+    } else {
+      router.push("/scan/camera");
+    }
   };
 
   const handleAddToActivitySuccess = async (eventId: string, activityId: string) => {
@@ -217,7 +223,17 @@ export default function ResultPage() {
 
   return (
     <div className="flex flex-col h-full min-h-screen w-full bg-ui-background">
-      <Header variant="SCAN" onLeftIconClick={() => router.push("/home")} />
+      <Header
+        variant="SCAN"
+        onLeftIconClick={() => {
+          if (targetEventId && targetActivityId) {
+            reset();
+            router.push(`/event/${targetEventId}/activity/${targetActivityId}`);
+          } else {
+            router.push("/home");
+          }
+        }}
+      />
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-6">
@@ -315,25 +331,49 @@ export default function ResultPage() {
             >
               Scan Another
             </button>
-            <button
-              onClick={() => setShowSheet(true)}
-              disabled={addingItems || addSuccess || !userId}
-              className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {addingItems ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Adding...
-                </>
-              ) : addSuccess ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Added!
-                </>
-              ) : (
-                "Add to Activity"
-              )}
-            </button>
+            {targetEventId && targetActivityId ? (
+              // Came from an activity page — add directly without showing sheet
+              <button
+                onClick={() => handleAddToActivitySuccess(targetEventId, targetActivityId)}
+                disabled={addingItems || addSuccess || !userId}
+                className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {addingItems ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : addSuccess ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Added!
+                  </>
+                ) : (
+                  "Add to Activity"
+                )}
+              </button>
+            ) : (
+              // Regular flow — show bottom sheet to pick event & activity
+              <button
+                onClick={() => setShowSheet(true)}
+                disabled={addingItems || addSuccess || !userId}
+                className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {addingItems ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : addSuccess ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Added!
+                  </>
+                ) : (
+                  "Add to Activity"
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
