@@ -8,7 +8,7 @@ import AvatarStack from "@/components/ui/AvatarStack";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
-import { getContacts, updateContact, ContactData } from "@/lib/firebase-contacts";
+import { getContacts, updateContact } from "@/lib/firebase-contacts";
 import type { EventWithActivities, ActivityItem } from "@/lib/firestore";
 import { getUserProfile } from "@/lib/firebase-auth";
 
@@ -51,16 +51,6 @@ export default function EventList({ onEventClick, activeId, events: providedEven
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [events, setEvents] = useState<EventWithActivities[]>(providedEvents ?? []);
-  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
-
-  // Fetch contacts from Firebase
-  useEffect(() => {
-    if (user?.uid) {
-      getContacts(user.uid)
-        .then((data) => setFirebaseContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err));
-    }
-  }, [user?.uid]);
 
   // Sync events when parent re-fetches
   useEffect(() => {
@@ -122,7 +112,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
       
       // Convert Firestore Timestamp to number if needed
       if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
-        eventCreatedAt = (createdAtData as any).toMillis();
+        eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
       } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
         eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
       } else if (typeof createdAtData === 'number') {
@@ -219,7 +209,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
         
         // Convert Firestore Timestamp to number if needed
         if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
-          eventCreatedAt = (createdAtData as any).toMillis();
+          eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
         } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
           eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
         } else if (typeof createdAtData === 'number') {
@@ -245,7 +235,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
             removedParticipants.forEach(name => {
               const contact = latestContacts.find(c => c.name === name);
               if (contact) {
-                const updatedIsEvent = contact.isEvent.filter((event: any) => event.eventCreatedAt !== eventCreatedAt);
+                const updatedIsEvent = contact.isEvent.filter((event: { eventCreatedAt: number; stillEvent: 0 | 1; }) => event.eventCreatedAt !== eventCreatedAt);
                 updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
               }
             });
@@ -314,7 +304,7 @@ export default function EventList({ onEventClick, activeId, events: providedEven
       setShowNewEventModal(false);
       setEditingEvent(null);
     }
-  }, [user?.uid, user?.displayName, editingEvent, firebaseContacts, onEventClick, onRefresh]);
+  }, [user?.uid, user?.displayName, editingEvent, onEventClick, onRefresh, events]);
 
   return (
     <>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import MainLayout from "@/components/layout/MainLayout";
+import ClientMainLayout from "@/components/layout/ClientMainLayout";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
@@ -17,9 +17,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="bg-ui-background" suppressHydrationWarning>
         <AuthProvider>
-          <MainLayout>
+          <ClientMainLayout>
             {children}
-          </MainLayout>
+          </ClientMainLayout>
         </AuthProvider>
       </body>
     </html>

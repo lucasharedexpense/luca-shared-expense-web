@@ -100,7 +100,10 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<LayoutDashboard className="w-6.5" />} 
                 text="Dashboard" 
-                onClick={() => router.push("/")} 
+                onClick={() => {
+                  router.push("/");
+                  onClose();
+                }} 
               />
 
               {/* ACCOUNT EXPANDABLE */}
@@ -113,7 +116,10 @@ export default function Sidebar({
                 {/* SUB MENU */}
                 <SidebarSubMenuItem 
                    text="Account Settings" 
-                   onClick={() => router.push("/account/settings")} 
+                   onClick={() => {
+                     router.push("/account/settings");
+                     onClose();
+                   }} 
                 />
                 <SidebarSubMenuItem 
                    text="Logout" 
@@ -124,17 +130,26 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<Settings className="w-6.5" />} 
                 text="Settings" 
-                onClick={() => router.push("/settings")} 
+                onClick={() => {
+                  router.push("/settings");
+                  onClose();
+                }} 
               />
               <SidebarMenuItem 
                 icon={<Flag className="w-6.5" />} 
                 text="Report Bugs" 
-                onClick={() => router.push("/report-bug")} 
+                onClick={() => {
+                  router.push("/report-bug");
+                  onClose();
+                }} 
               />
               <SidebarMenuItem 
                 icon={<Info className="w-6.5" />} 
                 text="About Us" 
-                onClick={() => router.push("/about-us")}
+                onClick={() => {
+                  router.push("/about-us");
+                  onClose();
+                }}
               />
             </div>
 
@@ -144,7 +159,10 @@ export default function Sidebar({
               <SidebarMenuItem 
                 icon={<HelpCircle className="w-6.5" />} 
                 text="Help & Support" 
-                onClick={() => router.push("/help-support")} 
+                onClick={() => {
+                  router.push("/help-support");
+                  onClose();
+                }} 
               />
             </div>
           </motion.div>
