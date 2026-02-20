@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import Header from "@/components/ui/Header";
@@ -10,15 +10,22 @@ export default function ResultPage() {
   const router = useRouter();
   const { receiptData, reset } = useScan();
 
-  if (!receiptData) {
-    router.push("/scan/camera");
-    return null;
-  }
+  // Handle redirect when no receipt data is available
+  useEffect(() => {
+    if (!receiptData) {
+      router.push("/scan/camera");
+    }
+  }, [receiptData, router]);
 
   const formatCurrency = (value: string | null): string => {
     if (!value) return "-";
     return `Rp ${value}`;
   };
+
+  // Show loading state while redirecting
+  if (!receiptData) {
+    return null;
+  }
 
   const handleScanAnother = () => {
     reset();

@@ -1,18 +1,39 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import SidebarDesktop from "@/components/ui/SidebarDesktop"; // Import Sidebar Desktop tadi
 import MobileLayout from "@/components/layout/MobileLayout"; // Layout lama kamu (untuk mobile)
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure component is mounted on client to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Daftar halaman yang "Fullscreen" (tidak butuh sidebar di desktop)
-  // Contoh: Login, Register, Greeting
-  const isFullscreenPage = ["/", "/auth/login", "/auth/signup", "/auth/fill-profile", "/auth/verify-email"].includes(pathname);
+  // Contoh: Login, Register, Greeting, Scan pages
+  const isFullscreenPage = [
+    "/", 
+    "/auth/login", 
+    "/auth/signup", 
+    "/auth/fill-profile", 
+    "/auth/verify-email",
+    "/scan",
+    "/scan/camera",
+    "/scan/upload",
+    "/scan/result"
+  ].includes(pathname);
 
-  // Jika halaman Login/Register, render children langsung (tanpa sidebar)
+  // During SSR or before mounted, render children directly to avoid hydration mismatch
+  if (!isMounted) {
+    return <>{children}</>;
+  }
+
+  // Jika halaman Login/Register/Scan, render children langsung (tanpa sidebar)
   if (isFullscreenPage) {
     return <>{children}</>;
   }

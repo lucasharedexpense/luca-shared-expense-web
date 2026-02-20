@@ -186,6 +186,8 @@ export default function EventList({ onEventClick, activeId, events: providedEven
                         placeholder="Search events..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        autoComplete="off"
+                        suppressHydrationWarning
                         className="w-full h-12 pl-11 pr-4 rounded-full bg-gray-100 border-none outline-none focus:bg-white focus:ring-2 focus:ring-ui-accent-yellow transition-all text-sm font-medium placeholder:text-gray-400"
                     />
                 </div>

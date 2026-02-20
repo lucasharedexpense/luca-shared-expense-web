@@ -44,10 +44,12 @@ export default function UploadPage() {
     setError(null);
 
     try {
+      console.log("[Upload Page] Starting scan...");
       const formData = new FormData();
       formData.append("file", file);
 
       const result = await scanReceipt(formData);
+      console.log("[Upload Page] Scan result:", result);
 
       if (!result.success || result.error) {
         setError(result.error || "Failed to scan receipt");
@@ -55,10 +57,13 @@ export default function UploadPage() {
       } else if (result.data) {
         setReceiptData(result.data);
         setError(null);
+        console.log("[Upload Page] Navigating to result page...");
         router.push("/scan/result");
       }
-    } catch {
-      setError("Failed to scan receipt. Please try again.");
+    } catch (err) {
+      console.error("[Upload Page] Exception:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to scan receipt. Please try again.";
+      setError(errorMsg);
       setReceiptData(null);
     } finally {
       setLoading(false);
@@ -94,6 +99,7 @@ export default function UploadPage() {
               accept="image/*"
               onChange={handleFileSelect}
               className="hidden"
+              aria-label="Upload receipt image"
             />
 
             {preview ? (
