@@ -9,10 +9,22 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
 
   // Daftar halaman yang "Fullscreen" (tidak butuh sidebar di desktop)
-  // Contoh: Login, Register, Greeting
-  const isFullscreenPage = ["/", "/auth/login", "/auth/signup", "/auth/fill-profile", "/auth/verify-email"].includes(pathname);
+  // Contoh: Login, Register, Greeting, Scan pages
+  const isFullscreenPage = [
+    "/", 
+    "/auth/login", 
+    "/auth/signup", 
+    "/auth/fill-profile", 
+    "/auth/verify-email",
+    "/scan",
+    "/scan/camera",
+    "/scan/upload",
+    "/scan/result"
+  ].includes(pathname);
 
-  // Jika halaman Login/Register, render children langsung (tanpa sidebar)
+
+
+  // Jika halaman Login/Register/Scan, render children langsung (tanpa sidebar)
   if (isFullscreenPage) {
     return <>{children}</>;
   }
