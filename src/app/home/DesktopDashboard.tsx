@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import EventList from "@/components/features/EventList";
 import NewActivityModal from "@/components/features/NewActivityModal";
+import SearchBar from "@/components/ui/SearchBar";
 import type { Contact } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
@@ -268,8 +269,19 @@ const EventDetailColumn = ({
     eventId, activeActivityId, onActivityClick, onClose, 
     onAddClick, onEditActivity, onSummaryClick, onDeleteActivity, events
 }: EventDetailColumnProps) => {
+    const [searchQuery, setSearchQuery] = useState("");
     const event = events.find((e) => e.id === eventId);
     if (!event) return null;
+
+    // Filter activities based on search query
+    const filteredActivities = event.activities.filter((activity) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            activity.title.toLowerCase().includes(query) ||
+            activity.category.toLowerCase().includes(query) ||
+            activity.payerName.toLowerCase().includes(query)
+        );
+    });
 
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -289,6 +301,15 @@ const EventDetailColumn = ({
             {/* Tambahkan 'pb-28' agar konten terbawah tidak ketutup tombol floating */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar pb-28">
                 
+                {/* Search Bar */}
+                <div className="mb-3 sticky top-0 bg-white z-10 py-1">
+                    <SearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search activity..."
+                    />
+                </div>
+
                 {/* Tombol Add New Activity (Tetap di atas sebagai input) */}
                 <button 
                     onClick={onAddClick}
@@ -301,7 +322,12 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {event.activities.map((act) => {
+                {filteredActivities.length === 0 && event.activities.length > 0 ? (
+                    <div className="text-center py-8 opacity-50">
+                        <p className="text-sm text-gray-500">No activities match your search.</p>
+                    </div>
+                ) : (
+                    filteredActivities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -364,7 +390,8 @@ const EventDetailColumn = ({
                             <ChevronRight className={`w-5 h-5 shrink-0 ${isActive ? "text-ui-black" : "text-gray-300"}`} />
                         </div>
                     )
-                })}
+                })
+                )}
             </div>
 
             {/* 3. BIG FLOATING ACTION BUTTON (Summary) */}

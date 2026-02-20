@@ -9,6 +9,7 @@ import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import SearchBar from "@/components/ui/SearchBar";
 
 // --- HELPER: FORMAT DATE ---
 const formatDate = (dateInput: string | Date | { toDate(): Date } | { seconds: number; nanoseconds?: number } | number | null | undefined): string => {
@@ -80,6 +81,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
   const [showDeleteEvent, setShowDeleteEvent] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Unwrap ID
   const rawId = params?.id;
@@ -206,6 +208,16 @@ export default function EventDetailPage() {
     );
   }
 
+  // Filter activities based on search query
+  const filteredActivities = eventData.activities.filter((activity) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      activity.title.toLowerCase().includes(query) ||
+      activity.category.toLowerCase().includes(query) ||
+      activity.payerName.toLowerCase().includes(query)
+    );
+  });
+
   // RENDER UI
   return (
     <div className="flex flex-col h-full w-full bg-ui-background">
@@ -231,19 +243,32 @@ export default function EventDetailPage() {
       </div>
 
       {/* CONTENT ACTIVITY */}
-      <div className="w-full px-5 mt-2">
+      <div className="w-full px-5 mt-2 shrink-0">
         <h3 className="font-bold text-lg text-ui-black mb-4">Activities</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 mt-0 pb-32">
+         <div className="mb-4 -mx-5 px-5 sticky top-0 bg-ui-background z-10 py-2">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search activity..."
+          />
+         </div>
+
          {eventData.activities.length === 0 ? (
             <div className="text-center py-10 opacity-50">
                <p className="text-sm text-ui-dark-grey">No activities yet.</p>
                <p className="text-xs text-ui-dark-grey mt-1">Tap + to add one!</p>
             </div>
+         ) : filteredActivities.length === 0 ? (
+            <div className="text-center py-10 opacity-50">
+               <p className="text-sm text-ui-dark-grey">No activities match your search.</p>
+               <p className="text-xs text-ui-dark-grey mt-1">Try a different search term.</p>
+            </div>
          ) : (
             <div className="flex flex-col gap-3">
-               {eventData.activities.map((activity, index) => {
+               {filteredActivities.map((activity, index) => {
                  
                  // Kalkulasi Total Real-time
                  const totalBill = getActivityTotal(activity);
