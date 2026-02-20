@@ -96,15 +96,11 @@ export default function NewEventModal({
             setDate(isoDate);
             // Filter user sendiri dari list participants biar gak dobel
             const others = initialData.participants.filter(p => p.name !== "You" && p.name !== user?.displayName);
-            setSelectedContacts(others.map(p => ({
-              id: p.name,
-              name: p.name,
-              avatarName: p.avatarName,
-              bankAccounts: [],
-              description: "",
-              phoneNumber: "",
-              userId: "",
-            })));
+            // Map participant names back to ContactData objects from Firebase contacts
+            const participantContacts = others
+              .map(p => contacts.find(c => c.name === p.name))
+              .filter((c): c is ContactData => c !== undefined);
+            setSelectedContacts(participantContacts);
         } else {
             // Create Mode (Reset)
             setTitle("");

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import EventForm, { EventFormData } from "@/components/forms/EventForm";
 import { useAuth } from "@/lib/auth-context";
 import { createEvent } from "@/lib/firestore";
-import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { getContacts, updateContact, ContactData } from "@/lib/firebase-contacts";
 import { getUserProfile } from "@/lib/firebase-auth";
 
 export default function NewEventPage() {
@@ -57,6 +57,9 @@ export default function NewEventPage() {
       // Add the current user as a participant
       participants.unshift(currentUserParticipant);
 
+      // Capture timestamp before creating event
+      const eventCreatedAt = Date.now();
+
       await createEvent(user.uid, {
         title: data.title,
         location: data.location,
@@ -64,6 +67,28 @@ export default function NewEventPage() {
         participants,
         imageUrl: data.imageUrl || "",
       });
+
+      // Update all selected participants' isEvent array
+      if (data.participantIds.length > 0) {
+        try {
+          // Fetch fresh contact data to ensure we have the latest isEvent array
+          const latestContacts = await getContacts(user.uid);
+          
+          const updatePromises = data.participantIds.map((id) => {
+            const contact = latestContacts.find((c) => c.id === id);
+            if (!contact) return Promise.resolve();
+
+            const updatedIsEvent = [
+              ...contact.isEvent,
+              { eventCreatedAt, stillEvent: 1 as const },
+            ];
+            return updateContact(user.uid, id, { isEvent: updatedIsEvent });
+          });
+          await Promise.all(updatePromises);
+        } catch (err) {
+          console.error("Failed to update participant isEvent:", err);
+        }
+      }
 
       router.push("/home");
     } catch (error) {
