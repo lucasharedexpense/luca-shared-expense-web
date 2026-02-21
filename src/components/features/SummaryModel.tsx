@@ -3,6 +3,8 @@
 import React, { useState, useMemo } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { getContacts, updateContact } from "@/lib/firebase-contacts";
+import { updateDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { X, ArrowRight, Check, ChevronDown, ChevronUp, Share2, Receipt } from "lucide-react";
 import { calculateSummary, ConsumptionDetail } from "@/lib/settlement-logic";
@@ -85,8 +87,13 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                 <button
                                         className="hidden md:inline-block w-full mt-3 px-6 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl shadow-md hover:bg-yellow-400 transition-all focus:outline-none focus:ring-2 focus:ring-yellow-300"
                                         onClick={async () => {
-                                            if (!userId || !event?.createdAt) return;
+                                            if (!userId || !event?.createdAt || !event?.id) return;
                                             try {
+                                                // Update event isFinish to 1
+                                                const eventRef = doc(db, "users", userId, "events", event.id);
+                                                await updateDoc(eventRef, { isFinish: 1 });
+
+                                                // Update contacts
                                                 const contacts = await getContacts(userId);
                                                 const updatePromises = contacts.map(contact => {
                                                     const updatedIsEvent = contact.isEvent.filter(ev => ev.eventCreatedAt !== event.createdAt && ev.stillEvent !== 1);
