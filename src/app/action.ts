@@ -49,7 +49,7 @@ export async function scanReceipt(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      // const errorText = await response.text();
       
       // Provide more user-friendly error messages
       if (response.status === 503) {

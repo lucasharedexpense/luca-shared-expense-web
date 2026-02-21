@@ -406,12 +406,15 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
     const [itemIds, setItemIds] = useState<(string | null)[]>([]);
 
-    // Initialize items from events prop (items already fetched alongside activities)
-    useEffect(() => {
+    // When activityId changes, reset items to what is stored in the events prop.
+    // Using render-phase state reset (React-recommended alternative to useEffect + setState).
+    const [prevActivityId, setPrevActivityId] = useState(activityId);
+    if (prevActivityId !== activityId) {
+        setPrevActivityId(activityId);
         const activityItems = (activity?.items ?? []) as Item[];
         setItems(activityItems);
         setItemIds(activityItems.map((item) => item.id ?? null));
-    }, [activityId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
 
     // Calculations - Now based on items from Firebase
     const subTotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);

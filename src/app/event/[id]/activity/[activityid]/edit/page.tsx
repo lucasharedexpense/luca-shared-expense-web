@@ -15,7 +15,7 @@ import { db } from "@/lib/firebase";
 type ItemWithId = Item & { id?: string };
 
 // TODO: Replace MOCK_DATABASE with real Firestore fetch (useAuth + getEventsWithActivities)
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+// import { MOCK_DATABASE } from "@/lib/dummy-data";
 
 /** Item shape matching Firestore activity items */
 interface ActivityItem {
