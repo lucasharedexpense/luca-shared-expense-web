@@ -57,7 +57,7 @@ export default function Header({
   return (
     // Surface Container
     <header className="w-full bg-ui-white z-50 sticky top-0 border-b border-ui-grey/50">
-      <div className="h-15 px-2 flex items-center justify-between max-w-md mx-auto w-full">
+      <div className="h-15 px-5 flex items-center justify-between w-full">
         
         {/* KIRI: Icon Area (Crossfade Logic) */}
         <div className="h-full w-12.5 flex items-center justify-center">

@@ -6,10 +6,11 @@ import { Image as ImageIcon, Camera, AlertCircle } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { useScan } from "../scan-context";
 
-/** Returns true when running on a touch-based mobile/tablet device */
+/** Layar > 1024px dianggap desktop/laptop → WebRTC camera.
+ *  Layar ≤ 1024px dianggap tablet/HP → native camera app. */
 function isMobileOrTablet(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
+  if (typeof window === "undefined") return false;
+  return window.innerWidth <= 1024;
 }
 
 export default function CameraPage() {

@@ -81,7 +81,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
   // Handle Navigasi dari Navbar Bawah
   const handleNavSelect = (index: number) => {
-    if (index === 0) router.push("/scan");
+    if (index === 0) router.push("/scan/camera");
     if (index === 1) router.push("/");
     if (index === 2) router.push("/contacts");
   };
@@ -122,8 +122,8 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           onItemSelected={handleNavSelect}
           // Tombol Plus di Navbar mengarah ke halaman Add Event
           onAddClick={() => router.push("/new-event")}
-          // Tombol Scan mengarah ke halaman Scan (kamera akan terbuka otomatis)
-          onScanClick={() => router.push("/scan")}
+          // Tombol Scan mengarah langsung ke kamera (otomatis detect mobile/desktop)
+          onScanClick={() => router.push("/scan/camera")}
         />
       )}
 
