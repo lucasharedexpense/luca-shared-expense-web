@@ -74,6 +74,7 @@ export interface Event {
   createdAt?: number;
   participants?: Participant[];
   title?: string; // Alias for name
+  isFinish?: number; // 0 = ongoing, 1 = finished
 }
 
 export interface EventWithActivities extends Event {
@@ -255,6 +256,7 @@ export interface CreateEventData {
   date: Date | string;
   imageUrl?: string;
   participants: { name: string; avatarName?: string }[];
+  isFinish?: number;
 }
 
 /**
@@ -275,6 +277,7 @@ export async function createEvent(
       participants: data.participants,
       settlementResultJson: "{}",
       createdAt: Date.now(),
+      isFinish: 0,
     });
     return docRef.id;
   } catch (error) {
