@@ -96,11 +96,21 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           <Header 
             variant={headerVariant} 
             onLeftIconClick={() => {
-              // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home. Kalau mode lain (Details), Back.
+              // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home.
+              // Kalau Activity Details, balik ke event detail langsung.
+              // Kalau mode lain (Details), Back.
               if (headerVariant === "HOME") {
                 setIsSidebarOpen(true);
               } else if (headerVariant === "SCAN") {
                 router.push("/home");
+              } else if (headerVariant === "ACTIVITY_DETAILS") {
+                // Ekstrak eventId dari pathname: /event/[id]/activity/[activityid]
+                const match = pathname.match(/^\/event\/([^/]+)\/activity/);
+                if (match) {
+                  router.push(`/event/${match[1]}`);
+                } else {
+                  router.back();
+                }
               } else {
                 router.back();
               }

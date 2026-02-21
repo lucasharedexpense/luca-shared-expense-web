@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
     "@opentelemetry/api",
     "undici",
   ],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",  // allow up to 5MB (gambar sudah dikompresi ke ≤1MB)
+    },
+  },
 };
 
 export default nextConfig;
