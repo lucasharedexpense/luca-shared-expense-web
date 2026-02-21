@@ -195,11 +195,11 @@ export default function AddItemPage() {
                 Price
               </label>
               <div className="relative">
-                <span className="absolute left-0 top-2 text-2xl font-bold text-ui-dark-grey/50">$</span>
+                <span className="absolute left-0 top-2 text-2xl font-bold text-ui-dark-grey/50">Rp</span>
                 <input
                   type="text"
                   placeholder="0"
-                  className="w-full text-2xl font-bold text-ui-black placeholder:text-ui-dark-grey/50 outline-none bg-transparent border-b-2 border-ui-accent-yellow py-2 transition-colors pl-6"
+                  className="w-full text-2xl font-bold text-ui-black placeholder:text-ui-dark-grey/50 outline-none bg-transparent border-b-2 border-ui-accent-yellow py-2 transition-colors pl-12"
                   value={price}
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, "");
