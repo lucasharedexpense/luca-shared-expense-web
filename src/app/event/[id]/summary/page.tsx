@@ -120,7 +120,7 @@ export default function SummaryPage() {
           totalExpense: result.totalExpense,
           calculatedAt,
         });
-      } catch {
+      } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load summary.");
       } finally {
         setLoading(false);

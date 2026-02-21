@@ -66,7 +66,7 @@ export const getContacts = async (uid: string): Promise<ContactData[]> => {
       phoneNumber: doc.data().phoneNumber || "",
       isEvent: doc.data().isEvent || [],
     }));
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -88,7 +88,7 @@ export const addContact = async (
       createdAt: new Date(),
     });
     return docRef.id;
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -109,7 +109,7 @@ export const updateContact = async (
       ...data,
       updatedAt: new Date(),
     });
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -126,7 +126,7 @@ export const deleteContact = async (
     const userDocId = await getUserDocId(uid);
     const contactRef = doc(db, "users", userDocId, "contacts", contactId);
     await deleteDoc(contactRef);
-  } catch {
+  } catch (error) {
     throw error;
   }
 };

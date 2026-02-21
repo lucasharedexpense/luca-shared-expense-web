@@ -307,7 +307,7 @@ export async function createEvent(
       isFinish: 0,
     });
     return docRef.id;
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -342,7 +342,7 @@ export async function updateEvent(
     if (data.participants !== undefined) updateData.participants = data.participants;
 
     await updateDoc(eventRef, updateData);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -358,7 +358,7 @@ export async function deleteEvent(
   try {
     const eventRef = doc(db, "users", userId, "events", eventId);
     await deleteDoc(eventRef);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -396,7 +396,7 @@ export async function createActivity(
     });
     
     return docRef.id;
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -422,7 +422,7 @@ export async function updateActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await updateDoc(activityRef, data);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -439,7 +439,7 @@ export async function deleteActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await deleteDoc(activityRef);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -487,7 +487,7 @@ export async function createItem(
     });
 
     return docRef.id;
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -523,7 +523,7 @@ export async function updateItem(
       itemId
     );
     await updateDoc(itemRef, data);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }
@@ -551,7 +551,7 @@ export async function deleteItem(
       itemId
     );
     await deleteDoc(itemRef);
-  } catch {
+  } catch (error) {
     throw error;
   }
 }

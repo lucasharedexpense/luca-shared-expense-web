@@ -346,7 +346,7 @@ export default function AccountSettingsPage() {
     try {
       await changePassword(oldP, newP);
       setToastMessage("Password updated successfully");
-    } catch {
+    } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Failed to update password";
       setErrorMessage(errMsg);
     } finally {
@@ -361,7 +361,7 @@ export default function AccountSettingsPage() {
       await deleteAccount();
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
-    } catch {
+    } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Failed to delete account";
       setErrorMessage(errMsg);
       setIsLoading(false);

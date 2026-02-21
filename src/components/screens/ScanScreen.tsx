@@ -49,7 +49,7 @@ export default function ScanPage() {
           // If pathname changed while waiting for getUserMedia, stop the stream
           stream.getTracks().forEach((track) => track.stop());
         }
-      } catch {
+      } catch (error) {
         if (!isMounted) return;
         
         let errorMsg = "Unable to access camera";

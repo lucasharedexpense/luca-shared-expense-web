@@ -159,7 +159,7 @@ export default function SignUpPage() {
         // Redirect ke halaman verifikasi email
         router.push("/auth/verify-email");
 
-    } catch {
+    } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Sign up failed. Please try again.";
         setGlobalError(errorMessage);
         setIsLoading(false);
@@ -185,7 +185,7 @@ export default function SignUpPage() {
           router.push("/home");
         }
 
-    } catch {
+    } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Google sign-up failed. Please try again.";
         if (errorMessage !== "__CANCELLED_POPUP__") {
           // Show error while button is still disabled

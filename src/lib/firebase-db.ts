@@ -27,7 +27,7 @@ export const addDocument = async (
       ...data,
     });
     return docRef.id;
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -46,7 +46,7 @@ export const getDocument = async (
       return { id: docSnap.id, ...docSnap.data() };
     }
     return null;
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -63,7 +63,7 @@ export const getDocuments = async (
       id: doc.id,
       ...doc.data(),
     }));
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -82,7 +82,7 @@ export const queryDocuments = async (
       id: doc.id,
       ...doc.data(),
     }));
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -101,7 +101,7 @@ export const updateDocument = async (
       ...data,
       updatedAt: new Date(),
     });
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -116,7 +116,7 @@ export const deleteDocument = async (
   try {
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
