@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import EventForm, { EventFormData } from "@/components/forms/EventForm";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, updateEvent, EventWithActivities } from "@/lib/firestore";
-import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { getContacts, updateContact, ContactData } from "@/lib/firebase-contacts";
 import { getUserProfile } from "@/lib/firebase-auth";
 
 export default function EditEventPage() {
@@ -104,6 +104,61 @@ export default function EditEventPage() {
 
       // Add the current user as a participant
       participants.unshift(currentUserParticipant);
+
+      // Get old participants from existing event data
+      const oldParticipantNames = (eventData?.participants ?? []).map(p => p.name);
+      const newParticipantNames = participants.map(p => p.name);
+
+      // Find removed and added participants
+      const removedParticipants = oldParticipantNames.filter(name => !newParticipantNames.includes(name));
+      const addedParticipants = newParticipantNames.filter(name => !oldParticipantNames.includes(name));
+
+      // Update contacts' isEvent array
+      if (removedParticipants.length > 0 || addedParticipants.length > 0) {
+        let eventCreatedAt: number = 0;
+        const createdAtData = eventData?.createdAt ?? 0;
+        
+        // Convert Firestore Timestamp to number if needed
+        if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+          eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
+        } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+          eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+        } else if (typeof createdAtData === 'number') {
+          eventCreatedAt = createdAtData;
+        }
+
+        try {
+          // Fetch fresh contact data to ensure we have the latest isEvent array
+          const latestContacts = await getContacts(user.uid);
+          const updatePromises: Promise<void>[] = [];
+
+          // For removed participants: remove from isEvent array
+          removedParticipants.forEach(name => {
+            const contact = latestContacts.find(c => c.name === name);
+            if (contact) {
+              const updatedIsEvent = contact.isEvent.filter(event => event.eventCreatedAt !== eventCreatedAt);
+              updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+            }
+          });
+
+          // For added participants: add new entry to isEvent
+          addedParticipants.forEach(name => {
+            const contact = latestContacts.find(c => c.name === name);
+            if (contact) {
+              const updatedIsEvent = [
+                ...contact.isEvent,
+                { eventCreatedAt, stillEvent: 1 as const },
+              ];
+              updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+            }
+          });
+
+          await Promise.all(updatePromises);
+        } catch (err) {
+          console.error("Failed to update participant isEvent:", err);
+          // Don't alert - event was updated successfully
+        }
+      }
 
       await updateEvent(userId, eventId, {
         title: data.title,

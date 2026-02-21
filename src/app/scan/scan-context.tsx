@@ -27,6 +27,11 @@ interface ScanContextType {
   setError: (error: string | null) => void;
   loading: boolean;
   setLoading: (loading: boolean) => void;
+  // Optional target activity to add scan results to directly
+  targetEventId: string | null;
+  setTargetEventId: (id: string | null) => void;
+  targetActivityId: string | null;
+  setTargetActivityId: (id: string | null) => void;
   reset: () => void;
 }
 
@@ -38,6 +43,8 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [targetEventId, setTargetEventId] = useState<string | null>(null);
+  const [targetActivityId, setTargetActivityId] = useState<string | null>(null);
 
   const reset = () => {
     setFile(null);
@@ -45,6 +52,8 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     setReceiptData(null);
     setError(null);
     setLoading(false);
+    setTargetEventId(null);
+    setTargetActivityId(null);
   };
 
   return (
@@ -60,6 +69,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         setError,
         loading,
         setLoading,
+        targetEventId,
+        setTargetEventId,
+        targetActivityId,
+        setTargetActivityId,
         reset,
       }}
     >

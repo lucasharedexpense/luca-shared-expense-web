@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Trash2, Plus, Check, X, Pencil, Users } from "lucide-react";
-import { MOCK_DATABASE, Item } from "@/lib/dummy-data"; // Pastikan path import ini benar
+import { Item } from "@/lib/dummy-data";
 import { Wave } from "@/components/ui/Icons";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities, updateActivity, updateItem, createItem, deleteItem } from "@/lib/firestore";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type ItemWithId = Item & { id?: string };
 
 // --- HELPER: FORMAT CURRENCY ---
 const formatCurrency = (amount: number) => 
@@ -201,16 +207,21 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants,
                     {/* Participant Selector (Dynamic from Activity Participants) */}
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-4">
                             {activityParticipants.map((name, idx) => {
                                 const isSelected = formData.memberNames.includes(name);
                                 return (
                                     <button 
                                         key={idx}
                                         onClick={() => toggleMember(name)}
-                                        className={`relative w-10 h-10 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}
+                                        className="flex flex-col items-center gap-2 cursor-pointer transition-opacity"
                                     >
-                                        <Image src={getAvatarByName(name)} alt={name} width={40} height={40} className="w-full h-full object-cover" unoptimized />
+                                        <div className={`relative w-12 h-12 rounded-full border-2 transition-all overflow-hidden ${isSelected ? 'border-ui-accent-yellow opacity-100' : 'border-transparent opacity-30 grayscale'}`}>
+                                            <Image src={getAvatarByName(name)} alt={name} width={48} height={48} className="w-full h-full object-cover" unoptimized />
+                                        </div>
+                                        <span className={`text-xs font-semibold text-center transition-opacity ${isSelected ? 'text-ui-black opacity-100' : 'opacity-50'}`}>
+                                            {name}
+                                        </span>
                                     </button>
                                 );
                             })}
@@ -233,24 +244,26 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants,
 export default function ActivityEditPage() {
   const router = useRouter();
   const params = useParams();
-  
+  const { userId, loading: authLoading } = useAuth();
+
   const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const activityId = Array.isArray(params?.activityid) ? params.activityid[0] : params?.activityid;
 
-  // 1. LOAD DATA DARI DB
-  const eventData = MOCK_DATABASE.events.find((e) => e.id === eventId);
-  const originalActivity = eventData?.activities.find((a) => a.id === activityId);
+  // Page/data loading state
+  const [pageLoading, setPageLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [allEventParticipants, setAllEventParticipants] = useState<{ name: string; avatarName: string }[]>([]);
 
-  // States initialized directly from originalActivity to avoid setState-in-effect
-  const [title, setTitle] = useState(() => originalActivity?.title ?? "");
-  const [payerName, setPayerName] = useState(() => originalActivity?.payerName ?? "");
-  const [items, setItems] = useState<Item[]>(() =>
-    originalActivity ? JSON.parse(JSON.stringify(originalActivity.items)) : []
-  );
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(() =>
-    originalActivity?.participants.map(p => p.name) ?? []
-  );
-  const [taxPercent, setTaxPercent] = useState(() => originalActivity?.items[0]?.taxPercentage ?? 10);
+  // Activity fields
+  const [title, setTitle] = useState("");
+  const [payerName, setPayerName] = useState("");
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+
+  // Items
+  const [items, setItems] = useState<ItemWithId[]>([]);
+  const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
+
+  const [taxPercent, setTaxPercent] = useState(10);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
   const [globalDiscountAmount, setGlobalDiscountAmount] = useState(0);
 
@@ -266,6 +279,59 @@ export default function ActivityEditPage() {
     name: ""
   });
 
+  // 1. LOAD ACTIVITY DATA FROM FIRESTORE
+  useEffect(() => {
+    const fetchData = async () => {
+      if (authLoading) return;
+      if (!userId || !eventId || !activityId) {
+        setPageLoading(false);
+        return;
+      }
+      try {
+        const allEvents = await getEventsWithActivities(userId);
+        const event = allEvents.find(e => e.id === eventId);
+        const activity = event?.activities.find(a => a.id === activityId);
+
+        if (activity) {
+          setTitle(activity.title);
+          setPayerName(activity.payerName);
+          setSelectedParticipants(activity.participants?.map(p => p.name) ?? []);
+        }
+
+        setAllEventParticipants(
+          event?.participants?.map(p => ({ name: p.name, avatarName: p.avatarName || "" })) ?? []
+        );
+      } catch (error) {
+        console.error("Error fetching activity:", error);
+      } finally {
+        setPageLoading(false);
+      }
+    };
+    fetchData();
+  }, [userId, eventId, activityId, authLoading]);
+
+  // 2. LOAD ITEMS FROM FIRESTORE (one-time, so local edits aren't overridden)
+  useEffect(() => {
+    const fetchItems = async () => {
+      if (!userId || !eventId || !activityId) return;
+      try {
+        const itemsRef = collection(db, "users", userId, "events", eventId, "activities", activityId, "items");
+        const snapshot = await getDocs(itemsRef);
+        const itemsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as unknown as ItemWithId[];
+        setItems(itemsList);
+        if (itemsList.length > 0 && itemsList[0].taxPercentage) {
+          setTaxPercent(itemsList[0].taxPercentage);
+        }
+      } catch (error) {
+        console.error("Error fetching items:", error);
+      }
+    };
+    fetchItems();
+  }, [userId, eventId, activityId]);
+
   // Calculations
   const subTotal = useMemo(() =>
     items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
@@ -279,17 +345,13 @@ export default function ActivityEditPage() {
 
   const grandTotal = subTotal + taxAmount - globalDiscountAmount;
 
-  // Helper Avatar (Lookup ke Event Data)
+  // Helper Avatar (Lookup ke allEventParticipants)
   const getAvatarByName = (name: string) => {
-    const p = eventData?.participants.find(p => p.name === name);
+    const p = allEventParticipants.find(p => p.name === name);
     const avatar = p?.avatarName;
-
-    // 1. Cek apakah ada avatar & apakah formatnya URL
     if (avatar && avatar.startsWith("http")) {
         return avatar;
     }
-    
-    // 2. Fallback: Kalau "avatar_1" atau null, generate Dicebear pake seed name
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
   };
 
@@ -311,6 +373,10 @@ export default function ActivityEditPage() {
 
   const confirmDelete = () => {
       if (deleteModal.index !== null) {
+          const deletedItem = items[deleteModal.index];
+          if (deletedItem?.id) {
+              setDeletedItemIds(prev => [...prev, deletedItem.id!]);
+          }
           setItems(prev => prev.filter((_, i) => i !== deleteModal.index));
       }
       setDeleteModal({ isOpen: false, index: null, name: "" });
@@ -348,15 +414,58 @@ export default function ActivityEditPage() {
       setIsModalOpen(false);
   };
 
-  const handleSave = () => {
-      // Logic save ke DB (di sini cuma console log)
-      console.log("Saving...", { title, items, grandTotal, selectedParticipants });
-      router.back();
+  const handleSave = async () => {
+      if (!userId || !eventId || !activityId) return;
+      setSaving(true);
+      try {
+          // Update activity metadata
+          await updateActivity(userId, eventId, activityId, {
+              title,
+              payerName,
+              participants: selectedParticipants.map(name => {
+                  const p = allEventParticipants.find(ep => ep.name === name);
+                  return { name, avatarName: p?.avatarName || "" };
+              }),
+          });
+
+          // Save items: update existing, create new
+          for (const item of items) {
+              const { id: itemId, ...itemData } = item;
+              if (itemId) {
+                  await updateItem(userId, eventId, activityId, itemId, itemData);
+              } else {
+                  await createItem(userId, eventId, activityId, {
+                      itemName: itemData.itemName,
+                      price: itemData.price,
+                      quantity: itemData.quantity,
+                      memberNames: itemData.memberNames,
+                      discountAmount: itemData.discountAmount || 0,
+                      taxPercentage: itemData.taxPercentage || 0,
+                  });
+              }
+          }
+
+          // Delete removed items
+          for (const id of deletedItemIds) {
+              await deleteItem(userId, eventId, activityId, id);
+          }
+
+          router.back();
+      } catch (error) {
+          console.error("Error saving:", error);
+      } finally {
+          setSaving(false);
+      }
   };
 
   const [isPayerOpen, setIsPayerOpen] = useState(false);
 
-  if (!originalActivity) return <div>Loading...</div>;
+  if (pageLoading || authLoading) return (
+    <div className="flex flex-col items-center justify-center h-full bg-ui-background gap-4">
+      <div className="w-10 h-10 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-ui-dark-grey text-sm">Loading...</p>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full w-full bg-ui-background">
@@ -563,8 +672,8 @@ export default function ActivityEditPage() {
 
       {/* FLOATING SAVE BUTTON */}
       <div className="fixed bottom-8 right-5 z-20">
-          <button onClick={handleSave} className="w-16 h-16 bg-ui-accent-yellow text-ui-black rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-             <Check className="w-8 h-8" strokeWidth={3} />
+          <button onClick={handleSave} disabled={saving} className="w-16 h-16 bg-ui-accent-yellow text-ui-black rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-60 disabled:scale-100">
+             {saving ? <div className="w-6 h-6 border-3 border-ui-black border-t-transparent rounded-full animate-spin" /> : <Check className="w-8 h-8" strokeWidth={3} />}
           </button>
       </div>
 
@@ -586,7 +695,7 @@ export default function ActivityEditPage() {
             key={selectedParticipants.join(",")}
             isOpen={isParticipantModalOpen}
             onClose={() => setIsParticipantModalOpen(false)}
-            allEventParticipants={eventData?.participants || []}
+            allEventParticipants={allEventParticipants}
             selectedNames={selectedParticipants}
             onSave={setSelectedParticipants}
         />

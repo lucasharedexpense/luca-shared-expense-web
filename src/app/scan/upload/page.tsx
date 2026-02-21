@@ -44,10 +44,12 @@ export default function UploadPage() {
     setError(null);
 
     try {
+      console.log("[Upload Page] Starting scan...");
       const formData = new FormData();
       formData.append("file", file);
 
       const result = await scanReceipt(formData);
+      console.log("[Upload Page] Scan result:", result);
 
       if (!result.success || result.error) {
         setError(result.error || "Failed to scan receipt");
@@ -55,10 +57,13 @@ export default function UploadPage() {
       } else if (result.data) {
         setReceiptData(result.data);
         setError(null);
+        console.log("[Upload Page] Navigating to result page...");
         router.push("/scan/result");
       }
-    } catch {
-      setError("Failed to scan receipt. Please try again.");
+    } catch (err) {
+      console.error("[Upload Page] Exception:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to scan receipt. Please try again.";
+      setError(errorMsg);
       setReceiptData(null);
     } finally {
       setLoading(false);
@@ -94,13 +99,28 @@ export default function UploadPage() {
               accept="image/*"
               onChange={handleFileSelect}
               className="hidden"
+              aria-label="Upload receipt image"
             />
 
             {preview ? (
               <div className="space-y-4">
-                <div className="relative w-full max-h-64 rounded-xl overflow-hidden bg-gray-100">
-                  <Image src={preview} alt="Preview" fill className="object-cover" unoptimized />
+                {/* Preview image — proper height so next/image fill works */}
+                <div className="relative w-full h-72 rounded-xl overflow-hidden bg-gray-100 shadow-inner">
+                  <Image
+                    src={preview}
+                    alt="Receipt preview"
+                    fill
+                    className="object-contain"
+                    unoptimized
+                  />
+                  {/* "Preview" badge */}
+                  <span className="absolute top-2 left-2 bg-black/50 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                    Preview
+                  </span>
                 </div>
+                <p className="text-xs text-center text-gray-500">
+                  Looks good? Tap <span className="font-semibold text-ui-black">Scan Receipt</span> to continue.
+                </p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => fileInputRef.current?.click()}

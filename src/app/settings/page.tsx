@@ -9,8 +9,6 @@ import {
   Lock, 
   Shield, 
   Bell, 
-  Globe, 
-  Moon, 
   HelpCircle, 
   Info, 
   LogOut, 

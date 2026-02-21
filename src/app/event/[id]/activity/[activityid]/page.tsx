@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Edit2, Trash2, Plus } from "lucide-react";
+import { Edit2, Trash2, Plus, ScanLine } from "lucide-react";
 import { Item } from "@/lib/dummy-data";
 
 // Item as stored in Firestore includes an `id` field from doc.id
@@ -374,6 +374,15 @@ export default function ActivityDetailPage() {
              className="w-14 h-14 bg-ui-accent-red text-ui-white rounded-full shadow-lg shadow-black/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
           >
              <Trash2 className="w-6 h-6" />
+          </button>
+      </div>
+
+      <div className="fixed bottom-48 right-5 z-20">
+          <button 
+             onClick={() => router.push(`/scan/camera?eventId=${eventId}&activityId=${activityId}`)}
+             className="w-14 h-14 bg-ui-white text-ui-black rounded-full shadow-lg shadow-black/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/20"
+          >
+             <ScanLine className="w-6 h-6" />
           </button>
       </div>
 

@@ -1,33 +1,239 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, ChevronRight, X, Loader2, ArrowLeft } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { useScan } from "../scan-context";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities, createItem } from "@/lib/firestore";
+import type { EventWithActivities, Activity } from "@/lib/firestore";
+
+// ---- ADD TO ACTIVITY BOTTOM SHEET ----
+interface AddToActivitySheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (eventId: string, activityId: string) => void;
+  userId: string;
+}
+
+function AddToActivitySheet({ isOpen, onClose, onSuccess, userId }: AddToActivitySheetProps) {
+  const [events, setEvents] = useState<EventWithActivities[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventWithActivities | null>(null);
+  const [step, setStep] = useState<"event" | "activity">("event");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setStep("event");
+    setSelectedEvent(null);
+    const fetchEvents = async () => {
+      setLoadingEvents(true);
+      try {
+        const data = await getEventsWithActivities(userId);
+        setEvents(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+    fetchEvents();
+  }, [isOpen, userId]);
+
+  if (!isOpen) return null;
+
+  const handleSelectEvent = (event: EventWithActivities) => {
+    setSelectedEvent(event);
+    setStep("activity");
+  };
+
+  const handleSelectActivity = (activity: Activity) => {
+    if (!selectedEvent) return;
+    onSuccess(selectedEvent.id, activity.id);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Sheet */}
+      <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100">
+          {step === "activity" && (
+            <button
+              onClick={() => setStep("event")}
+              aria-label="Back to events"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 text-ui-black" />
+            </button>
+          )}
+          <div className="flex-1">
+            <h3 className="font-bold text-ui-black text-base">
+              {step === "event" ? "Select Event" : `Select Activity`}
+            </h3>
+            {step === "activity" && selectedEvent && (
+              <p className="text-xs text-ui-dark-grey mt-0.5 truncate">{selectedEvent.name || selectedEvent.title}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-3">
+          {loadingEvents ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-ui-accent-yellow" />
+            </div>
+          ) : step === "event" ? (
+            events.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm font-medium text-ui-dark-grey">No events found.</p>
+                <p className="text-xs text-gray-400 mt-1">Create an event first before adding items.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {events.map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => handleSelectEvent(event)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-50 hover:bg-yellow-50 hover:border-ui-accent-yellow border border-transparent rounded-2xl transition-all text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-ui-black truncate">{event.name || event.title}</p>
+                      <p className="text-xs text-ui-dark-grey mt-0.5">
+                        {event.activities.length} {event.activities.length === 1 ? "activity" : "activities"}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+                  </button>
+                ))}
+              </div>
+            )
+          ) : selectedEvent ? (
+            selectedEvent.activities.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm font-medium text-ui-dark-grey">No activities in this event.</p>
+                <p className="text-xs text-gray-400 mt-1">Add an activity to this event first.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {selectedEvent.activities.map((activity) => (
+                  <button
+                    key={activity.id}
+                    onClick={() => handleSelectActivity(activity)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 bg-gray-50 hover:bg-yellow-50 hover:border-ui-accent-yellow border border-transparent rounded-2xl transition-all text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-ui-black truncate">{activity.title}</p>
+                      {activity.category && (
+                        <p className="text-xs text-ui-dark-grey mt-0.5">{activity.category}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+                  </button>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ResultPage() {
   const router = useRouter();
-  const { receiptData, reset } = useScan();
+  const { receiptData, reset, targetEventId, targetActivityId } = useScan();
+  const { userId } = useAuth();
 
-  if (!receiptData) {
-    router.push("/scan/camera");
-    return null;
-  }
+  const [showSheet, setShowSheet] = useState(false);
+  const [addingItems, setAddingItems] = useState(false);
+  const [addSuccess, setAddSuccess] = useState(false);
+
+  // Handle redirect when no receipt data is available
+  // Skip redirect if addSuccess is true — we're about to navigate to activity page
+  useEffect(() => {
+    if (!receiptData && !addSuccess) {
+      router.push("/scan/camera");
+    }
+  }, [receiptData, addSuccess, router]);
 
   const formatCurrency = (value: string | null): string => {
     if (!value) return "-";
     return `Rp ${value}`;
   };
 
+  // Show loading state while redirecting
+  if (!receiptData) {
+    return null;
+  }
+
   const handleScanAnother = () => {
     reset();
-    router.push("/scan/camera");
+    // If we came from an activity, go back to camera with same target params
+    if (targetEventId && targetActivityId) {
+      router.push(`/scan/camera?eventId=${targetEventId}&activityId=${targetActivityId}`);
+    } else {
+      router.push("/scan/camera");
+    }
+  };
+
+  const handleAddToActivitySuccess = async (eventId: string, activityId: string) => {
+    if (!userId || !receiptData?.items?.length) return;
+    setShowSheet(false);
+    setAddingItems(true);
+    try {
+      await Promise.all(
+        receiptData.items.map((item) =>
+          createItem(userId, eventId, activityId, {
+            itemName: item.name || "Item",
+            price: parseInt(item.price?.replace(/\D/g, "") || "0") || 0,
+            quantity: parseFloat(item.qty || "1") || 1,
+            memberNames: [],
+            discountAmount: 0,
+            taxPercentage: 0,
+          })
+        )
+      );
+      setAddSuccess(true);
+      setTimeout(() => {
+        reset();
+        router.push(`/event/${eventId}/activity/${activityId}`);
+      }, 1200);
+    } catch (err) {
+      console.error("Error adding items:", err);
+      setAddingItems(false);
+    }
   };
 
   return (
     <div className="flex flex-col h-full min-h-screen w-full bg-ui-background">
-      <Header variant="SCAN" onLeftIconClick={() => router.push("/home")} />
+      <Header
+        variant="SCAN"
+        onLeftIconClick={() => {
+          if (targetEventId && targetActivityId) {
+            reset();
+            router.push(`/event/${targetEventId}/activity/${targetActivityId}`);
+          } else {
+            router.push("/home");
+          }
+        }}
+      />
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-6">
@@ -125,12 +331,62 @@ export default function ResultPage() {
             >
               Scan Another
             </button>
-            <button className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20">
-              Add to Activity
-            </button>
+            {targetEventId && targetActivityId ? (
+              // Came from an activity page — add directly without showing sheet
+              <button
+                onClick={() => handleAddToActivitySuccess(targetEventId, targetActivityId)}
+                disabled={addingItems || addSuccess || !userId}
+                className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {addingItems ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : addSuccess ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Added!
+                  </>
+                ) : (
+                  "Add to Activity"
+                )}
+              </button>
+            ) : (
+              // Regular flow — show bottom sheet to pick event & activity
+              <button
+                onClick={() => setShowSheet(true)}
+                disabled={addingItems || addSuccess || !userId}
+                className="flex-1 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {addingItems ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : addSuccess ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Added!
+                  </>
+                ) : (
+                  "Add to Activity"
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ADD TO ACTIVITY SHEET */}
+      {userId && (
+        <AddToActivitySheet
+          isOpen={showSheet}
+          onClose={() => setShowSheet(false)}
+          onSuccess={handleAddToActivitySuccess}
+          userId={userId}
+        />
+      )}
     </div>
   );
 }

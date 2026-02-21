@@ -48,6 +48,7 @@ export default function SidebarDesktop() {
         <button 
             onClick={() => router.push("/scan")} // Atau ke /new-event langsung
             className="w-full py-3 bg-ui-accent-yellow rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+            aria-label="Scan receipt"
         >
             <ScanLine className="w-5 h-5 text-ui-black" strokeWidth={2.5} />
             {/* Kalau di desktop mungkin lebih cocok "New Event" daripada Scan, tapi biar konsisten fungsinya kita arahin sama */}

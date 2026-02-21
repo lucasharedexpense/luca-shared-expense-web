@@ -1,6 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useAuth } from "@/lib/useAuth";
+import { getContacts, updateContact } from "@/lib/firebase-contacts";
+import { updateDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import Image from "next/image";
 import { X, ArrowRight, Check, ChevronDown, ChevronUp, Share2, Receipt } from "lucide-react";
 import { calculateSummary, ConsumptionDetail } from "@/lib/settlement-logic";
@@ -20,6 +24,7 @@ interface SummaryModalProps {
 }
 
 export default function SummaryModal({ isOpen, onClose, event }: SummaryModalProps) {
+    const { userId } = useAuth();
   const [activeTab, setActiveTab] = useState<'SETTLEMENT' | 'DETAILS'>('SETTLEMENT');
   
   // Calculate Data
@@ -79,6 +84,31 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                 <button className="w-full py-3 bg-ui-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
                     <Share2 className="w-4 h-4" /> Share Summary
                 </button>
+                <button
+                                        className="hidden md:inline-block w-full mt-3 px-6 py-3 bg-ui-accent-yellow text-ui-black font-bold rounded-xl shadow-md hover:bg-yellow-400 transition-all focus:outline-none focus:ring-2 focus:ring-yellow-300"
+                                        onClick={async () => {
+                                            if (!userId || !event?.createdAt || !event?.id) return;
+                                            try {
+                                                // Update event isFinish to 1
+                                                const eventRef = doc(db, "users", userId, "events", event.id);
+                                                await updateDoc(eventRef, { isFinish: 1 });
+
+                                                // Update contacts
+                                                const contacts = await getContacts(userId);
+                                                const updatePromises = contacts.map(contact => {
+                                                    const updatedIsEvent = contact.isEvent.filter(ev => ev.eventCreatedAt !== event.createdAt && ev.stillEvent !== 1);
+                                                    return updateContact(userId, contact.id, { isEvent: updatedIsEvent });
+                                                });
+                                                await Promise.all(updatePromises);
+                                                // Optionally close modal or show success
+                                                onClose();
+                                            } catch (err) {
+                                                console.error("Failed to finish event:", err);
+                                            }
+                                        }}
+                                >
+                                        Finish Event
+                                </button>
             </div>
         </div>
 
@@ -99,38 +129,37 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                                 <p>No settlements needed.<br/>Everyone is squared up! 🎉</p>
                             </div>
                         ) : (
-                            summaryData.settlements.map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all">
-                                    {/* Transfer Flow */}
-                                    <div className="flex items-center gap-4 flex-1">
-                                        <div className="flex flex-col items-center gap-1 min-w-15">
-                                            <Image src={getAvatarUrl(item.fromName)} alt={item.fromName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
-                                            <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.fromName}</span>
-                                        </div>
-                                        
-                                        <div className="flex-1 flex flex-col items-center">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase mb-1">PAYS</span>
-                                            <div className="w-full h-px bg-gray-200 relative">
-                                                <div className="absolute right-0 top-1/2 -translate-y-1/2">
-                                                    <ArrowRight className="w-4 h-4 text-gray-300" />
+                            <>
+                                {summaryData.settlements.map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all">
+                                        {/* Transfer Flow */}
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="flex flex-col items-center gap-1 min-w-15">
+                                                <Image src={getAvatarUrl(item.fromName)} alt={item.fromName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
+                                                <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.fromName}</span>
+                                            </div>
+                                            <div className="flex-1 flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-400 font-bold uppercase mb-1">PAYS</span>
+                                                <div className="w-full h-px bg-gray-200 relative">
+                                                    <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                                                        <ArrowRight className="w-4 h-4 text-gray-300" />
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="flex flex-col items-center gap-1 min-w-15">
+                                                <Image src={getAvatarUrl(item.toName)} alt={item.toName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
+                                                <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.toName}</span>
+                                            </div>
                                         </div>
-
-                                        <div className="flex flex-col items-center gap-1 min-w-15">
-                                            <Image src={getAvatarUrl(item.toName)} alt={item.toName} width={40} height={40} className="w-10 h-10 rounded-full bg-gray-100 object-cover" unoptimized />
-                                            <span className="text-xs font-bold text-gray-600 truncate max-w-20">{item.toName}</span>
+                                        {/* Amount */}
+                                        <div className="ml-6 text-right">
+                                            <span className="block font-bold text-lg text-ui-black">
+                                                {formatCurrency(item.amount)}
+                                            </span>
                                         </div>
                                     </div>
-
-                                    {/* Amount */}
-                                    <div className="ml-6 text-right">
-                                        <span className="block font-bold text-lg text-ui-black">
-                                            {formatCurrency(item.amount)}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
+                                ))}
+                            </>
                         )}
                         <p className="text-xs text-gray-400 text-center mt-4">Calculated to minimize total transactions.</p>
                     </div>
