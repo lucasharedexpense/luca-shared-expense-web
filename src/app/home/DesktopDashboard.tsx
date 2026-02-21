@@ -4,7 +4,12 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import EventList from "@/components/features/EventList";
 import NewActivityModal from "@/components/features/NewActivityModal";
-import type { Contact } from "@/lib/dummy-data";
+/** Shape expected by NewActivityModal's participants prop */
+interface ModalParticipant {
+  id: string;
+  name: string;
+  avatarName: string;
+}
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
 import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
@@ -847,15 +852,12 @@ export default function DesktopDashboard() {
     // Helper avatar
     const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
 
-    // Convert ParticipantSimple to Contact-like objects with IDs
-    const getParticipantsWithIds = (participants: Participant[]): Contact[] => {
+    // Convert Participant[] to ModalParticipant[] with generated IDs
+    const getParticipantsWithIds = (participants: Participant[]): ModalParticipant[] => {
         return participants.map((p, idx) => ({
             id: `participant-${idx}-${p.name}`,
             name: p.name,
             avatarName: p.avatarName ?? "",
-            phoneNumber: "",
-            bankAccounts: [],
-            userId: "",
         }));
     };
 

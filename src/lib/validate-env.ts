@@ -35,5 +35,5 @@ export const validateFirebaseEnv = () => {
     );
   }
 
-  console.log("✅ Firebase environment variables loaded successfully");
+  // Environment variables validated successfully
 };

@@ -15,7 +15,7 @@ import {
   Loader2,
   ImagePlus
 } from "lucide-react";
-import type { Event } from "@/lib/dummy-data";
+import type { Event } from "@/lib/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { getContacts, ContactData } from "@/lib/firebase-contacts";
 import { uploadEventImage } from "@/lib/firebase-storage";

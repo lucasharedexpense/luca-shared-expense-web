@@ -4,7 +4,19 @@ import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Trash2, Plus, Check, X, Pencil, Users } from "lucide-react";
-import { MOCK_DATABASE, Item } from "@/lib/dummy-data"; // Pastikan path import ini benar
+// TODO: Replace MOCK_DATABASE with real Firestore fetch (useAuth + getEventsWithActivities)
+import { MOCK_DATABASE } from "@/lib/dummy-data";
+
+/** Item shape matching Firestore activity items */
+interface Item {
+  itemName: string;
+  price: number;
+  quantity: number;
+  memberNames: string[];
+  discountAmount: number;
+  taxPercentage: number;
+  timestamp: number;
+}
 import { Wave } from "@/components/ui/Icons";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
 
@@ -354,8 +366,7 @@ export default function ActivityEditPage() {
   };
 
   const handleSave = () => {
-      // Logic save ke DB (di sini cuma console log)
-      console.log("Saving...", { title, items, grandTotal, selectedParticipants });
+      // TODO: Implement save to Firestore
       router.back();
   };
 

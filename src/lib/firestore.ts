@@ -173,7 +173,6 @@ export async function getEventsWithActivities(
     const eventsSnapshot = await getDocs(eventsRef);
 
     if (eventsSnapshot.empty) {
-      console.log("No events found for user:", userId);
       return [];
     }
 
@@ -199,9 +198,6 @@ export async function getEventsWithActivities(
       return bCreated - aCreated;
     });
 
-    console.log(
-      `✅ Fetched ${eventsWithActivities.length} events with activities`
-    );
     return eventsWithActivities;
   } catch (error) {
     console.error("Error fetching events with activities:", error);
@@ -280,7 +276,6 @@ export async function createEvent(
       settlementResultJson: "{}",
       createdAt: Date.now(),
     });
-    console.log(`✅ Created event: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
     console.error("Error creating event:", error);
@@ -318,7 +313,6 @@ export async function updateEvent(
     if (data.participants !== undefined) updateData.participants = data.participants;
 
     await updateDoc(eventRef, updateData);
-    console.log(`✅ Updated event: ${eventId}`);
   } catch (error) {
     console.error("Error updating event:", error);
     throw error;
@@ -336,7 +330,6 @@ export async function deleteEvent(
   try {
     const eventRef = doc(db, "users", userId, "events", eventId);
     await deleteDoc(eventRef);
-    console.log(`✅ Deleted event: ${eventId}`);
   } catch (error) {
     console.error("Error deleting event:", error);
     throw error;
@@ -375,7 +368,6 @@ export async function createActivity(
       payerName: data.payerName,
     });
     
-    console.log(`✅ Created activity: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
     console.error("Error creating activity:", error);
@@ -404,7 +396,6 @@ export async function updateActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await updateDoc(activityRef, data);
-    console.log(`✅ Updated activity: ${activityId}`);
   } catch (error) {
     console.error("Error updating activity:", error);
     throw error;
@@ -423,7 +414,6 @@ export async function deleteActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await deleteDoc(activityRef);
-    console.log(`✅ Deleted activity: ${activityId}`);
   } catch (error) {
     console.error("Error deleting activity:", error);
     throw error;
@@ -472,7 +462,6 @@ export async function createItem(
       timestamp: Date.now(),
     });
 
-    console.log(`✅ Created item: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
     console.error("Error creating item:", error);
@@ -511,7 +500,6 @@ export async function updateItem(
       itemId
     );
     await updateDoc(itemRef, data);
-    console.log(`✅ Updated item: ${itemId}`);
   } catch (error) {
     console.error("Error updating item:", error);
     throw error;
@@ -541,7 +529,6 @@ export async function deleteItem(
       itemId
     );
     await deleteDoc(itemRef);
-    console.log(`✅ Deleted item: ${itemId}`);
   } catch (error) {
     console.error("Error deleting item:", error);
     throw error;

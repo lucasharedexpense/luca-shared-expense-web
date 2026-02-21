@@ -40,7 +40,6 @@ export default function CameraPage() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         track.stop();
-        console.log("[Camera] Stopped track:", track.label);
       });
       streamRef.current = null;
     }
@@ -55,9 +54,7 @@ export default function CameraPage() {
       setIsLoading(true);
       setCameraError(null);
       
-      console.log("[Camera] === Starting camera initialization ===");
-      
-      // Step 1: Stop any existing streams first
+      // Stop any existing streams first
       await stopAllCameraStreams();
       
       // Step 2: Check if getUserMedia is supported
@@ -65,16 +62,11 @@ export default function CameraPage() {
         throw new Error("Your browser doesn't support camera access. Please use a modern browser like Chrome or Edge.");
       }
 
-      // Step 3: List available cameras for debugging
+      // Step 3: Enumerate available cameras (non-critical)
       try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        console.log("[Camera] Available cameras:", videoDevices.length);
-        videoDevices.forEach((device, i) => {
-          console.log(`  [${i}] ${device.label || 'Camera ' + (i + 1)}`);
-        });
-      } catch (e) {
-        console.log("[Camera] Could not enumerate devices:", e);
+        await navigator.mediaDevices.enumerateDevices();
+      } catch {
+        // Device enumeration not critical
       }
 
       let stream: MediaStream | null = null;
@@ -109,17 +101,12 @@ export default function CameraPage() {
       // Try each constraint set until one works
       for (let i = 0; i < constraints.length; i++) {
         try {
-          console.log(`[Camera] Attempt ${i + 1}/${constraints.length}:`, constraints[i]);
           stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
-          console.log(`[Camera] ✓ Success with attempt ${i + 1}`);
           break;
         } catch (attemptError) {
-          console.log(`[Camera] ✗ Attempt ${i + 1} failed:`, attemptError);
           if (i === constraints.length - 1) {
-            // This was the last attempt, throw the error
             throw attemptError;
           }
-          // Otherwise, continue to next constraint
         }
       }
 
@@ -127,22 +114,17 @@ export default function CameraPage() {
         throw new Error("Failed to obtain camera stream after all attempts");
       }
 
-      // Step 4: Attach stream to video element
+      // Attach stream to video element
       if (videoRef.current) {
-        console.log("[Camera] Attaching stream to video element");
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // If metadata is already available (can happen if browser is fast), resolve immediately
-        if (videoRef.current.readyState >= 1) {
-          console.log("[Camera] ✓ Metadata already available");
-        } else {
+        if (videoRef.current.readyState < 1) {
           // Wait for video metadata to be ready
           const loadPromise = new Promise<void>((resolve, reject) => {
             const video = videoRef.current!;
             const onMeta = () => {
-              console.log("[Camera] ✓ Video metadata loaded");
-              console.log(`[Camera] Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+
               video.removeEventListener("loadedmetadata", onMeta);
               video.removeEventListener("error", onErr);
               resolve();
@@ -167,17 +149,13 @@ export default function CameraPage() {
         // Explicitly call play() — required by some browsers even with autoPlay
         try {
           await videoRef.current.play();
-          console.log("[Camera] ✓ Video playing");
-        } catch (playErr) {
-          console.warn("[Camera] play() failed (non-fatal):", playErr);
+        } catch {
+          // play() failure is non-fatal on some browsers
         }
 
         setIsLoading(false);
-        console.log("[Camera] === Camera initialization complete ===");
       }
     } catch (err) {
-      console.error("[Camera] === Camera initialization failed ===");
-      console.error("[Camera] Error details:", err);
       setIsLoading(false);
       
       let errorMsg = "Could not access camera.";
@@ -289,7 +267,6 @@ export default function CameraPage() {
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => {
-                    console.log("[Camera] User clicked Try Again");
                     setRetryCount(prev => prev + 1);
                   }}
                   className="w-full px-4 py-3 bg-ui-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all"

@@ -6,7 +6,12 @@ import {
   X, Loader2, Utensils, Car, Ticket, ShoppingBag, 
   MoreHorizontal, Wallet, Check 
 } from "lucide-react";
-import type { Contact } from "@/lib/dummy-data";
+
+interface Participant {
+  id: string;
+  name: string;
+  avatarName?: string;
+}
 
 // --- DUMMY CATEGORIES (Sama kayak sebelumnya) ---
 const CATEGORIES = [
@@ -17,7 +22,7 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' },
 ];
 
-const getAvatarUrl = (contact: Contact) => {
+const getAvatarUrl = (contact: Participant) => {
     const avatarName = contact?.avatarName ?? contact?.name;
     if (avatarName?.startsWith("http")) return avatarName;
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName ?? "user"}`;
@@ -38,7 +43,7 @@ interface NewActivityModalProps {
       payerId: string;
       splitAmongIds: string[];
   }) => void;
-  participants: Contact[];
+  participants: Participant[];
   isLoading?: boolean;
   initialData?: InitialActivityData | null;
 }
@@ -68,7 +73,7 @@ interface FormState {
   splitAmongIds: string[];
 }
 
-function buildFormState(data: InitialActivityData | null, contacts: Contact[]): FormState {
+function buildFormState(data: InitialActivityData | null, contacts: Participant[]): FormState {
   if (data) {
     const total = data.items?.reduce((acc, item) => acc + item.price * item.quantity, 0) ?? 0;
     return {

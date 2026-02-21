@@ -207,8 +207,8 @@ export default function SettingsPage() {
             avatar: "avatar_1",
           });
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
+      } catch {
+        // Profile fetch failed
       } finally {
         setProfileLoading(false);
       }
@@ -254,8 +254,7 @@ export default function SettingsPage() {
       await logout();
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
-    } catch (error) {
-      console.error("Error logging out:", error);
+    } catch {
       setErrorMessage("Failed to log out");
     }
   };
@@ -333,13 +332,13 @@ export default function SettingsPage() {
                 <SettingsItem 
                     icon={<Shield className="w-5 h-5" />}
                     title="Privacy & Security"
-                    onClick={() => console.log("Privacy")}
+                    onClick={() => { /* TODO: Privacy settings page */ }}
                 />
                 <SettingsItem 
                     icon={<Bell className="w-5 h-5" />}
                     title="Notifications"
                     subtitle="On, Email & Push"
-                    onClick={() => console.log("Notifications")}
+                    onClick={() => { /* TODO: Notifications settings page */ }}
                 />
             </SettingsGroupContainer>
 
