@@ -125,8 +125,9 @@ function docToEvent(doc: QueryDocumentSnapshot<DocumentData>): Event {
 }
 
 /**
- * Fetch all activities for a specific event
+ * Fetch all activities for a specific event, including their items sub-collection
  * Path: users/{userId}/events/{eventId}/activities
+ *       users/{userId}/events/{eventId}/activities/{activityId}/items
  */
 async function getActivitiesForEvent(
   userId: string,
@@ -145,8 +146,40 @@ async function getActivitiesForEvent(
 
     const activitiesSnapshot = await getDocs(activitiesRef);
 
-    // Convert snapshots to Activity objects
-    const activities = activitiesSnapshot.docs.map(docToActivity);
+    // For each activity, also fetch its items sub-collection
+    const activities = await Promise.all(
+      activitiesSnapshot.docs.map(async (actDoc) => {
+        const activity = docToActivity(actDoc);
+
+        // Fetch items sub-collection for this activity
+        const itemsRef = collection(
+          db,
+          "users",
+          userId,
+          "events",
+          eventId,
+          "activities",
+          actDoc.id,
+          "items"
+        );
+        const itemsSnapshot = await getDocs(itemsRef);
+
+        const items: ActivityItem[] = itemsSnapshot.docs.map((itemDoc) => {
+          const d = itemDoc.data();
+          return {
+            itemName: d.itemName ?? "",
+            price: d.price ?? 0,
+            quantity: d.quantity ?? 0,
+            memberNames: d.memberNames ?? [],
+            discountAmount: d.discountAmount,
+            taxPercentage: d.taxPercentage,
+            timestamp: d.timestamp,
+          };
+        });
+
+        return { ...activity, items };
+      })
+    );
 
     return activities;
   } catch (error) {

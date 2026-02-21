@@ -13,15 +13,10 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { collection, doc, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { calculateConsumptionDetails } from "@/lib/smart-split-algorithm";
-import type {
-  FirestoreActivity,
-  FirestoreItem,
-  SettlementTransaction,
-  ConsumptionDetail,
-} from "@/lib/smart-split-algorithm";
+import { calculateSummary } from "@/lib/settlement-logic";
 import SummaryClientView from "./SummaryClientView";
 import type { SummaryPageData, SummaryParticipant } from "./summary-data";
+import type { SettlementTransaction } from "@/lib/smart-split-algorithm";
 
 export default function SummaryPage() {
   const params = useParams();
@@ -31,6 +26,8 @@ export default function SummaryPage() {
   const [data, setData] = useState<SummaryPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  console.log(eventId);
 
   useEffect(() => {
     if (authLoading) return;
@@ -62,24 +59,21 @@ export default function SummaryPage() {
           avatarName: (p.avatarName as string) ?? undefined,
         }));
 
-        // ── 2. Parse cached settlements from Firestore ─────────────────────
-        let settlements: SettlementTransaction[] = [];
+        // ── 2. Read calculatedAt from cached JSON (display only) ───────────
         let calculatedAt: string | null = null;
-
         try {
           const parsed = JSON.parse(eventData.settlementResultJson || "{}");
-          settlements = parsed.settlements ?? [];
           calculatedAt = parsed.calculatedAt ?? null;
         } catch {
-          // Fallback: empty settlements
+          // ignore
         }
 
-        // ── 3. Fetch activities + items for fresh consumption details ──────
+        // ── 3. Fetch activities + items ────────────────────────────────────
         const activitiesSnap = await getDocs(
           collection(db, "users", userId, "events", eventId, "activities"),
         );
 
-        const activities: FirestoreActivity[] = await Promise.all(
+        const activities = await Promise.all(
           activitiesSnap.docs.map(async (actDoc) => {
             const d = actDoc.data();
 
@@ -96,10 +90,9 @@ export default function SummaryPage() {
               ),
             );
 
-            const items: FirestoreItem[] = itemsSnap.docs.map((itemDoc) => {
+            const items = itemsSnap.docs.map((itemDoc) => {
               const id = itemDoc.data();
               return {
-                id: itemDoc.id,
                 itemName: id.itemName ?? "",
                 price: id.price ?? 0,
                 quantity: id.quantity ?? 0,
@@ -110,38 +103,22 @@ export default function SummaryPage() {
             });
 
             return {
-              id: actDoc.id,
-              payerName: d.payerName ?? "",
               title: d.title ?? "",
+              payerName: d.payerName ?? "",
               items,
             };
           }),
         );
 
-        // ── 4. Compute consumption details + total expense client-side ─────
-        const consumptionDetails: ConsumptionDetail[] =
-          calculateConsumptionDetails(activities);
-
-        let totalExpense = 0;
-        for (const act of activities) {
-          for (const item of act.items) {
-            const itemTotal = item.price * item.quantity;
-            const afterTax =
-              itemTotal * (1 + (item.taxPercentage ?? 0) / 100);
-            totalExpense += Math.max(
-              0,
-              afterTax - (item.discountAmount ?? 0),
-            );
-          }
-        }
-        totalExpense = Math.round(totalExpense * 100) / 100;
+        // ── 4. Run SmartSplitBill algorithm via calculateSummary ───────────
+        const result = calculateSummary({ participants, activities });
 
         setData({
           eventName,
           participants,
-          settlements,
-          consumptionDetails,
-          totalExpense,
+          settlements: result.settlements as SettlementTransaction[],
+          consumptionDetails: result.consumptionDetails,
+          totalExpense: result.totalExpense,
           calculatedAt,
         });
       } catch (err) {
