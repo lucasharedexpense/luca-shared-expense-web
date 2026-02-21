@@ -102,8 +102,6 @@ export default function EventDetailPage() {
       const allEvents = await getEventsWithActivities(userId);
       const event = allEvents.find((e) => e.id === eventId);
       setEventData(event || null);
-    } catch (error) {
-      setEventData(null);
     } finally {
       setLoading(false);
     }
@@ -121,8 +119,6 @@ export default function EventDetailPage() {
     try {
       await deleteActivity(userId, eventId, activityToDelete);
       await fetchEvent(); // Refresh data
-    } catch (error) {
-      alert("Failed to delete activity.");
     } finally {
       setActivityToDelete(null);
     }
