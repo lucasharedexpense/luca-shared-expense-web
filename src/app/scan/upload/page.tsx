@@ -7,6 +7,7 @@ import { Upload, AlertCircle, X, Loader2 } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { useScan } from "../scan-context";
 import { scanReceipt } from "@/app/action";
+import { compressImage } from "@/lib/compress-image";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function UploadPage() {
 
   const { file, setFile, preview, setPreview, error, setError, loading, setLoading, setReceiptData } = useScan();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -23,7 +24,8 @@ export default function UploadPage() {
       return;
     }
 
-    setFile(selectedFile);
+    const compressed = await compressImage(selectedFile);
+    setFile(compressed);
     setError(null);
     setReceiptData(null);
 
@@ -31,7 +33,7 @@ export default function UploadPage() {
     reader.onloadend = () => {
       setPreview(reader.result as string);
     };
-    reader.readAsDataURL(selectedFile);
+    reader.readAsDataURL(compressed);
   };
 
   const handleScan = async () => {
@@ -171,7 +173,7 @@ export default function UploadPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Scanning...
+                  <span>Scanning... please wait</span>
                 </>
               ) : (
                 <>
@@ -185,7 +187,8 @@ export default function UploadPage() {
           {/* BACK TO CAMERA */}
           <button
             onClick={handleReset}
-            className="w-full py-2 bg-gray-100 text-ui-black font-semibold text-sm rounded-xl hover:bg-gray-200 transition-colors"
+            disabled={loading}
+            className="w-full py-2 bg-gray-100 text-ui-black font-semibold text-sm rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Back to Camera
           </button>
