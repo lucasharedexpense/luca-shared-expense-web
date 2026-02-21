@@ -84,7 +84,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  
+
   // Error State
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -142,29 +142,18 @@ export default function LoginPage() {
     if (isGoogleLoading || isLoading) return;
     setIsGoogleLoading(true);
     setGlobalError(null);
-
     try {
         const user = await signInWithGoogle();
-        // Set session cookie agar middleware tahu user sudah login
-        document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
-        
-        // Cek apakah user baru
+        document.cookie = "luca_session=true; path=/; max-age=604800";
         const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
-        if (isNewUser) {
-          router.push("/auth/fill-profile");
-        } else {
-          router.push("/home");
-        }
+        router.push(isNewUser ? "/auth/fill-profile" : "/home");
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Google sign-in failed. Please try again.";
-        if (errorMessage !== "__CANCELLED_POPUP__") {
-          // Show error while button is still disabled
+        // Silently ignore user-cancelled popup
+        if (!errorMessage.includes("cancelled") && !errorMessage.includes("closed-by-user")) {
           setGlobalError(errorMessage);
-          // Re-enable button after 2s
-          setTimeout(() => setIsGoogleLoading(false), 2000);
-        } else {
-          setIsGoogleLoading(false);
         }
+        setIsGoogleLoading(false);
     }
   };
 
