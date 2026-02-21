@@ -55,6 +55,7 @@ export interface Activity {
   categoryColorHex?: string;
   items?: ActivityItem[];
   participants?: ActivityParticipant[];
+  isSplitEqual?: boolean;
 }
 
 export interface Participant {
@@ -97,6 +98,7 @@ function docToActivity(doc: QueryDocumentSnapshot<DocumentData>): Activity {
     categoryColorHex: data.categoryColorHex,
     items: data.items || [],
     participants: data.participants || [],
+    isSplitEqual: data.isSplitEqual ?? false,
   };
 }
 

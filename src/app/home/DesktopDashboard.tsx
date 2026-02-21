@@ -4,7 +4,13 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import EventList from "@/components/features/EventList";
 import NewActivityModal from "@/components/features/NewActivityModal";
-import type { Contact } from "@/lib/dummy-data";
+/** Shape expected by NewActivityModal's participants prop */
+interface ModalParticipant {
+  id: string;
+  name: string;
+  avatarName: string;
+}
+import SearchBar from "@/components/ui/SearchBar";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
 import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
@@ -14,6 +20,9 @@ import {
     Calculator
 } from "lucide-react";
 import SummaryModal from "@/components/features/SummaryModel";
+import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import Toggle from "@/components/ui/Toggle";
 
 // ─── INTERFACES ───────────────────────────────────────────────────────────────
 
@@ -399,6 +408,21 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     // --- STATE EDIT MODE ---
     const [isEditing, setIsEditing] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
+
+    // --- STATE EQUAL SPLIT ---
+    const currentSplitEqual = activity?.isSplitEqual ?? false;
+    const [isEqualSplit, setIsEqualSplit] = useState(currentSplitEqual);
+    
+    // State tambahan buat tracking perubahan dari Firebase tanpa useEffect
+    const [prevSplitEqual, setPrevSplitEqual] = useState(currentSplitEqual);
+    const originalItemMappings = React.useRef<Record<string, string[]>>({});
+
+    // Sinkronisasi state dari Firebase (Render-phase update)
+    // Ini cara resmi dari React buat gantiin useEffect di kasus seperti ini
+    if (currentSplitEqual !== prevSplitEqual) {
+        setPrevSplitEqual(currentSplitEqual);
+        setIsEqualSplit(currentSplitEqual);
+    }
     
     // Modal Item States
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -556,6 +580,62 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
             
             {/* Items List */}
             <div className="flex-1 overflow-y-auto p-0 pb-40">
+                
+                {/* Equal Split Toggle */}
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-ui-black">Equal Split</span>
+                        <span className="text-[10px] text-gray-400 font-medium">Bagi rata semua item ke semua partisipan</span>
+                    </div>
+                    <Toggle 
+                        label="" // label dikosongin biar ngga dobel teks
+                        checked={isEqualSplit}
+                        onChange={async (val) => {
+                            if (!userId || !eventId || !activityId || !activity) return;
+
+                            // 1. Optimistic update UI
+                            setIsEqualSplit(val);
+
+                            try {
+                                const batch = writeBatch(db);
+                                
+                                // 2. Update status isSplitEqual
+                                const activityRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId));
+                                batch.update(activityRef, { isSplitEqual: val });
+
+                                const allParticipantNames = activity.participants?.map((p) => p.name) || [];
+
+                                // 3. Update semua items
+                                if (val === true) {
+                                    items.forEach((item) => {
+                                        if (!item.id) return;
+                                        originalItemMappings.current[item.id] = item.memberNames; // Save backup
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: allParticipantNames });
+                                    });
+                                } else {
+                                    items.forEach((item) => {
+                                        if (!item.id) return;
+                                        const originalMembers = originalItemMappings.current[item.id] || []; 
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: originalMembers });
+                                    });
+                                }
+
+                                // 4. Commit batch
+                                await batch.commit();
+                                console.log("Berhasil atomic update isSplitEqual & item members!");
+                                
+                            } catch (error) {
+                                console.error("Firebase update error:", error);
+                                setIsEqualSplit(!val); // Revert UI kalo error
+                            }
+                        }}
+                    />
+                </div>
+
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr className="text-left text-xs font-bold text-gray-400 uppercase tracking-wider">

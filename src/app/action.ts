@@ -44,13 +44,9 @@ export async function scanReceipt(
         Authorization: `Bearer ${apiToken}`,
       },
       body: backendFormData,
-      // Add timeout and other fetch options
-      signal: AbortSignal.timeout(60000), // 60 second timeout
     });
 
-    if (!response.ok) {
-      // const errorText = await response.text();
-      
+    if (!response.ok) {      
       // Provide more user-friendly error messages
       if (response.status === 503) {
         return {
@@ -86,13 +82,6 @@ export async function scanReceipt(
       return {
         success: false,
         error: "Network error: Unable to reach AI service. Please check your internet connection and try again.",
-      };
-    }
-    
-    if (errorMessage.includes("timeout") || errorMessage.includes("aborted")) {
-      return {
-        success: false,
-        error: "Request timeout: The AI model is taking too long to respond. Please try with a smaller image or try again later.",
       };
     }
     
