@@ -78,7 +78,7 @@ export async function scanReceipt(
       success: false,
       error: result.error || "Unknown error from backend",
     };
-  } catch (err) {
+  } catch {
     const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
     
     // Provide specific error messages for common issues

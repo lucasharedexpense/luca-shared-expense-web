@@ -310,8 +310,7 @@ export default function ActivityEditPage() {
         setAllEventParticipants(
           event?.participants?.map(p => ({ name: p.name, avatarName: p.avatarName || "" })) ?? []
         );
-      } catch (error) {
-        console.error("Error fetching activity:", error);
+      } catch {
       } finally {
         setPageLoading(false);
       }
@@ -334,8 +333,7 @@ export default function ActivityEditPage() {
         if (itemsList.length > 0 && itemsList[0].taxPercentage) {
           setTaxPercent(itemsList[0].taxPercentage);
         }
-      } catch (error) {
-        console.error("Error fetching items:", error);
+      } catch {
       }
     };
     fetchItems();
@@ -457,8 +455,7 @@ export default function ActivityEditPage() {
           }
 
           router.back();
-      } catch (error) {
-          console.error("Error saving:", error);
+      } catch {
       } finally {
           setSaving(false);
       }

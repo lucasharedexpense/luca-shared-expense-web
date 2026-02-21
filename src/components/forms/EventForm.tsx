@@ -60,13 +60,11 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
       setContactsLoading(true);
       getContacts(user.uid)
         .then((data) => setFirebaseContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err))
+        .catch(() => {})
         .finally(() => setContactsLoading(false));
     }
   }, [user?.uid]);
 
-  // --- STATE FORM ---
-  // If initialData exists (Edit Mode), use those values. Otherwise default to empty.
   const [title, setTitle] = useState(initialData?.title || "");
   const [location, setLocation] = useState(initialData?.location || "");
   
@@ -142,8 +140,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
         try {
           setUploading(true);
           imageUrl = await uploadEventImage(user.uid, imageFile);
-        } catch (err) {
-          console.error("Image upload failed:", err);
+        } catch {
           alert("Failed to upload image. Event will be created without image.");
           imageUrl = imagePreview || "";
         } finally {

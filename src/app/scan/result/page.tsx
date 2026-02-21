@@ -32,8 +32,7 @@ function AddToActivitySheet({ isOpen, onClose, onSuccess, userId }: AddToActivit
       try {
         const data = await getEventsWithActivities(userId);
         setEvents(data);
-      } catch (e) {
-        console.error(e);
+      } catch {
       } finally {
         setLoadingEvents(false);
       }
@@ -215,8 +214,7 @@ export default function ResultPage() {
         reset();
         router.push(`/event/${eventId}/activity/${activityId}`);
       }, 1200);
-    } catch (err) {
-      console.error("Error adding items:", err);
+    } catch {
       setAddingItems(false);
     }
   };

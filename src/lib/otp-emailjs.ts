@@ -88,14 +88,13 @@ export const sendOtpEmail = async (email: string): Promise<{ success: boolean; m
     };
 
     return { success: true, message: "OTP sent successfully!" };
-  } catch (error: unknown) {
+  } catch {
     const errMsg =
       error instanceof Error
         ? error.message
         : typeof error === "object" && error !== null && "text" in error
           ? String((error as Record<string, unknown>).text)
           : JSON.stringify(error);
-    console.error("Failed to send OTP:", errMsg);
     return { success: false, message: `Failed to send OTP: ${errMsg}` };
   }
 };

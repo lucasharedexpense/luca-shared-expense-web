@@ -109,7 +109,7 @@ const PasswordChangeModal = ({ isOpen, onClose, onSubmit }: { isOpen: boolean; o
       try {
         await onSubmit(values.old, values.new);
         setValues({ old: "", new: "", confirm: "" });
-      } catch (err: unknown) {
+      } catch {
         setError(err instanceof Error ? err.message : "Failed to update password");
       } finally {
         setIsLoading(false);
@@ -243,7 +243,7 @@ export default function SettingsPage() {
       await changePassword(oldPass, newPass);
       setShowPasswordModal(false);
       setToastMessage("Password updated successfully");
-    } catch (error: unknown) {
+    } catch {
       throw error; // Let modal handle the error display
     }
   };

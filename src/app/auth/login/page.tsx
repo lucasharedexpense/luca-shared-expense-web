@@ -130,7 +130,7 @@ export default function LoginPage() {
         document.cookie = "luca_session=true; path=/; max-age=604800"; // 7 hari
         // Success -> Redirect to home
         router.push("/home");
-    } catch (error) {
+    } catch {
         const errorMessage = error instanceof Error ? error.message : "Login failed. Please check your credentials.";
         setGlobalError(errorMessage);
         setIsLoading(false);
@@ -155,7 +155,7 @@ export default function LoginPage() {
         } else {
           router.push("/home");
         }
-    } catch (error) {
+    } catch {
         const errorMessage = error instanceof Error ? error.message : "Google sign-in failed. Please try again.";
         if (errorMessage !== "__CANCELLED_POPUP__") {
           // Show error while button is still disabled

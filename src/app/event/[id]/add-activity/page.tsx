@@ -34,8 +34,7 @@ export default function AddActivityPage() {
         const allEvents = await getEventsWithActivities(userId);
         const event = allEvents.find((e) => e.id === eventId);
         setEventData(event || null);
-      } catch (error) {
-        console.error("Error fetching event:", error);
+      } catch {
         setEventData(null);
       } finally {
         setLoading(false);
@@ -50,7 +49,7 @@ export default function AddActivityPage() {
     if (userId) {
       getContacts(userId)
         .then((data) => setContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err));
+        .catch(() => {});
     }
   }, [userId]);
 
@@ -121,8 +120,7 @@ export default function AddActivityPage() {
       });
 
       router.back();
-    } catch (error) {
-      console.error("Error creating activity:", error);
+    } catch {
       alert("Failed to create activity. Please try again.");
     } finally {
       setSaving(false);

@@ -476,8 +476,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 // Delete from local state
                 setItems(prev => prev.filter((_, i) => i !== idx));
                 setItemIds(prev => prev.filter((_, i) => i !== idx));
-            } catch (error) {
-                console.error("Error deleting item:", error);
+            } catch {
                 alert("Failed to delete item.");
             }
         }
@@ -527,8 +526,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 }
             }
             setIsModalOpen(false);
-        } catch (error) {
-            console.error("Error saving item:", error);
+        } catch {
             alert("Failed to save item.");
         }
     };
@@ -768,8 +766,7 @@ export default function DesktopDashboard() {
             setEventsLoading(true);
             const data = await getEventsWithActivities(userId);
             setEvents(data);
-        } catch (error) {
-            console.error("Error loading events:", error);
+        } catch {
             setEvents([]);
         } finally {
             setEventsLoading(false);
@@ -817,8 +814,7 @@ export default function DesktopDashboard() {
             
             // Refresh from Firebase
             await refreshEvents();
-        } catch (error) {
-            console.error("Error deleting activity:", error);
+        } catch {
             alert("Failed to delete activity.");
         } finally {
             setActivityToDelete(null);
@@ -900,8 +896,7 @@ export default function DesktopDashboard() {
             setShowActivityModal(false); 
             setEditingActivity(null); 
             setRefreshKey(prev => prev + 1);
-        } catch (error) {
-            console.error("Error creating/updating activity:", error);
+        } catch {
             alert("Failed to save activity. Please try again.");
             setIsLoading(false);
         }

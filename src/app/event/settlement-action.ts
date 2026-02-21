@@ -152,7 +152,7 @@ export async function calculateEventSettlement(
 ): Promise<SettlementActionResult> {
   try {
     return await runSettlementPipeline(userId, eventId);
-  } catch (error) {
+  } catch {
     return {
       success: false,
       settlements: [],

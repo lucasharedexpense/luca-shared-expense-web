@@ -121,8 +121,7 @@ export default function ActivityDetailPage() {
         
         setEventData(event || null);
         setActivityData(activity || null);
-      } catch (error) {
-        console.error("Error fetching activity:", error);
+      } catch {
         setEventData(null);
         setActivityData(null);
       } finally {

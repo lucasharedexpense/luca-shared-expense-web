@@ -90,8 +90,7 @@ export default function EventsListWithActivities({ userId }: EventsListProps) {
 
         const data = await getEventsWithActivities(userId);
         setEvents(data);
-      } catch (err) {
-        console.error("Failed to fetch events:", err);
+      } catch {
         setError("Failed to load events. Please try again.");
       } finally {
         setIsLoading(false);

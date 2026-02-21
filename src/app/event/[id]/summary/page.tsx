@@ -27,7 +27,6 @@ export default function SummaryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  console.log(eventId);
 
   useEffect(() => {
     if (authLoading) return;
@@ -121,8 +120,7 @@ export default function SummaryPage() {
           totalExpense: result.totalExpense,
           calculatedAt,
         });
-      } catch (err) {
-        console.error("[SummaryPage] Error loading data:", err);
+      } catch {
         setError(err instanceof Error ? err.message : "Failed to load summary.");
       } finally {
         setLoading(false);
