@@ -6,8 +6,7 @@ import {
   ArrowLeft, 
   Code, 
   Globe, 
-  Instagram, 
-  Info
+  Instagram 
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons"; // Asumsi file icon yang dibuat sebelumnya
 

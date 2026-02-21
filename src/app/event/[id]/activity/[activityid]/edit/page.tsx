@@ -14,6 +14,20 @@ import { db } from "@/lib/firebase";
 
 type ItemWithId = Item & { id?: string };
 
+// TODO: Replace MOCK_DATABASE with real Firestore fetch (useAuth + getEventsWithActivities)
+import { MOCK_DATABASE } from "@/lib/dummy-data";
+
+/** Item shape matching Firestore activity items */
+interface ActivityItem {
+  itemName: string;
+  price: number;
+  quantity: number;
+  memberNames: string[];
+  discountAmount: number;
+  taxPercentage: number;
+  timestamp: number;
+}
+
 // --- HELPER: FORMAT CURRENCY ---
 const formatCurrency = (amount: number) => 
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
@@ -69,14 +83,12 @@ const DualInput = ({ baseAmount, amountValue, percentValue, onUpdate }: DualInpu
 interface ParticipantsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    allEventParticipants: { name: string; avatarName: string }[]; // Data murni dari DB Event
+    allEventParticipants: { name: string; avatarName: string }[];
     selectedNames: string[];
     onSave: (names: string[]) => void;
 }
 
 const ParticipantsModal = ({ isOpen, onClose, allEventParticipants, selectedNames, onSave }: ParticipantsModalProps) => {
-    // State is initialized from props. Parent passes key={String(isOpen)+selectedNames.join()}
-    // to remount this component when it opens, avoiding setState-in-effect.
     const [tempSelected, setTempSelected] = useState<string[]>(selectedNames);
 
     if (!isOpen) return null;
@@ -137,16 +149,14 @@ const ParticipantsModal = ({ isOpen, onClose, allEventParticipants, selectedName
 interface ItemModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (item: Item) => void;
-    initialItem: Item;
-    activityParticipants: string[]; // List nama orang yg sudah terpilih di activity
+    onSave: (item: ActivityItem) => void;
+    initialItem: ActivityItem;
+    activityParticipants: string[];
     getAvatarByName: (name: string) => string;
 }
 
 const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants, getAvatarByName }: ItemModalProps) => {
-    // State is initialized from props. Parent passes key={editingItemIndex ?? 'new'}
-    // to remount this component when switching items, avoiding setState-in-effect.
-    const [formData, setFormData] = useState<Item>(initialItem);
+    const [formData, setFormData] = useState<ActivityItem>(initialItem);
 
     if (!isOpen) return null;
 
@@ -204,7 +214,6 @@ const ItemModal = ({ isOpen, onClose, onSave, initialItem, activityParticipants,
                         </div>
                     </div>
 
-                    {/* Participant Selector (Dynamic from Activity Participants) */}
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">Shared By</label>
                         <div className="flex flex-wrap gap-4">
@@ -271,7 +280,7 @@ export default function ActivityEditPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [modalInitialItem, setModalInitialItem] = useState<Item | null>(null);
+  const [modalInitialItem, setModalInitialItem] = useState<ActivityItem | null>(null);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; index: number | null; name: string }>({
     isOpen: false,
@@ -337,7 +346,6 @@ export default function ActivityEditPage() {
     items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
   , [items]);
 
-  // Derive taxAmount directly — no setState in effect needed
   const taxAmount = useMemo(() => {
     const taxableAmount = Math.max(0, subTotal - globalDiscountAmount);
     return taxableAmount * (taxPercent / 100);
@@ -357,7 +365,6 @@ export default function ActivityEditPage() {
 
   // Handlers
   const handleDeleteItem = (index: number) => {
-      // Validasi: Jangan hapus kalau sisa 1 item (opsional)
       if (items.length <= 1) {
           alert("Minimal harus ada satu item.");
           return;
@@ -387,7 +394,6 @@ export default function ActivityEditPage() {
       setModalInitialItem({
           discountAmount: 0,
           itemName: "",
-          // Default user pertama: Payer atau orang pertama di list activity
           memberNames: [payerName || selectedParticipants[0] || ""],
           price: 0,
           quantity: 1,
@@ -403,7 +409,7 @@ export default function ActivityEditPage() {
       setIsModalOpen(true);
   };
 
-  const handleModalSave = (item: Item) => {
+  const handleModalSave = (item: ActivityItem) => {
       if (editingItemIndex !== null) {
           const newItems = [...items];
           newItems[editingItemIndex] = item;
@@ -482,10 +488,9 @@ export default function ActivityEditPage() {
         <div className="relative drop-shadow-xl filter">
             <div className="bg-ui-white rounded-t-3xl p-6 pb-2">
                 
-                {/* 1. PARTICIPANTS (Edit who joined this activity) */}
+                {/* 1. PARTICIPANTS */}
                 <div className="flex items-center justify-between mb-6 bg-ui-grey p-2 rounded-2xl border border-gray-100">
                      <div className="flex -space-x-2 overflow-hidden px-2 py-1">
-                        {/* Map dari state selectedParticipants (bukan dummy) */}
                         {selectedParticipants.map((name, idx) => (
                             <div key={idx} className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-gray-200 overflow-hidden">
                                 <Image src={getAvatarByName(name)} alt={name} width={32} height={32} className="w-full h-full object-cover" unoptimized />
@@ -513,61 +518,34 @@ export default function ActivityEditPage() {
                          <Pencil className="w-4 h-4 text-gray-500 absolute right-0 bottom-2" />
                     </div>
                     <div className="relative flex text-left align-middle justify-center">
-                        {/* 1. TRIGGER BUTTON (Tampilan saat ini) */}
                         <button 
                             onClick={() => setIsPayerOpen(!isPayerOpen)}
                             className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full pl-1 pr-3 py-1 transition-all"
                         >
-                            {/* Avatar Kecil */}
                             <div className="w-5 h-5 rounded-full overflow-hidden border border-white shadow-sm">
                                 <Image src={getAvatarByName(payerName)} alt="Payer" width={20} height={20} className="w-full h-full object-cover" unoptimized />
                             </div>
-                            
-                            {/* Nama Payer */}
-                            <span className="text-xs font-bold text-ui-black">
-                                {payerName}
-                            </span>
-                            
-                            {/* Chevron Icon */}
+                            <span className="text-xs font-bold text-ui-black">{payerName}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform ${isPayerOpen ? 'rotate-180' : ''}`}>
                                 <path d="m6 9 6 6 6-6"/>
                             </svg>
                         </button>
 
-                        {/* 2. DROPDOWN LIST (Muncul pas diklik) */}
                         {isPayerOpen && (
                             <>
-                                {/* Backdrop invisible buat nutup pas klik luar */}
-                                <div 
-                                    className="fixed inset-0 z-40 cursor-default" 
-                                    onClick={() => setIsPayerOpen(false)}
-                                />
-                                
-                                {/* The List */}
+                                <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsPayerOpen(false)} />
                                 <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-1 animate-in fade-in zoom-in-95 duration-200 origin-top">
-                                    <div className="text-[10px] font-bold text-gray-400 px-3 py-2 uppercase tracking-wider">
-                                        Select Payer
-                                    </div>
-                                    
+                                    <div className="text-[10px] font-bold text-gray-400 px-3 py-2 uppercase tracking-wider">Select Payer</div>
                                     <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto no-scrollbar">
                                         {selectedParticipants.map((name) => (
                                             <button
                                                 key={name}
-                                                onClick={() => {
-                                                    setPayerName(name);
-                                                    setIsPayerOpen(false);
-                                                }}
+                                                onClick={() => { setPayerName(name); setIsPayerOpen(false); }}
                                                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${payerName === name ? 'bg-ui-accent-yellow/10 text-black' : 'hover:bg-gray-50 text-gray-600'}`}
                                             >
                                                 <Image src={getAvatarByName(name)} alt={name} width={24} height={24} className="w-6 h-6 rounded-full object-cover bg-gray-100" unoptimized />
-                                                <span className={`text-xs ${payerName === name ? 'font-bold' : 'font-medium'}`}>
-                                                    {name}
-                                                </span>
-                                                
-                                                {/* Checkmark kalau aktif */}
-                                                {payerName === name && (
-                                                    <Check className="w-3 h-3 text-ui-black ml-auto" />
-                                                )}
+                                                <span className={`text-xs ${payerName === name ? 'font-bold' : 'font-medium'}`}>{name}</span>
+                                                {payerName === name && <Check className="w-3 h-3 text-ui-black ml-auto" />}
                                             </button>
                                         ))}
                                     </div>
@@ -629,9 +607,7 @@ export default function ActivityEditPage() {
                 <div className="flex flex-col gap-3 pb-6">
                     <div className="flex justify-between items-center text-xs text-ui-dark-grey font-medium">
                         <span>Subtotal</span>
-                        <span className="font-bold text-ui-black">
-                            {formatCurrency(subTotal)}
-                        </span>
+                        <span className="font-bold text-ui-black">{formatCurrency(subTotal)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-xs text-ui-dark-grey font-medium">Discount</span>
@@ -657,9 +633,7 @@ export default function ActivityEditPage() {
                     </div>
                     <div className="flex justify-between items-center text-lg font-bold text-ui-black mt-2 pt-2 border-t border-ui-grey/10">
                         <span>Total Bill</span>
-                        <span className="">
-                            {formatCurrency(grandTotal)}
-                        </span>
+                        <span className="">{formatCurrency(grandTotal)}</span>
                     </div>
                 </div>
             </div>

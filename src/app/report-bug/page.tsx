@@ -116,14 +116,6 @@ export default function ReportBugPage() {
                         <ImagePlus className="w-6 h-6" />
                         <span className="text-[10px] font-medium">Add</span>
                     </button>
-                    
-                    {/* Contoh visual kalau ada foto (bisa dikomen kalo gak perlu) */}
-                    {/* <div className="w-20 h-20 rounded-xl bg-gray-200 border border-gray-100 overflow-hidden relative group">
-                        <img src="https://via.placeholder.com/150" className="w-full h-full object-cover" />
-                        <button className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="w-3 h-3" />
-                        </button>
-                    </div> */}
                 </div>
             </div>
         </div>

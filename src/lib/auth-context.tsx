@@ -8,8 +8,8 @@ import { validateFirebaseEnv } from "./validate-env";
 // Validate environment on app load
 try {
   validateFirebaseEnv();
-} catch (error) {
-  console.error("Environment validation failed:", error);
+} catch {
+  // Environment validation failed — app will handle missing config
 }
 
 interface AuthContextType {

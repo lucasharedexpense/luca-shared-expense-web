@@ -31,7 +31,7 @@ export async function uploadEventImage(
 
     // Get download URL
     const downloadUrl = await getDownloadURL(snapshot.ref);
-    console.log(`✅ Uploaded image: ${downloadUrl}`);
+
     return downloadUrl;
   } catch (error) {
     console.error("Error uploading event image:", error);

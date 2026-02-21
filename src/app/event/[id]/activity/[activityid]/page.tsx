@@ -3,9 +3,10 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Edit2, Trash2, Plus, ScanLine } from "lucide-react";
-import { Item } from "@/lib/dummy-data";
+import type { ActivityItem } from "@/lib/firestore";
 
 // Item as stored in Firestore includes an `id` field from doc.id
+type Item = ActivityItem;
 type ItemWithId = Item & { id: string };
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities } from "@/lib/firestore";
@@ -64,7 +65,7 @@ function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
                                 style: "currency", 
                                 currency: "IDR", 
                                 minimumFractionDigits: 0 
-                            }).format(item.discountAmount)}
+                            }).format(item.discountAmount ?? 0)}
                         </span>
                     )}
                 </div>

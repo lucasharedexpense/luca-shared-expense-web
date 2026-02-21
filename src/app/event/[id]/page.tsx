@@ -6,9 +6,10 @@ import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, deleteEvent, EventWithActivities } from "@/lib/firestore";
 import { getContacts, updateContact } from "@/lib/firebase-contacts";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
-import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
+import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2, Loader2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
 import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { generateAndSaveSettlement } from "@/app/event/settlement-action";
 import SearchBar from "@/components/ui/SearchBar";
 
 // --- HELPER: FORMAT DATE ---
@@ -81,6 +82,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
   const [showDeleteEvent, setShowDeleteEvent] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
   // Unwrap ID
@@ -101,7 +103,6 @@ export default function EventDetailPage() {
       const event = allEvents.find((e) => e.id === eventId);
       setEventData(event || null);
     } catch (error) {
-      console.error("Error fetching event:", error);
       setEventData(null);
     } finally {
       setLoading(false);
@@ -121,7 +122,6 @@ export default function EventDetailPage() {
       await deleteActivity(userId, eventId, activityToDelete);
       await fetchEvent(); // Refresh data
     } catch (error) {
-      console.error("Error deleting activity:", error);
       alert("Failed to delete activity.");
     } finally {
       setActivityToDelete(null);
@@ -136,7 +136,6 @@ export default function EventDetailPage() {
       let eventCreatedAt: number = 0;
       const createdAtData = eventData?.createdAt ?? 0;
       
-      // Convert Firestore Timestamp to number if needed
       if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
         eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
       } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
@@ -145,43 +144,27 @@ export default function EventDetailPage() {
         eventCreatedAt = createdAtData;
       }
 
-      console.log("\n=== DELETING EVENT ===");
-      console.log("Event createdAt:", eventCreatedAt, typeof eventCreatedAt);
-      console.log("Event createdAt as string:", String(eventCreatedAt));
-
       const participantNames = (eventData?.participants ?? []).map(p => p.name);
 
       if (participantNames.length > 0) {
+        const eventCreatedAtStr = String(eventCreatedAt);
         const updatePromises = allContacts
           .filter(contact => participantNames.includes(contact.name))
           .map(contact => {
-            console.log(`\nContact: ${contact.name}`);
-            console.log("Before - isEvent array:", JSON.stringify(contact.isEvent));
-            
-            const eventCreatedAtStr = String(eventCreatedAt);
-            const updatedIsEvent = contact.isEvent.filter(event => {
-              const eventCreatedAtFromDb = String(event.eventCreatedAt);
-              const shouldKeep = eventCreatedAtFromDb !== eventCreatedAtStr;
-              console.log(`  Comparing: "${eventCreatedAtFromDb}" !== "${eventCreatedAtStr}" ? ${shouldKeep}`);
-              return shouldKeep;
-            });
-            
-            console.log("After - isEvent array:", JSON.stringify(updatedIsEvent));
-            console.log("Removed", contact.isEvent.length - updatedIsEvent.length, "entries");
+            const updatedIsEvent = contact.isEvent.filter(event => 
+              String(event.eventCreatedAt) !== eventCreatedAtStr
+            );
             return updateContact(userId, contact.id, { isEvent: updatedIsEvent });
           });
         
         if (updatePromises.length > 0) {
           await Promise.all(updatePromises);
-          console.log("=== Event deleted and contacts updated ===");
         }
       }
 
-      // Delete the event
       await deleteEvent(userId, eventId);
       router.replace("/home");
-    } catch (error) {
-      console.error("Error deleting event:", error);
+    } catch {
       alert("Failed to delete event.");
     } finally {
       setShowDeleteEvent(false);
@@ -326,9 +309,28 @@ export default function EventDetailPage() {
       {/* --- FOOTER: SUMMARIZE BUTTON --- */}
       <div className="fixed bottom-8 left-5 right-5 z-30">
         <button 
-            onClick={() => router.push(`/event/${eventId}/summary`)}
-            className="w-full h-14 bg-ui-accent-yellow text-white rounded-full shadow-xl shadow-black/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg border border-white/10">
-            <span className="mt-0.5 text-ui-black">Summarize</span>
+            disabled={summarizing}
+            onClick={async () => {
+              if (!userId || !eventId) return;
+              try {
+                setSummarizing(true);
+                await generateAndSaveSettlement(userId, eventId);
+              } catch {
+                // redirect() throws NEXT_REDIRECT which is caught here
+                // but the navigation still happens. No-op.
+              } finally {
+                setSummarizing(false);
+              }
+            }}
+            className="w-full h-14 bg-ui-accent-yellow text-white rounded-full shadow-xl shadow-black/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg border border-white/10 disabled:opacity-70 disabled:cursor-not-allowed">
+            {summarizing ? (
+              <>
+                <Loader2 className="w-5 h-5 text-ui-black animate-spin" />
+                <span className="mt-0.5 text-ui-black">Calculating...</span>
+              </>
+            ) : (
+              <span className="mt-0.5 text-ui-black">Summarize</span>
+            )}
         </button>
       </div>
 

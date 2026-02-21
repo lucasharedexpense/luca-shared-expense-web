@@ -48,7 +48,9 @@ export default function CameraPage() {
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
