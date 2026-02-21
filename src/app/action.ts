@@ -48,9 +48,7 @@ export async function scanReceipt(
       signal: AbortSignal.timeout(60000), // 60 second timeout
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      
+    if (!response.ok) {      
       // Provide more user-friendly error messages
       if (response.status === 503) {
         return {

@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities } from "@/lib/firestore";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
-import { collection, onSnapshot, doc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // --- 1. COMPONENT TERPISAH: RECEIPT ITEM ---

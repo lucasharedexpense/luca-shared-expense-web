@@ -11,7 +11,6 @@ interface ModalParticipant {
   avatarName: string;
 }
 import SearchBar from "@/components/ui/SearchBar";
-import type { Contact } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
 import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
@@ -437,13 +436,19 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [items, setItems] = useState<Item[]>([]);
 
     // --- STATE EQUAL SPLIT ---
-    const [isEqualSplit, setIsEqualSplit] = useState(activity?.isSplitEqual ?? false);
+    const currentSplitEqual = activity?.isSplitEqual ?? false;
+    const [isEqualSplit, setIsEqualSplit] = useState(currentSplitEqual);
+    
+    // State tambahan buat tracking perubahan dari Firebase tanpa useEffect
+    const [prevSplitEqual, setPrevSplitEqual] = useState(currentSplitEqual);
     const originalItemMappings = React.useRef<Record<string, string[]>>({});
 
-    // Sinkronisasi state toggle dengan data dari Firebase kalo beda activity
-    useEffect(() => {
-        setIsEqualSplit(activity?.isSplitEqual ?? false);
-    }, [activity?.isSplitEqual]);
+    // Sinkronisasi state dari Firebase (Render-phase update)
+    // Ini cara resmi dari React buat gantiin useEffect di kasus seperti ini
+    if (currentSplitEqual !== prevSplitEqual) {
+        setPrevSplitEqual(currentSplitEqual);
+        setIsEqualSplit(currentSplitEqual);
+    }
     
     // Modal Item States
     const [isModalOpen, setIsModalOpen] = useState(false);
