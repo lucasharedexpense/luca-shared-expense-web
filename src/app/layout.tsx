@@ -1,7 +1,7 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import MainLayout from "@/components/layout/MainLayout"; // <--- GANTI IMPORT INI
+import ClientMainLayout from "@/components/layout/ClientMainLayout";
+import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "Luca App",
@@ -14,12 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-ui-background"> 
-        {/* Bungkus children dengan MainLayout */}
-        <MainLayout>
-          {children}
-        </MainLayout>
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-ui-background" suppressHydrationWarning>
+        <AuthProvider>
+          <ClientMainLayout>
+            {children}
+          </ClientMainLayout>
+        </AuthProvider>
       </body>
     </html>
   );

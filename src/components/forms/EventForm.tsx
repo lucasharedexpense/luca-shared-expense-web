@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -10,19 +11,27 @@ import {
   Plus,
   Type,
   Check,
-  X
+  X,
+  Loader2,
+  ImagePlus
 } from "lucide-react";
-import { MOCK_DATABASE, Contact, Event } from "@/lib/dummy-data";
+import type { Event } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/auth-context";
+import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { uploadEventImage } from "@/lib/firebase-storage";
+
+/** Minimal shape for Firestore Timestamp objects */
+interface FirestoreTimestamp {
+  toDate(): Date;
+}
 
 // Define the shape of data returned by this form
 export interface EventFormData {
-  title: string;
-  location: string;
-  date: string;
-  participants: {
-      name: string;
-      avatarName: string;
-  }[];
+   title: string;
+   location: string;
+   date: string;
+   participantIds: string[]; // Only store contact IDs
+   imageUrl?: string; // Optional image URL
 }
 
 interface EventFormProps {
@@ -33,58 +42,135 @@ interface EventFormProps {
 
 export default function EventForm({ initialData, isEditing = false, onSubmit }: EventFormProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- FIREBASE CONTACTS STATE ---
+  const [firebaseContacts, setFirebaseContacts] = useState<ContactData[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  // --- IMAGE STATE ---
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
+  const [uploading, setUploading] = useState(false);
+
+  // Fetch contacts from Firebase
+  useEffect(() => {
+    if (user?.uid) {
+      setContactsLoading(true);
+      getContacts(user.uid)
+        .then((data) => setFirebaseContacts(data))
+        .catch((err) => console.error("Failed to fetch contacts:", err))
+        .finally(() => setContactsLoading(false));
+    }
+  }, [user?.uid]);
 
   // --- STATE FORM ---
   // If initialData exists (Edit Mode), use those values. Otherwise default to empty.
   const [title, setTitle] = useState(initialData?.title || "");
   const [location, setLocation] = useState(initialData?.location || "");
   
-  // Note: Date format from DB might differ from input type="date".
-  // Adjust this if your DB stores "12 Dec 2025" instead of "2025-12-12".
-  const [date, setDate] = useState(initialData?.date || "");
+  // Note: Date format from DB is DD/MM/YYYY string.
+  const [date, setDate] = useState(() => {
+    if (initialData?.date) {
+      try {
+        let d: Date;
+        if (typeof initialData.date === 'object' && initialData.date !== null && 'toDate' in initialData.date) {
+          d = (initialData.date as FirestoreTimestamp).toDate();
+        } else if (typeof initialData.date === 'string') {
+          // Handle DD/MM/YYYY format from Firebase
+          const ddmmyyyy = initialData.date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (ddmmyyyy) {
+            d = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+          } else {
+            d = new Date(initialData.date);
+          }
+        } else {
+          d = new Date(initialData.date);
+        }
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0]; // Convert to YYYY-MM-DD for input type="date"
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return new Date().toISOString().split('T')[0];
+  });
 
-  // Convert participants from Event format back to Contact-like format for the state
-  const [selectedParticipants, setSelectedParticipants] = useState<any[]>(
-    initialData?.participants.map(p => ({
-        id: p.name, // Fallback ID since simple participant obj might not have one
-        name: p.name,
-        avatarName: p.avatarName,
-        phoneNumber: "" 
-    })) || []
-  );
+   // Store only the contact ID in selectedParticipants for true sync
+   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+      initialData?.participants
+         ? initialData.participants.map((p) => {
+               // Try to find the contact by name and avatarName (legacy events)
+               const found = firebaseContacts.find(
+                  (c) => c.name === p.name && c.avatarName === p.avatarName
+               );
+               return found ? found.id : null;
+            }).filter((id): id is string => id !== null)
+         : []
+   );
   
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // --- HANDLERS ---
-  const handleSave = () => {
-    if (!title || !date) {
-      alert("Please fill in Title and Date!");
-      return;
-    }
-
-    const formData: EventFormData = {
-      title,
-      location,
-      date,
-      participants: selectedParticipants.map(c => ({
-         name: c.name,
-         avatarName: c.avatarName
-      }))
-    };
-
-    onSubmit(formData);
-  };
-
-  const toggleParticipant = (contact: Contact) => {
-    // Check by ID first, fallback to Name (since event participants might not have ID ref)
-    const exists = selectedParticipants.find(p => p.id === contact.id || p.name === contact.name);
-    
-    if (exists) {
-      setSelectedParticipants(prev => prev.filter(p => p.name !== contact.name));
-    } else {
-      setSelectedParticipants(prev => [...prev, contact]);
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
   };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+   const handleSave = async () => {
+      if (!title || !date) {
+         alert("Please fill in Title and Date!");
+         return;
+      }
+
+      // Upload image if a new file was selected
+      let imageUrl = initialData?.imageUrl || "";
+      if (imageFile && user?.uid) {
+        try {
+          setUploading(true);
+          imageUrl = await uploadEventImage(user.uid, imageFile);
+        } catch (err) {
+          console.error("Image upload failed:", err);
+          alert("Failed to upload image. Event will be created without image.");
+          imageUrl = imagePreview || "";
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      // Store only contact IDs
+      const formData: EventFormData = {
+         title,
+         location,
+         date,
+         participantIds: selectedParticipants,
+         imageUrl,
+      };
+
+      onSubmit(formData);
+   };
+
+   const toggleParticipant = (contact: ContactData) => {
+      const exists = selectedParticipants.includes(contact.id);
+      if (exists) {
+         setSelectedParticipants((prev) => prev.filter((id) => id !== contact.id));
+      } else {
+         setSelectedParticipants((prev) => [...prev, contact.id]);
+      }
+   };
 
   return (
     <div className="flex flex-col h-full w-full bg-ui-white z-1">
@@ -142,9 +228,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                      <CalendarIcon className="w-3 h-3" /> Date
                   </label>
                   <input 
-                    type="text" // Using text to accept any format for dummy data flexibility
-                    placeholder="e.g. 2025-12-12"
-                    // type="date" // Uncomment this for real date picker
+                    type="date"
                     className="w-full bg-ui-grey rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-ui-accent-yellow/50 transition-all font-medium text-ui-black"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
@@ -152,11 +236,67 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
             </div>
 
-            {/* 3. Participants Section */}
+            {/* 3. Image Upload Section */}
+            <div className="flex flex-col gap-3 mt-2">
+               <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest">Event Image</label>
+               <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageSelect}
+                  className="hidden"
+               />
+               {imagePreview ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-ui-grey/20 group">
+                     <div className="relative w-full h-40">
+                        <Image
+                           src={imagePreview}
+                           alt="Event Preview"
+                           fill
+                           sizes="100vw"
+                           className="object-cover"
+                           unoptimized
+                        />
+                     </div>
+                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                        <button 
+                           type="button"
+                           onClick={() => fileInputRef.current?.click()}
+                           className="px-3 py-1.5 bg-white rounded-lg text-xs font-bold text-ui-black shadow-sm hover:brightness-110 transition-all active:scale-95"
+                        >
+                           Change
+                        </button>
+                        <button 
+                           type="button"
+                           onClick={removeImage}
+                           className="px-3 py-1.5 bg-ui-accent-red rounded-lg text-xs font-bold text-white shadow-sm hover:brightness-110 transition-all active:scale-95"
+                        >
+                           Remove
+                        </button>
+                     </div>
+                     {uploading && (
+                        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                           <Loader2 className="w-6 h-6 animate-spin text-ui-accent-yellow" />
+                        </div>
+                     )}
+                  </div>
+               ) : (
+                  <button
+                     type="button"
+                     onClick={() => fileInputRef.current?.click()}
+                     className="w-full py-8 rounded-2xl border-2 border-dashed border-ui-grey/30 flex flex-col items-center justify-center gap-2 text-ui-dark-grey/60 hover:border-ui-accent-yellow hover:text-ui-accent-yellow hover:bg-ui-accent-yellow/5 transition-all cursor-pointer group"
+                  >
+                     <ImagePlus className="w-6 h-6 group-hover:text-ui-accent-yellow" />
+                     <span className="text-xs font-medium">Click to add event image</span>
+                  </button>
+               )}
+            </div>
+
+            {/* 4. Participants Section */}
             <div className="flex flex-col gap-3 mt-4">
                <div className="flex justify-between items-end">
                   <label className="text-xs font-bold text-ui-dark-grey uppercase tracking-widest flex items-center gap-2">
-                     <Users className="w-3 h-3" /> Who's Joining?
+                     <Users className="w-3 h-3" /> Who&apos;s Joining?
                   </label>
                   <span className="text-xs bg-ui-accent-yellow/20 text-ui-dark-grey px-2 py-1 rounded-full font-bold">
                      {selectedParticipants.length} people
@@ -164,33 +304,40 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
                
                {/* Avatar Row + Add Button */}
-               <div className="flex items-center bg-ui-grey rounded-xl px-2 gap-3 overflow-x-auto no-scrollbar py-2 min-h-16">
-                  <button 
-                     onClick={() => setIsContactModalOpen(true)}
-                     className="w-12 h-12 rounded-full border-2 border-dashed border-ui-dark-grey/30 flex items-center justify-center shrink-0 hover:border-ui-accent-yellow hover:bg-ui-accent-yellow/10 transition-all active:scale-95 group"
-                  >
-                     <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
-                  </button>
+              <div className="flex items-center bg-ui-grey rounded-xl px-2 gap-3 overflow-x-auto no-scrollbar py-2 min-h-16">
+                 <button 
+                    onClick={() => setIsContactModalOpen(true)}
+                    className="w-12 h-12 rounded-full border-2 border-dashed border-ui-dark-grey/30 flex items-center justify-center shrink-0 hover:border-ui-accent-yellow hover:bg-ui-accent-yellow/10 transition-all active:scale-95 group"
+                 >
+                    <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
+                 </button>
 
-                  {selectedParticipants.map((p, idx) => (
-                     <div key={idx} className="relative group shrink-0 animate-in fade-in zoom-in duration-200">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border border-ui-grey">
-                            <img 
-                              src={p.avatarName?.startsWith("http") ? p.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.name}`} 
-                              alt={p.name}
-                              className="w-full h-full object-cover"
-                            />
-                        </div>
-                        {/* Remove Badge (Hover) */}
-                        <button 
-                           onClick={() => toggleParticipant(p)}
-                           className="absolute -top-1 -right-1 w-5 h-5 bg-ui-accent-red text-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                           <X className="w-3 h-3" />
-                        </button>
-                     </div>
-                  ))}
-               </div>
+                          {selectedParticipants.map((id) => {
+                             const contact = firebaseContacts.find((c) => c.id === id);
+                             if (!contact) return null;
+                             return (
+                                <div key={id} className="relative group shrink-0 animate-in fade-in zoom-in duration-200">
+                                   <div className="w-12 h-12 rounded-full overflow-hidden border border-ui-grey">
+                                      <Image
+                                         src={contact.avatarName?.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`}
+                                         alt={contact.name}
+                                         width={48}
+                                         height={48}
+                                         className="object-cover"
+                                         unoptimized
+                                      />
+                                   </div>
+                                   {/* Remove Badge (Hover) */}
+                                   <button
+                                      onClick={() => toggleParticipant(contact)}
+                                      className="absolute -top-1 -right-1 w-5 h-5 bg-ui-accent-red text-white rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                   >
+                                      <X className="w-3 h-3" />
+                                   </button>
+                                </div>
+                             );
+                          })}
+              </div>
             </div>
 
          </div>
@@ -222,9 +369,15 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                </div>
 
                <div className="flex-1 overflow-y-auto p-2">
-                  {MOCK_DATABASE.contacts.map((contact) => {
-                     // Check if participant is selected (by ID or Name)
-                     const isSelected = selectedParticipants.some(p => p.id === contact.id || p.name === contact.name);
+                  {contactsLoading ? (
+                    <div className="flex items-center justify-center py-8 text-gray-400">
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      <span className="text-sm">Loading contacts...</span>
+                    </div>
+                  ) : (
+                  firebaseContacts.map((contact) => {
+                     // Check if participant is selected (by ID)
+                     const isSelected = selectedParticipants.includes(contact.id);
                      return (
                         <div 
                            key={contact.id}
@@ -232,9 +385,13 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                            className={`flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-colors border ${isSelected ? 'bg-ui-accent-yellow/10 border-ui-accent-yellow' : 'hover:bg-ui-grey/5 border-transparent'}`}
                         >
                            <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden shrink-0">
-                              <img 
-                                 src={contact.avatarName.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`} 
-                                 className="w-full h-full object-cover"
+                              <Image 
+                                 src={contact.avatarName.startsWith("http") ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`}
+                                 alt={contact.name}
+                                 width={40}
+                                 height={40}
+                                 className="object-cover"
+                                 unoptimized
                               />
                            </div>
                            
@@ -248,7 +405,8 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                            </div>
                         </div>
                      )
-                  })}
+                  })
+                  )}
                </div>
 
                <div className="p-4 border-t border-ui-grey/10">

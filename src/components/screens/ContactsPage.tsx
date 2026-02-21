@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { 
-  Search, 
   Plus, 
   X, 
   Phone, 
@@ -11,27 +11,71 @@ import {
   Edit2,
   RefreshCw,
   Camera,
-  User
+  User,
+  Loader2,
+  AlertTriangle,
+  Check
 } from "lucide-react";
-import { MOCK_DATABASE, Contact } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/auth-context";
+import { ContactData, getContacts, addContact, updateContact, deleteContact } from "@/lib/firebase-contacts";
 import SearchBar from "../ui/SearchBar";
 
 // --- HELPER: Random Color ---
-const getAvatarColor = (name: String) => {
+const getAvatarColor = (name: string) => {
   const colors = ["bg-red-400", "bg-blue-400", "bg-green-400", "bg-orange-400", "bg-purple-400", "bg-teal-400"];
   return colors[name.length % colors.length];
 };
 
 export default function ContactsPage() {
+  const { user: authUser, loading: authLoading } = useAuth();
+
   // --- STATE ---
-  const [contacts, setContacts] = useState<Contact[]>(MOCK_DATABASE.contacts);
+  const [contacts, setContacts] = useState<ContactData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Modal States
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ContactData | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [editingContact, setEditingContact] = useState<ContactData | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  // --- FETCH CONTACTS FROM FIREBASE ---
+  useEffect(() => {
+    const fetchContacts = async () => {
+      if (!authUser) {
+        setIsLoadingContacts(false);
+        return;
+      }
+      try {
+        const data = await getContacts(authUser.uid);
+        setContacts(data);
+      } catch (error) {
+        console.error("Error fetching contacts:", error);
+        setErrorMessage("Failed to load contacts");
+      } finally {
+        setIsLoadingContacts(false);
+      }
+    };
+    if (!authLoading) fetchContacts();
+  }, [authUser, authLoading]);
+
+  // Toast timers
+  useEffect(() => {
+    if (toastMessage) {
+      const t = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toastMessage]);
+  useEffect(() => {
+    if (errorMessage) {
+      const t = setTimeout(() => setErrorMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMessage]);
 
   // --- LOGIC GROUPING (A-Z) ---
   const groupedContacts = useMemo(() => {
@@ -44,7 +88,7 @@ export default function ContactsPage() {
     const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
     // 3. Grouping
-    const groups: Record<string, Contact[]> = {};
+    const groups: Record<string, ContactData[]> = {};
     sorted.forEach((contact) => {
       const firstChar = contact.name.charAt(0).toUpperCase();
       const key = /[A-Z]/.test(firstChar) ? firstChar : "#";
@@ -76,22 +120,60 @@ export default function ContactsPage() {
     }
   };
 
-  // --- CRUD HANDLERS (Sederhana) ---
-  const handleSaveContact = (newContact: Contact) => {
-    if (editingContact) {
-       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
-    } else {
-       setContacts(prev => [...prev, newContact]);
+  // --- CRUD HANDLERS (Firebase) ---
+  const handleSaveContact = async (contactData: ContactData) => {
+    if (!authUser) return;
+    setIsSaving(true);
+    try {
+      if (editingContact) {
+        // Update existing contact
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _updateId, ...updateData } = contactData;
+        await updateContact(authUser.uid, editingContact.id, updateData);
+        setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...contactData, id: editingContact.id } : c));
+        setToastMessage("Contact updated successfully");
+      } else {
+        // Add new contact
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _newId, ...newData } = contactData;
+        const newId = await addContact(authUser.uid, newData);
+        setContacts(prev => [...prev, { ...contactData, id: newId }]);
+        setToastMessage("Contact added successfully");
+      }
+      setIsFormOpen(false);
+      setEditingContact(null);
+    } catch (error) {
+      console.error("Error saving contact:", error);
+      setErrorMessage("Failed to save contact");
+    } finally {
+      setIsSaving(false);
     }
-    setIsFormOpen(false);
-    setEditingContact(null);
   };
 
-  const handleDeleteContact = () => {
-    if (selectedContact) {
-       setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
-       setSelectedContact(null);
-       setIsDeleteConfirmOpen(false);
+  const handleDeleteContact = async () => {
+    if (!selectedContact || !authUser) return;
+    
+    // Check if contact is currently in any event
+    const isInEvent = selectedContact.isEvent.some((event) => event.stillEvent === 1);
+    
+    if (isInEvent) {
+      setErrorMessage("Cannot delete contact: This contact is currently participating in one or more events");
+      setIsDeleteConfirmOpen(false);
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await deleteContact(authUser.uid, selectedContact.id);
+      setContacts(prev => prev.filter(c => c.id !== selectedContact.id));
+      setSelectedContact(null);
+      setIsDeleteConfirmOpen(false);
+      setToastMessage("Contact deleted");
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      setErrorMessage("Failed to delete contact");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -116,64 +198,70 @@ export default function ContactsPage() {
       </div>
 
       {/* 2. AREA PUTIH (Content Wrapper) */}
-      {/* Penting: overflow-hidden di sini supaya konten di dalamnya ga bikin page melar */}
       <div className="flex-1 overflow-hidden flex flex-col relative z-0">
          
-         {/* 3. SCROLLABLE LIST AREA */}
-         {/* Penting: flex-1 dan overflow-y-auto di sini yang bikin list ini doang yg scroll */}
-         <div 
-            id="contact-list-container"
-            className="flex-1 overflow-y-auto min-h-0 no-scrollbar pb-40 pl-5 pr-8 relative"
-         >
-            
-            {activeLetters.length === 0 ? (
-               <div className="flex flex-col items-center justify-center h-full text-center px-10">
-                  <p className="text-ui-dark-grey font-medium">No contacts found</p>
-               </div>
-            ) : (
-               activeLetters.map((letter) => (
-                  <div key={letter} id={`group-${letter}`} className="mb-6 scroll-mt-6">
-                     {/* Sticky Header Huruf */}
-                     <div className="sticky top-0 pb-2 z-10 bg-ui-background border-b border-ui-grey/30 mb-0">
-                        <span className="text-ui-black font-black text-xl font-display">{letter}</span>
-                     </div>
-                     
-                     {/* List Item per Huruf */}
-                     <div className="flex flex-col gap-3">
-                        {groupedContacts[letter].map((contact) => (
-                           <ContactItem 
-                              key={contact.id} 
-                              contact={contact} 
-                              onClick={() => setSelectedContact(contact)} 
-                           />
-                        ))}
-                     </div>
-                  </div>
-               ))
-            )}
-         </div>
+         {/* Loading State */}
+         {isLoadingContacts ? (
+           <div className="flex-1 flex flex-col items-center justify-center">
+             <Loader2 className="w-8 h-8 animate-spin text-ui-accent-yellow" />
+             <p className="mt-4 text-sm font-medium text-gray-500">Loading contacts...</p>
+           </div>
+         ) : (
+           <>
+             {/* 3. SCROLLABLE LIST AREA */}
+             <div 
+                id="contact-list-container"
+                className="flex-1 overflow-y-auto min-h-0 no-scrollbar pb-40 pl-5 pr-8 relative"
+             >
+                
+                {activeLetters.length === 0 ? (
+                   <div className="flex flex-col items-center justify-center h-full text-center px-10">
+                      <p className="text-ui-dark-grey font-medium">{searchQuery ? "No contacts found" : "No contacts yet. Tap + to add one!"}</p>
+                   </div>
+                ) : (
+                   activeLetters.map((letter) => (
+                      <div key={letter} id={`group-${letter}`} className="mb-6 scroll-mt-6">
+                         {/* Sticky Header Huruf */}
+                         <div className="sticky top-0 pb-2 z-10 bg-ui-background border-b border-ui-grey/30 mb-0">
+                            <span className="text-ui-black font-black text-xl font-display">{letter}</span>
+                         </div>
+                         
+                         {/* List Item per Huruf */}
+                         <div className="flex flex-col gap-3">
+                            {groupedContacts[letter].map((contact) => (
+                               <ContactItem 
+                                  key={contact.id} 
+                                  contact={contact} 
+                                  onClick={() => setSelectedContact(contact)} 
+                               />
+                            ))}
+                         </div>
+                      </div>
+                   ))
+                )}
+             </div>
 
-         {/* 4. ALPHABET SIDEBAR (Fixed Position relative to White Area) */}
-         {activeLetters.length > 0 && (
-            <div className="absolute right-1 top-6 bottom-32 w-6 flex flex-col items-center justify-center gap-1 z-20 pointer-events-none">
-                {/* pointer-events-auto di tombolnya biar bisa diklik */}
-               <div className="pointer-events-auto flex flex-col gap-1 py-2 px-1 bg-ui-grey/10 rounded-full backdrop-blur-sm">
-                   {activeLetters.map((letter) => (
-                      <button 
-                         key={letter}
-                         onClick={() => scrollToSection(letter)}
-                         className="text-[10px] font-bold text-ui-dark-grey w-4 h-4 flex items-center justify-center rounded-full hover:bg-ui-accent-yellow hover:text-ui-black transition-colors"
-                      >
-                         {letter}
-                      </button>
-                   ))}
-               </div>
-            </div>
+             {/* 4. ALPHABET SIDEBAR */}
+             {activeLetters.length > 0 && (
+                <div className="absolute right-1 top-6 bottom-32 w-6 flex flex-col items-center justify-center gap-1 z-20 pointer-events-none">
+                   <div className="pointer-events-auto flex flex-col gap-1 py-2 px-1 bg-ui-grey/10 rounded-full backdrop-blur-sm">
+                       {activeLetters.map((letter) => (
+                          <button 
+                             key={letter}
+                             onClick={() => scrollToSection(letter)}
+                             className="text-[10px] font-bold text-ui-dark-grey w-4 h-4 flex items-center justify-center rounded-full hover:bg-ui-accent-yellow hover:text-ui-black transition-colors"
+                          >
+                             {letter}
+                          </button>
+                       ))}
+                   </div>
+                </div>
+             )}
+           </>
          )}
       </div>
 
-      {/* --- MODALS (Detail, Form, Delete) --- */}
-      {/* Kode modal sama seperti sebelumnya, disembunyikan biar ringkas */}
+      {/* --- MODALS --- */}
       {selectedContact && (
          <DetailModal 
             contact={selectedContact}
@@ -185,16 +273,35 @@ export default function ContactsPage() {
       {isFormOpen && (
          <ContactFormModal 
             initialData={editingContact}
-            onClose={() => setIsFormOpen(false)}
+            onClose={() => { setIsFormOpen(false); setEditingContact(null); }}
             onSave={handleSaveContact}
+            isSaving={isSaving}
          />
       )}
       {isDeleteConfirmOpen && (
          <DeleteConfirmModal 
             name={selectedContact?.name || ""}
+            isInEvent={selectedContact?.isEvent.some((event) => event.stillEvent === 1) ?? false}
             onClose={() => setIsDeleteConfirmOpen(false)}
             onConfirm={handleDeleteContact}
+            isDeleting={isSaving}
          />
+      )}
+
+      {/* SUCCESS TOAST */}
+      {toastMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-ui-black text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-[70]">
+            <div className="bg-green-500 rounded-full p-0.5"><Check className="w-3 h-3 text-white" strokeWidth={4} /></div>
+            <span className="font-bold text-sm">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ERROR TOAST */}
+      {errorMessage && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300 z-[70]">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="font-bold text-sm">{errorMessage}</span>
+        </div>
       )}
     </div>
   );
@@ -202,13 +309,12 @@ export default function ContactsPage() {
 
 // --- SUB COMPONENTS ---
 
-function ContactItem({ contact, onClick }: { contact: Contact; onClick: () => void }) {
+function ContactItem({ contact, onClick }: { contact: ContactData; onClick: () => void }) {
   // Logic Avatar
-  const isUrl = contact.avatarName.startsWith("http");
-  // Kalau avatarName cuma "avatar_1", kita bisa mapping ke file local atau sementara pake Dicebear
+  const isUrl = contact.avatarName?.startsWith("http");
   const avatarSrc = isUrl 
     ? contact.avatarName 
-    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`; // Fallback biar tetep ada gambar
+    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`;
 
   return (
     <div 
@@ -216,12 +322,12 @@ function ContactItem({ contact, onClick }: { contact: Contact; onClick: () => vo
       className="flex items-center gap-4 hover:bg-gray-50 rounded-2xl transition-all active:scale-[0.98] cursor-pointer"
     >
       <div className={`w-12 h-12 rounded-full border border-ui-grey/20 overflow-hidden shrink-0 ${getAvatarColor(contact.name)}`}>
-         <img src={avatarSrc} alt={contact.name} className="w-full h-full object-cover" />
+         <Image src={avatarSrc} alt={contact.name} width={48} height={48} className="w-full h-full object-cover" unoptimized />
       </div>
       <div className="flex-1 min-w-0">
          <h4 className="font-medium text-ui-black text-[16px] truncate">{contact.name}</h4>
          <p className="text-sm text-ui-dark-grey truncate font-medium">
-            {contact.phoneNumber || "No details"}
+            {contact.phoneNumber || "No phone"}
          </p>
       </div>
     </div>
@@ -230,17 +336,34 @@ function ContactItem({ contact, onClick }: { contact: Contact; onClick: () => vo
 
 // (Modal Components sama seperti sebelumnya, letakkan di bawah file ini)
 // ... DetailModal, ContactFormModal, DeleteConfirmModal ...
-function DeleteConfirmModal({ name, onClose, onConfirm }: any) {
+function DeleteConfirmModal({ name, isInEvent, onClose, onConfirm, isDeleting }: { name: string; isInEvent?: boolean; onClose: () => void; onConfirm: () => void; isDeleting?: boolean }) {
     return (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-ui-white w-full max-w-xs rounded-2xl p-6 shadow-2xl">
                <h3 className="text-lg font-bold text-ui-black mb-2">Hapus Contact?</h3>
-               <p className="text-sm text-ui-dark-grey mb-6">
-                  Apakah Anda yakin ingin menghapus <b>{name}</b>?
-               </p>
+               
+               {isInEvent ? (
+                  <div className="mb-6">
+                     <div className="flex gap-3 rounded-xl bg-ui-accent-red/10 p-3 mb-3">
+                        <AlertTriangle className="w-5 h-5 text-ui-accent-red shrink-0 mt-0.5" />
+                        <p className="text-sm text-ui-accent-red font-medium">
+                           <b>{name}</b> is currently participating in an event and cannot be deleted.
+                        </p>
+                     </div>
+                     <p className="text-xs text-ui-dark-grey">Remove this contact from the event first to delete.</p>
+                  </div>
+               ) : (
+                  <p className="text-sm text-ui-dark-grey mb-6">
+                     Apakah Anda yakin ingin menghapus <b>{name}</b>?
+                  </p>
+               )}
+               
                <div className="flex gap-3">
-                  <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-ui-grey font-semibold text-sm">Batal</button>
-                  <button onClick={onConfirm} className="flex-1 py-3 rounded-xl bg-ui-accent-red text-white font-semibold text-sm">Hapus</button>
+                  <button onClick={onClose} disabled={isDeleting} className="flex-1 py-3 rounded-xl bg-ui-grey font-semibold text-sm disabled:opacity-50">Batal</button>
+                  <button onClick={onConfirm} disabled={isDeleting || isInEvent} className="flex-1 py-3 rounded-xl bg-ui-accent-red text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                    {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Hapus
+                  </button>
                </div>
             </div>
          </div>
@@ -254,8 +377,8 @@ function DeleteConfirmModal({ name, onClose, onConfirm }: any) {
 // ==========================================
 
 // 2. Detail Modal
-function DetailModal({ contact, onClose, onEdit, onDelete }: any) {
-   const isUrl = contact.avatarName.startsWith("http");
+function DetailModal({ contact, onClose, onEdit, onDelete }: { contact: ContactData; onClose: () => void; onEdit: () => void; onDelete: () => void }) {
+   const isUrl = contact.avatarName?.startsWith("http");
    const avatarSrc = isUrl ? contact.avatarName : `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.name}`;
 
    return (
@@ -273,7 +396,7 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: any) {
             <div className="px-6 pb-8 -mt-12 flex flex-col items-center">
                {/* Big Avatar */}
                <div className="w-24 h-24 rounded-full border-4 z-10 border-ui-white bg-ui-grey overflow-hidden shadow-md mb-4">
-                  <img src={avatarSrc} className="w-full h-full object-cover" />
+                  <Image src={avatarSrc} alt={contact.name} width={96} height={96} className="w-full h-full object-cover" unoptimized />
                </div>
 
                <h2 className="text-2xl font-bold text-ui-black font-display text-center">{contact.name}</h2>
@@ -287,7 +410,7 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: any) {
 
                   {/* Bank Accounts List */}
                   {contact.bankAccounts && contact.bankAccounts.length > 0 ? (
-                     contact.bankAccounts.map((bank: any, idx: number) => (
+                     contact.bankAccounts.map((bank: ContactData["bankAccounts"][number], idx: number) => (
                         <div key={idx} className="bg-ui-grey p-4 rounded-xl flex items-center gap-4">
                            <CreditCard className="w-5 h-5 text-ui-dark-grey" />
                            <div className="flex-1">
@@ -322,27 +445,35 @@ function DetailModal({ contact, onClose, onEdit, onDelete }: any) {
 
 
 // 3. Form Modal (Add / Edit)
-function ContactFormModal({ initialData, onClose, onSave }: any) {
+function ContactFormModal({ initialData, onClose, onSave, isSaving }: { initialData: ContactData | null; onClose: () => void; onSave: (data: ContactData) => void; isSaving?: boolean }) {
    const [name, setName] = useState(initialData?.name || "");
    const [phone, setPhone] = useState(initialData?.phoneNumber || "");
    
    // --- STATE BANK ACCOUNTS ---
    // Kita simpan list bank di state lokal dulu sebelum di-save
-   const [bankAccounts, setBankAccounts] = useState<any[]>(initialData?.bankAccounts || []);
+   const [bankAccounts, setBankAccounts] = useState<ContactData["bankAccounts"]>(initialData?.bankAccounts || []);
    
    // State untuk input bank baru
    const [newBankName, setNewBankName] = useState("");
    const [newRekening, setNewRekening] = useState("");
 
    // --- STATE AVATAR ---
+   // If editing, use the existing avatar URL directly; otherwise generate a random one
+   const [useExistingAvatar, setUseExistingAvatar] = useState(!!initialData?.avatarName);
    const [tempAvatarSeed, setTempAvatarSeed] = useState(
-      initialData?.name || `user_${Math.floor(Math.random() * 1000)}`
+      () => `user_${Math.floor(Math.random() * 1000)}`
    );
 
    const getAvatarUrl = (seed: string) => 
       `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
 
+   // Determine the displayed avatar: existing saved URL or generated from seed
+   const displayedAvatar = useExistingAvatar && initialData?.avatarName
+      ? initialData.avatarName
+      : getAvatarUrl(tempAvatarSeed);
+
    const handleRandomizeAvatar = () => {
+      setUseExistingAvatar(false);
       setTempAvatarSeed(`user_${Math.floor(Math.random() * 1000)}`);
    };
 
@@ -352,8 +483,7 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
       
       const newAccount = {
          bankName: newBankName,
-         accountNumber: newRekening,
-         bankLogo: newBankName // Buat simplifikasi, logo pake nama bank aja
+         accountNumber: newRekening
       };
       
       setBankAccounts([...bankAccounts, newAccount]);
@@ -371,13 +501,13 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
    const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
-      const newContact: Contact = {
-         id: initialData?.id || Date.now().toString(),
+      const newContact: ContactData = {
+         id: initialData?.id || "",
          name,
          phoneNumber: phone,
-         avatarName: getAvatarUrl(tempAvatarSeed), 
-         bankAccounts: bankAccounts, // Simpan list bank terbaru
-         userId: "current_user_id",
+         avatarName: displayedAvatar, 
+         bankAccounts: bankAccounts,
+         isEvent: initialData?.isEvent || [],
       };
       onSave(newContact);
    };
@@ -404,10 +534,13 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
                <div className="flex flex-col items-center pt-8 pb-6 px-6 bg-linear-to-b from-ui-accent-yellow/10 to-transparent shrink-0">
                   <div className="relative group cursor-pointer" onClick={handleRandomizeAvatar}>
                      <div className="w-24 h-24 rounded-full border-4 border-ui-white bg-ui-grey/10 overflow-hidden shadow-md">
-                        <img 
-                           src={getAvatarUrl(tempAvatarSeed)} 
+                        <Image 
+                           src={displayedAvatar} 
                            alt="Avatar Preview" 
+                           width={96}
+                           height={96}
                            className="w-full h-full object-cover"
+                           unoptimized
                         />
                      </div>
                      <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -496,7 +629,8 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
                         <div className="bg-ui-grey rounded-xl">
                            <input 
                               placeholder="No. Rekening" 
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               className="flex-[1.5] ps-5 p-2.5 w-full rounded-xl text-sm outline-none border border-ui-grey/20 focus:border-ui-accent-yellow transition-colors placeholder:text-ui-dark-grey text-ui-black font-mono"
                               value={newRekening}
                               onChange={(e) => setNewRekening(e.target.value)}
@@ -518,16 +652,19 @@ function ContactFormModal({ initialData, onClose, onSave }: any) {
                   <div className="flex gap-3 mt-4 pt-2 border-t border-ui-grey/10">
                      <button 
                         type="button" 
-                        onClick={onClose} 
-                        className="flex-1 py-3.5 rounded-2xl bg-ui-grey/10 hover:bg-ui-grey/20 font-bold text-sm text-ui-dark-grey transition-colors"
+                        onClick={onClose}
+                        disabled={isSaving}
+                        className="flex-1 py-3.5 rounded-2xl bg-ui-grey/10 hover:bg-ui-grey/20 font-bold text-sm text-ui-dark-grey transition-colors disabled:opacity-50"
                      >
                         Cancel
                      </button>
                      <button 
-                        type="submit" 
-                        className="flex-1 py-3.5 rounded-2xl bg-ui-accent-yellow hover:brightness-105 font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20 transition-all active:scale-[0.98]"
+                        type="submit"
+                        disabled={isSaving}
+                        className="flex-1 py-3.5 rounded-2xl bg-ui-accent-yellow hover:brightness-105 font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                      >
-                        Save Contact
+                        {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {initialData ? "Update Contact" : "Save Contact"}
                      </button>
                   </div>
                </form>

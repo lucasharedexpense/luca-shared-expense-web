@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Plus, Home, Contacts, Scan } from "./Icons";
-import { ScanLine, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface FloatingNavbarProps {
@@ -11,6 +10,7 @@ interface FloatingNavbarProps {
   onAddClick?: () => void;
   onContactsClick?: () => void;
   onHomeClick?: () => void;
+  onScanClick?: () => void;
 }
 
 export default function FloatingNavbar({
@@ -19,6 +19,7 @@ export default function FloatingNavbar({
   onAddClick,
   onContactsClick,
   onHomeClick,
+  onScanClick,
 }: FloatingNavbarProps) {
   
   // Posisi X untuk indicator putih (sesuai offset dp di Kotlin: 12, 83, 154)
@@ -54,7 +55,10 @@ export default function FloatingNavbar({
           <NavIconButton
             icon={<Scan className="w-6 h-6" />}
             isSelected={selectedIndex === 0}
-            onClick={() => onItemSelected(0)}
+            onClick={() => {
+              onItemSelected(0);
+              onScanClick?.();
+            }}
           />
 
           {/* BUTTON 2: HOME / ADD (Index 1) */}

@@ -1,11 +1,47 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities, deleteActivity, deleteEvent, EventWithActivities } from "@/lib/firestore";
+import { getContacts, updateContact } from "@/lib/firebase-contacts";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
-import { ShoppingCart, Utensils, Car, Zap, Ticket } from "lucide-react"; 
+import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import SearchBar from "@/components/ui/SearchBar";
+
+// --- HELPER: FORMAT DATE ---
+const formatDate = (dateInput: string | Date | { toDate(): Date } | { seconds: number; nanoseconds?: number } | number | null | undefined): string => {
+  if (!dateInput) return "";
+  let date: Date;
+  
+  if (dateInput instanceof Date) {
+    date = dateInput;
+  } else if (typeof dateInput === "object" && "toDate" in dateInput && typeof (dateInput as { toDate(): Date }).toDate === "function") {
+    date = (dateInput as { toDate(): Date }).toDate();
+  } else if (typeof dateInput === "object" && "seconds" in dateInput) {
+    date = new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds || 0) / 1000000);
+  } else if (typeof dateInput === "string") {
+    // Handle DD/MM/YYYY format
+    const ddmmyyyy = dateInput.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      date = new Date(parseInt(ddmmyyyy[3]), parseInt(ddmmyyyy[2]) - 1, parseInt(ddmmyyyy[1]));
+    } else {
+      date = new Date(dateInput);
+    }
+  } else if (typeof dateInput === "number") {
+    date = new Date(dateInput);
+  } else {
+    return "";
+  }
+  
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 // --- HELPER: LOGIC ICON BERDASARKAN KATEGORI ---
 const getCategoryIcon = (category: string) => {
@@ -18,11 +54,11 @@ const getCategoryIcon = (category: string) => {
 };
 
 // --- HELPER: HITUNG TOTAL BILL DARI ITEMS ---
-const getActivityTotal = (activity: any) => {
+const getActivityTotal = (activity: { items?: { price: number; quantity: number; discountAmount?: number; taxPercentage?: number }[] }) => {
   if (!activity.items || activity.items.length === 0) return 0;
 
   // 1. Hitung Subtotal (Harga * Qty - Diskon per Item)
-  const subTotal = activity.items.reduce((acc: number, item: any) => {
+  const subTotal = activity.items.reduce((acc: number, item) => {
     const itemTotal = (item.price * item.quantity) - (item.discountAmount || 0);
     return acc + itemTotal;
   }, 0);
@@ -38,15 +74,129 @@ const getActivityTotal = (activity: any) => {
 export default function EventDetailPage() {
   const router = useRouter();
   const params = useParams(); 
+  const { userId, loading: authLoading } = useAuth();
+  
+  // State
+  const [eventData, setEventData] = useState<EventWithActivities | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+  const [showDeleteEvent, setShowDeleteEvent] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Unwrap ID
   const rawId = params?.id;
   const eventId = Array.isArray(rawId) ? rawId[0] : rawId;
 
-  // CARI DATA
-  const eventData = eventId 
-    ? MOCK_DATABASE.events.find((e) => e.id === eventId) 
-    : null;
+  // Fetch event dari Firebase
+  const fetchEvent = async () => {
+    if (authLoading) return;
+    if (!userId || !eventId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const allEvents = await getEventsWithActivities(userId);
+      const event = allEvents.find((e) => e.id === eventId);
+      setEventData(event || null);
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      setEventData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvent();
+    // fetchEvent is defined outside useEffect intentionally; deps are sufficient
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, eventId, authLoading]);
+
+  // Delete activity handler
+  const confirmDeleteActivity = async () => {
+    if (!userId || !eventId || !activityToDelete) return;
+    try {
+      await deleteActivity(userId, eventId, activityToDelete);
+      await fetchEvent(); // Refresh data
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      alert("Failed to delete activity.");
+    } finally {
+      setActivityToDelete(null);
+    }
+  };
+
+  // Delete event handler
+  const confirmDeleteEvent = async () => {
+    if (!userId || !eventId) return;
+    try {
+      const allContacts = await getContacts(userId);
+      let eventCreatedAt: number = 0;
+      const createdAtData = eventData?.createdAt ?? 0;
+      
+      // Convert Firestore Timestamp to number if needed
+      if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+        eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
+      } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+        eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+      } else if (typeof createdAtData === 'number') {
+        eventCreatedAt = createdAtData;
+      }
+
+      console.log("\n=== DELETING EVENT ===");
+      console.log("Event createdAt:", eventCreatedAt, typeof eventCreatedAt);
+      console.log("Event createdAt as string:", String(eventCreatedAt));
+
+      const participantNames = (eventData?.participants ?? []).map(p => p.name);
+
+      if (participantNames.length > 0) {
+        const updatePromises = allContacts
+          .filter(contact => participantNames.includes(contact.name))
+          .map(contact => {
+            console.log(`\nContact: ${contact.name}`);
+            console.log("Before - isEvent array:", JSON.stringify(contact.isEvent));
+            
+            const eventCreatedAtStr = String(eventCreatedAt);
+            const updatedIsEvent = contact.isEvent.filter(event => {
+              const eventCreatedAtFromDb = String(event.eventCreatedAt);
+              const shouldKeep = eventCreatedAtFromDb !== eventCreatedAtStr;
+              console.log(`  Comparing: "${eventCreatedAtFromDb}" !== "${eventCreatedAtStr}" ? ${shouldKeep}`);
+              return shouldKeep;
+            });
+            
+            console.log("After - isEvent array:", JSON.stringify(updatedIsEvent));
+            console.log("Removed", contact.isEvent.length - updatedIsEvent.length, "entries");
+            return updateContact(userId, contact.id, { isEvent: updatedIsEvent });
+          });
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log("=== Event deleted and contacts updated ===");
+        }
+      }
+
+      // Delete the event
+      await deleteEvent(userId, eventId);
+      router.replace("/home");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Failed to delete event.");
+    } finally {
+      setShowDeleteEvent(false);
+    }
+  };
+
+  // HANDLING LOADING
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-ui-background gap-4 p-5">
+        <div className="w-12 h-12 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-ui-dark-grey">Loading event...</p>
+      </div>
+    );
+  }
 
   // HANDLING NOT FOUND
   if (!eventData) {
@@ -57,6 +207,16 @@ export default function EventDetailPage() {
       </div>
     );
   }
+
+  // Filter activities based on search query
+  const filteredActivities = eventData.activities.filter((activity) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      activity.title.toLowerCase().includes(query) ||
+      activity.category.toLowerCase().includes(query) ||
+      activity.payerName.toLowerCase().includes(query)
+    );
+  });
 
   // RENDER UI
   return (
@@ -72,27 +232,43 @@ export default function EventDetailPage() {
       {/* HEADER CARD */}
       <div className="px-5 pt-4 pb-2 shrink-0">
         <EventHeaderCard 
-           event={eventData}
+           event={{
+             ...eventData,
+             date: formatDate(eventData.date),
+           } as unknown as Parameters<typeof EventHeaderCard>[0]['event']}
            onBackClick={() => router.back()}
-           onEditClick={() => router.push(`/event/${eventId}/edit`)} // Edit Event Info
-           onDeleteClick={() => console.log("Delete clicked")}
+           onEditClick={() => router.push(`/event/${eventId}/edit`)}
+           onDeleteClick={() => setShowDeleteEvent(true)}
         />
       </div>
 
       {/* CONTENT ACTIVITY */}
-      <div className="w-full px-5 mt-2">
+      <div className="w-full px-5 mt-2 shrink-0">
         <h3 className="font-bold text-lg text-ui-black mb-4">Activities</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 mt-0 pb-32">
+         <div className="mb-4 -mx-5 px-5 sticky top-0 bg-ui-background z-10 py-2">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search activity..."
+          />
+         </div>
+
          {eventData.activities.length === 0 ? (
             <div className="text-center py-10 opacity-50">
                <p className="text-sm text-ui-dark-grey">No activities yet.</p>
                <p className="text-xs text-ui-dark-grey mt-1">Tap + to add one!</p>
             </div>
+         ) : filteredActivities.length === 0 ? (
+            <div className="text-center py-10 opacity-50">
+               <p className="text-sm text-ui-dark-grey">No activities match your search.</p>
+               <p className="text-xs text-ui-dark-grey mt-1">Try a different search term.</p>
+            </div>
          ) : (
             <div className="flex flex-col gap-3">
-               {eventData.activities.map((activity, index) => {
+               {filteredActivities.map((activity, index) => {
                  
                  // Kalkulasi Total Real-time
                  const totalBill = getActivityTotal(activity);
@@ -129,6 +305,17 @@ export default function EventDetailPage() {
                             minimumFractionDigits: 0 
                         }).format(totalBill)}
                     </span>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivityToDelete(activity.id);
+                      }}
+                      className="p-2 rounded-full bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                  );
                })}
@@ -144,6 +331,24 @@ export default function EventDetailPage() {
             <span className="mt-0.5 text-ui-black">Summarize</span>
         </button>
       </div>
+
+      {/* DELETE ACTIVITY CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={!!activityToDelete}
+        onClose={() => setActivityToDelete(null)}
+        onConfirm={confirmDeleteActivity}
+        title="Delete Activity?"
+        name="this activity"
+      />
+
+      {/* DELETE EVENT CONFIRMATION MODAL */}
+      <DeleteConfirmModal
+        isOpen={showDeleteEvent}
+        onClose={() => setShowDeleteEvent(false)}
+        onConfirm={confirmDeleteEvent}
+        title="Delete Event?"
+        name={eventData?.title || "this event"}
+      />
 
     </div>
   );

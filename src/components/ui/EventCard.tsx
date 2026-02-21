@@ -1,72 +1,161 @@
-// components/ui/EventCard.tsx
-import React from "react";
-import { MapPin, Calendar } from "lucide-react"; // Pastikan install lucide-react
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import Image from "next/image";
+import { MapPin, Calendar } from "lucide-react";
 import AvatarStack from "./AvatarStack";
+import { getContacts, ContactData } from "@/lib/firebase-contacts";
+import { useAuth } from "@/lib/auth-context";
+
+// ==================== TYPES ====================
+
+interface Participant {
+  id?: string;
+  name?: string;
+  avatarName?: string;
+}
+
+interface Activity {
+  id: string;
+  title: string;
+  category: string;
+  payerName: string;
+  total: number;
+}
 
 interface EventCardProps {
   data: {
     id: string;
-    title: string;
-    location?: string; // Optional field
-    date: string;
-    participants: {
-      name: string;
-      avatarName: string;
-    }[];
+    name: string;
+    location: string;
+    date: string | Date | { toDate(): Date } | { seconds: number; nanoseconds: number } | null;
+    imageUrl?: string;
+    participants?: Participant[];
+    activities?: Activity[];
   };
-  onClick: (id: string) => void;
+  onClick?: (id: string) => void;
 }
 
-export default function EventCard({ data, onClick }: EventCardProps) {
+// ==================== SAFE DATE ====================
 
-  const participantAvatars = data.participants?.map((p) => p.avatarName) || [];
+type DateInput = string | Date | { toDate(): Date } | { seconds: number; nanoseconds: number } | null | undefined;
+
+function getSafeDate(dateInput: DateInput): Date {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput === "object" && "toDate" in dateInput && typeof (dateInput as { toDate(): Date }).toDate === "function") {
+    return (dateInput as { toDate(): Date }).toDate();
+  }
+
+  if (
+    typeof dateInput === "object" &&
+    "seconds" in dateInput &&
+    "nanoseconds" in dateInput
+  ) {
+    return new Date(
+      dateInput.seconds * 1000 + dateInput.nanoseconds / 1000000
+    );
+  }
+
+  if (typeof dateInput === "string" || typeof dateInput === "number") {
+    const parsed = new Date(dateInput);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  return new Date();
+}
+
+// ==================== COMPONENT ====================
+
+export default function EventCard({ data, onClick }: EventCardProps) {
+  const { user } = useAuth();
+  const [contacts, setContacts] = useState<ContactData[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    getContacts(user.uid).then(setContacts);
+  }, [user?.uid]);
+
+  // Format Date
+  const eventDate = getSafeDate(data.date);
+  const formattedDate = eventDate.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  // 🔥 ALWAYS resolve avatar from contacts
+  const participantAvatars = useMemo(() => {
+    if (!data.participants?.length) return [];
+
+    return data.participants
+      .map((p) => contacts.find((c) => c.id === p.id))
+      .filter(Boolean)
+      .map((contact) => {
+        if (!contact) return null;
+
+        // If avatarName is full URL
+        if (contact.avatarName?.startsWith("http")) {
+          return contact.avatarName;
+        }
+
+        // Stable avatar seed using contact ID
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${contact.id}`;
+      })
+      .filter(Boolean) as string[];
+  }, [data.participants, contacts]);
 
   return (
-    <div 
-      onClick={() => onClick(data.id)}
-      className="relative group w-full bg-ui-white p-5 rounded-3xl shadow-xl border border-ui-grey/40 flex flex-col gap-4 transition-all active:scale-[0.99] active:bg-gray-50 cursor-pointer overflow-hidden hover:shadow-md"
+    <div
+      onClick={() => onClick?.(data.id)}
+      className="relative group w-full bg-ui-white rounded-3xl shadow-xl border border-ui-grey/40 flex flex-col transition-all active:scale-[0.99] active:bg-gray-50 cursor-pointer overflow-hidden hover:shadow-md"
     >
-      
-      {/* HEADER: Judul & Icon (Opsional) */}
-      <div className="flex justify-between items-start">
-        {/* Judul dapet porsi lebar paling gede */}
-        <h3 className="font-bold text-ui-black text-[19px] leading-snug w-full pr-2">
-          {data.title}
-        </h3>
-      </div>
+      {/* IMAGE */}
+      {data.imageUrl && (
+        <div className="w-full aspect-video relative overflow-hidden">
+          <Image
+            src={data.imageUrl}
+            alt={data.name}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+        </div>
+      )}
 
-      {/* BODY: Informasi Lokasi & Tanggal */}
-      <div className="flex flex-col gap-1">
-        
-        {/* Lokasi */}
-        <div className="flex items-center gap-2 text-ui-dark-grey">
-          <MapPin className="w-4 h-4 shrink-0 text-ui-accent-yellow" />
-          <span className="text-sm font-medium truncate">
-            {data.location || "No location set"}
-          </span>
+      <div className="p-5 flex flex-col gap-4">
+        {/* HEADER */}
+        <div className="flex justify-between items-start gap-3">
+          <h3 className="font-bold text-ui-black text-[19px] leading-snug flex-1">
+            {data.name}
+          </h3>
+
+          {participantAvatars.length > 0 && (
+            <AvatarStack
+              avatars={participantAvatars}
+              size={32}
+              overlap={-10}
+              limit={3}
+            />
+          )}
         </div>
 
-        {/* Tanggal */}
-        <div className="flex items-center gap-2 text-ui-dark-grey">
-          <Calendar className="w-4 h-4 shrink-0 text-ui-accent-yellow" />
-          <span className="text-sm">
-            {data.date}
-          </span>
+        {/* LOCATION & DATE */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 text-ui-dark-grey">
+            <MapPin className="w-4 h-4 shrink-0 text-ui-accent-yellow" />
+            <span className="text-sm font-medium truncate">
+              {data.location || "No location set"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-ui-dark-grey">
+            <Calendar className="w-4 h-4 shrink-0 text-ui-accent-yellow" />
+            <span className="text-sm font-medium">{formattedDate}</span>
+          </div>
         </div>
-
       </div>
-
-      {/* FOOTER: Garis Tipis & Avatar */}
-      <div className="border-t border-ui-grey/30 flex justify-end items-center mt-1">
-        {/* Avatar Stack di Kanan Bawah */}
-        <AvatarStack 
-            avatars={participantAvatars} 
-            size={28}
-            overlap={-10}
-            limit={4} 
-        />
-      </div>
-      
     </div>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import Image from "next/image";
 import { 
   X, Loader2, Utensils, Car, Ticket, ShoppingBag, 
   MoreHorizontal, Wallet, Check 
 } from "lucide-react";
+import type { Contact } from "@/lib/dummy-data";
 
 // --- DUMMY CATEGORIES (Sama kayak sebelumnya) ---
 const CATEGORIES = [
@@ -15,9 +17,10 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' },
 ];
 
-const getAvatarUrl = (avatarName: string) => {
+const getAvatarUrl = (contact: Contact) => {
+    const avatarName = contact?.avatarName ?? contact?.name;
     if (avatarName?.startsWith("http")) return avatarName;
-    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName || "user"}`;
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarName ?? "user"}`;
 };
 
 const getAvatarColor = (name: string) => {
@@ -32,13 +35,57 @@ interface NewActivityModalProps {
       title: string;
       amount: number;
       category: string;
-      payerName: string;
-      splitAmong: string[];
+      payerId: string;
+      splitAmongIds: string[];
   }) => void;
-  participants: string[];
+  participants: Contact[];
   isLoading?: boolean;
-  // --- NEW PROP: INITIAL DATA ---
-  initialData?: any; 
+  initialData?: InitialActivityData | null;
+}
+
+// ─── INITIAL DATA SHAPE ───────────────────────────────────────────────────────
+
+interface ActivityItemData {
+  price: number;
+  quantity: number;
+}
+
+interface InitialActivityData {
+  title: string;
+  items?: ActivityItemData[];
+  category?: string;
+  payerId?: string;
+  splitAmongIds?: string[];
+}
+
+// ─── FORM STATE ───────────────────────────────────────────────────────────────
+
+interface FormState {
+  title: string;
+  amount: string;
+  category: string;
+  payerId: string;
+  splitAmongIds: string[];
+}
+
+function buildFormState(data: InitialActivityData | null, contacts: Contact[]): FormState {
+  if (data) {
+    const total = data.items?.reduce((acc, item) => acc + item.price * item.quantity, 0) ?? 0;
+    return {
+      title: data.title,
+      amount: total > 0 ? new Intl.NumberFormat("id-ID").format(total) : "",
+      category: data.category ?? "food",
+      payerId: data.payerId ?? "",
+      splitAmongIds: data.splitAmongIds ?? [],
+    };
+  }
+  return {
+    title: "",
+    amount: "",
+    category: "food",
+    payerId: contacts[0]?.id ?? "",
+    splitAmongIds: contacts.map((p) => p.id),
+  };
 }
 
 export default function NewActivityModal({ 
@@ -50,74 +97,34 @@ export default function NewActivityModal({
   initialData = null
 }: NewActivityModalProps) {
   
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("food");
-  const [payerName, setPayerName] = useState("");
-  const [splitAmong, setSplitAmong] = useState<string[]>([]);
-
-  // --- EFFECT: POPULATE FORM IF EDITING ---
-  useEffect(() => {
-    if (isOpen) {
-        if (initialData) {
-            // MODE EDIT
-            setTitle(initialData.title);
-            
-            // Hitung total amount dari items yang ada
-            const total = initialData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
-            setAmount(new Intl.NumberFormat("id-ID").format(total));
-            
-            // Set fields lainnya (Asumsi category default 'food' kalau ga ada di data dummy)
-            setCategory(initialData.category || "food"); 
-            setPayerName(initialData.payerName);
-            setSplitAmong(initialData.participants); // List orang yang terlibat split
-        } else {
-            // MODE CREATE (RESET)
-            setTitle("");
-            setAmount("");
-            setCategory("food");
-            if (participants.length > 0) {
-                setPayerName(participants[0]); 
-                setSplitAmong(participants); 
-            }
-        }
-    }
-  }, [isOpen, initialData, participants]);
+  const [form, setForm] = useState<FormState>(() => buildFormState(initialData ?? null, participants));
+  // Form state is initialized from props. The parent should pass a `key` prop
+  // (e.g. key={initialData?.title ?? 'new'}) to remount this component when
+  // switching between create/edit modes, avoiding setState-in-effect.
 
   if (!isOpen) return null;
 
-  const handleToggleSplit = (name: string) => {
-    if (splitAmong.includes(name)) {
-      if (splitAmong.length > 1) { 
-        setSplitAmong(prev => prev.filter(p => p !== name));
+  const handleToggleSplit = (id: string) => {
+    if (form.splitAmongIds.includes(id)) {
+      if (form.splitAmongIds.length > 1) {
+        setForm(prev => ({ ...prev, splitAmongIds: prev.splitAmongIds.filter(p => p !== id) }));
       }
     } else {
-      setSplitAmong(prev => [...prev, name]);
+      setForm(prev => ({ ...prev, splitAmongIds: [...prev.splitAmongIds, id] }));
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numericAmount = parseInt(amount.replace(/\D/g, ""));
-    
-    if (!title.trim() || isNaN(numericAmount) || numericAmount <= 0) return;
-    
+    const numericAmount = parseInt(form.amount.replace(/\D/g, "")) || 0;
+    if (!form.title.trim()) return;
     onSubmit({
-        title,
+        title: form.title,
         amount: numericAmount,
-        category,
-        payerName,
-        splitAmong
+        category: form.category,
+        payerId: form.payerId,
+        splitAmongIds: form.splitAmongIds,
     });
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value.replace(/\D/g, "");
-      if (val) {
-          setAmount(new Intl.NumberFormat("id-ID").format(parseInt(val)));
-      } else {
-          setAmount("");
-      }
   };
 
   return (
@@ -145,33 +152,17 @@ export default function NewActivityModal({
         <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
             <form id="createActivityForm" onSubmit={handleSubmit} className="flex flex-col gap-8">
             
-                {/* 1. TITLE & AMOUNT */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Activity Title</label>
-                        <input 
-                            autoFocus
-                            type="text" 
-                            placeholder="e.g. Dinner at Sushi Tei" 
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            className="w-full text-xl font-bold text-ui-black placeholder:text-gray-300 outline-none border-b-2 border-gray-100 focus:border-ui-accent-yellow py-2 transition-colors bg-transparent"
-                        />
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Amount (IDR)</label>
-                        <div className="flex items-center gap-2 border-b-2 border-gray-100 focus-within:border-ui-accent-yellow transition-colors py-2">
-                            <span className="text-xl font-bold text-gray-400">Rp</span>
-                            <input 
-                                type="text" 
-                                placeholder="0"
-                                value={amount}
-                                onChange={handleAmountChange}
-                                className="w-full text-2xl font-bold text-ui-black placeholder:text-gray-300 outline-none bg-transparent font-mono"
-                            />
-                        </div>
-                    </div>
+                {/* 1. TITLE */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Activity Title</label>
+                    <input 
+                        autoFocus
+                        type="text" 
+                        placeholder="e.g. Dinner at Sushi Tei" 
+                        value={form.title}
+                        onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full text-xl font-bold text-ui-black placeholder:text-gray-300 outline-none border-b-2 border-gray-100 focus:border-ui-accent-yellow py-2 transition-colors bg-transparent"
+                    />
                 </div>
 
                 {/* 2. CATEGORY */}
@@ -179,21 +170,20 @@ export default function NewActivityModal({
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category</label>
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
                         {CATEGORIES.map((cat) => {
-                            const isSelected = category === cat.id;
                             return (
                                 <button
                                     key={cat.id}
                                     type="button"
-                                    onClick={() => setCategory(cat.id)}
+                                    onClick={() => setForm(prev => ({ ...prev, category: cat.id }))}
                                     className={`
                                         flex items-center gap-2 px-4 py-3 rounded-2xl transition-all border shrink-0
-                                        ${isSelected 
+                                        ${form.category === cat.id 
                                             ? 'bg-ui-black text-white border-ui-black shadow-lg scale-105' 
                                             : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
                                         }
                                     `}
                                 >
-                                    <div className={`p-1 rounded-full ${isSelected ? 'bg-white/20' : cat.color}`}>
+                                    <div className={`p-1 rounded-full ${form.category === cat.id ? 'bg-white/20' : cat.color}`}>
                                         <cat.icon className="w-4 h-4" />
                                     </div>
                                     <span className="text-sm font-bold whitespace-nowrap">{cat.name}</span>
@@ -212,14 +202,14 @@ export default function NewActivityModal({
                             </label>
                         </div>
                         <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
-                            {participants.map((pName) => {
-                                const isSelected = payerName === pName;
-                                const avatarUrl = getAvatarUrl(pName);
-                                const bgColor = getAvatarColor(pName);
+                            {participants.map((contact) => {
+                                const isSelected = form.payerId === contact.id;
+                                const avatarUrl = getAvatarUrl(contact);
+                                const bgColor = getAvatarColor(contact.name);
                                 return (
                                     <div 
-                                        key={pName} 
-                                        onClick={() => setPayerName(pName)}
+                                        key={contact.id} 
+                                        onClick={() => setForm(prev => ({ ...prev, payerId: contact.id }))}
                                         className={`
                                             flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all
                                             ${isSelected 
@@ -229,10 +219,10 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={pName} className="w-full h-full object-cover" />
+                                            <Image src={avatarUrl} alt={contact.name} width={32} height={32} className="object-cover" unoptimized />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
-                                            {pName}
+                                            {contact.name}
                                         </span>
                                         {isSelected && <Check className="w-4 h-4 text-ui-black ml-auto" />}
                                     </div>
@@ -246,18 +236,18 @@ export default function NewActivityModal({
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Split Among</label>
                             <span className="text-[10px] font-bold bg-ui-accent-yellow/20 px-2 py-0.5 rounded-md text-ui-black">
-                                {splitAmong.length} People
+                                {form.splitAmongIds.length} People
                             </span>
                         </div>
-                        <div className="flex flex-col gap-2 max-h-50 overflow-y-auto pr-2 no-scrollbar">
-                            {participants.map((pName) => {
-                                const isSelected = splitAmong.includes(pName);
-                                const avatarUrl = getAvatarUrl(pName);
-                                const bgColor = getAvatarColor(pName);
+                        <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 no-scrollbar">
+                            {participants.map((contact) => {
+                                const isSelected = form.splitAmongIds.includes(contact.id);
+                                const avatarUrl = getAvatarUrl(contact);
+                                const bgColor = getAvatarColor(contact.name);
                                 return (
                                     <div 
-                                        key={pName}
-                                        onClick={() => handleToggleSplit(pName)} 
+                                        key={contact.id}
+                                        onClick={() => handleToggleSplit(contact.id)} 
                                         className={`
                                             flex items-center gap-3 p-2 rounded-xl border cursor-pointer transition-all
                                             ${isSelected 
@@ -267,10 +257,10 @@ export default function NewActivityModal({
                                         `}
                                     >
                                         <div className={`w-8 h-8 rounded-full overflow-hidden border border-gray-100 ${bgColor} shrink-0`}>
-                                            <img src={avatarUrl} alt={pName} className="w-full h-full object-cover" />
+                                            <Image src={avatarUrl} alt={contact.name} width={32} height={32} className="object-cover" unoptimized />
                                         </div>
                                         <span className={`text-sm font-bold truncate ${isSelected ? 'text-ui-black' : 'text-gray-500'}`}>
-                                            {pName}
+                                            {contact.name}
                                         </span>
                                         {isSelected && (
                                             <div className="ml-auto w-5 h-5 bg-ui-accent-yellow rounded-full flex items-center justify-center">
@@ -299,7 +289,7 @@ export default function NewActivityModal({
                 <button 
                     type="submit"
                     form="createActivityForm"
-                    disabled={!title || !amount || isLoading}
+                    disabled={!form.title || isLoading}
                     className="flex-2 h-12 rounded-xl bg-ui-black text-white font-bold shadow-lg shadow-black/20 hover:opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Activity")}

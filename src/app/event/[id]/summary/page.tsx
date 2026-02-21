@@ -1,161 +1,38 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Share2, RefreshCw, ArrowRight, Check, ChevronDown, ChevronUp } from "lucide-react";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import { Share2, ArrowRight, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities } from "@/lib/firestore";
+import type { Participant, EventWithActivities } from "@/lib/firestore";
+import { calculateSummary } from "@/lib/settlement-logic";
+import type { Settlement, ConsumptionDetail } from "@/lib/settlement-logic";
 
-// --- TYPES ---
-interface Settlement {
-  id: string;
-  fromName: string;
-  toName: string;
-  amount: number;
+// ─── EXTENDED LOCAL TYPES ──────────────────────────────────────────────────────
+
+/** Settlement extended with local UI isPaid flag */
+interface SettlementWithPaid extends Settlement {
   isPaid: boolean;
 }
 
-interface ConsumptionDetail {
-  userName: string;
-  totalConsumption: number;
-  items: {
-    itemName: string;
-    activityTitle: string;
-    price: number;
-    quantity: number; // Qty yang dimakan user ini (bukan total qty item)
-    splitAmount: number;
-  }[];
-}
-
 // --- HELPER: FORMAT CURRENCY ---
-const formatCurrency = (amount: number) => 
+const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
 // --- HELPER: GET AVATAR ---
-// (Logic yang sama dengan page sebelumnya)
-const getAvatarByName = (name: string, participants: any[]) => {
-    const p = participants.find(p => p.name === name);
-    const avatar = p?.avatarName;
+const getAvatarByName = (name: string, participants: Participant[]) => {
+    const p = participants.find((participant) => participant.name === name);
+    const avatar = p?.avatar;
     if (avatar && avatar.startsWith("http")) return avatar;
     return `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
 };
 
-// --- LOGIC PLACEHOLDER: CALCULATE SUMMARY ---
-// Ini fungsi pura-pura backend untuk menghitung settlement
-const calculateSummary = (event: any) => {
-    const consumptionMap: Record<string, number> = {};
-    const paidMap: Record<string, number> = {};
-    const detailsMap: Record<string, ConsumptionDetail> = {};
-
-    // Init maps
-    event.participants.forEach((p: any) => {
-        consumptionMap[p.name] = 0;
-        paidMap[p.name] = 0;
-        detailsMap[p.name] = { userName: p.name, totalConsumption: 0, items: [] };
-    });
-
-    let totalExpense = 0;
-
-    // 1. Loop semua activity & item
-    event.activities.forEach((activity: any) => {
-        // Hitung siapa yang bayar (Creditor)
-        // Kita hitung total per activity dulu (simplified)
-        let activityTotal = 0;
-
-        activity.items.forEach((item: any) => {
-            const itemTotal = (item.price * item.quantity) - (item.discountAmount || 0);
-            
-            // Tax pro-rate (simplified: tax dianggap flat ke harga item)
-            const taxRate = item.taxPercentage || activity.items[0]?.taxPercentage || 0;
-            const itemTotalWithTax = itemTotal + (itemTotal * (taxRate / 100));
-            
-            activityTotal += itemTotalWithTax;
-
-            // Hitung Konsumsi (Split bill)
-            const splitCount = item.memberNames.length;
-            if (splitCount > 0) {
-                const splitAmount = itemTotalWithTax / splitCount;
-                
-                item.memberNames.forEach((memberName: string) => {
-                    if (consumptionMap[memberName] !== undefined) {
-                        consumptionMap[memberName] += splitAmount;
-                        
-                        // Masukkan ke details
-                        detailsMap[memberName].items.push({
-                            itemName: item.itemName,
-                            activityTitle: activity.title,
-                            price: item.price,
-                            quantity: 1, // Asumsi split equal, user dianggap makan 1 porsi dari split
-                            splitAmount: splitAmount
-                        });
-                        detailsMap[memberName].totalConsumption += splitAmount;
-                    }
-                });
-            }
-        });
-
-        // Catat yang bayar
-        if (paidMap[activity.payerName] !== undefined) {
-            paidMap[activity.payerName] += activityTotal;
-        }
-        totalExpense += activityTotal;
-    });
-
-    // 2. Hitung Balance (Paid - Consumed)
-    // Positif = Dia kelebihan bayar (harus nerima duit)
-    // Negatif = Dia kurang bayar (harus ngasih duit)
-    const balances: { name: string; amount: number }[] = [];
-    Object.keys(consumptionMap).forEach(name => {
-        const balance = paidMap[name] - consumptionMap[name];
-        balances.push({ name, amount: balance });
-    });
-
-    // 3. Generate Settlements (Greedy Algorithm Sederhana)
-    const settlements: Settlement[] = [];
-    
-    // Pisahkan Debtor (utang) dan Creditor (piutang)
-    let debtors = balances.filter(b => b.amount < -1).sort((a, b) => a.amount - b.amount); // Ascending (paling minus duluan)
-    let creditors = balances.filter(b => b.amount > 1).sort((a, b) => b.amount - a.amount); // Descending (paling plus duluan)
-
-    let i = 0; // index debtors
-    let j = 0; // index creditors
-
-    while (i < debtors.length && j < creditors.length) {
-        const debtor = debtors[i];
-        const creditor = creditors[j];
-
-        // Cari nilai settlement (min dari utang si debtor atau piutang si creditor)
-        const amount = Math.min(Math.abs(debtor.amount), creditor.amount);
-
-        // Push settlement
-        settlements.push({
-            id: `settle_${i}_${j}`,
-            fromName: debtor.name,
-            toName: creditor.name,
-            amount: amount,
-            isPaid: false // Default false
-        });
-
-        // Update sisa
-        debtor.amount += amount;
-        creditor.amount -= amount;
-
-        // Geser index kalau sudah lunas/selesai
-        if (Math.abs(debtor.amount) < 1) i++;
-        if (creditor.amount < 1) j++;
-    }
-
-    return {
-        totalExpense,
-        settlements,
-        consumptionDetails: Object.values(detailsMap).filter(d => d.totalConsumption > 0)
-    };
-};
-
-
 // --- SUB-COMPONENTS ---
 
 // 1. Tab Switcher
-const SummaryTabSwitcher = ({ currentTab, onTabChange }: { currentTab: 'SETTLEMENT' | 'DETAILS', onTabChange: (t: any) => void }) => (
+const SummaryTabSwitcher = ({ currentTab, onTabChange }: { currentTab: 'SETTLEMENT' | 'DETAILS', onTabChange: (t: 'SETTLEMENT' | 'DETAILS') => void }) => (
     <div className="mx-6 h-12 bg-white rounded-full border border-gray-100 p-1 flex relative">
         <button 
             onClick={() => onTabChange('SETTLEMENT')}
@@ -180,7 +57,7 @@ const SummaryTabSwitcher = ({ currentTab, onTabChange }: { currentTab: 'SETTLEME
 );
 
 // 2. Settlement Card
-const SettlementCard = ({ item, participants, onToggle }: { item: Settlement, participants: any[], onToggle: () => void }) => {
+const SettlementCard = ({ item, participants, onToggle }: { item: SettlementWithPaid, participants: Participant[], onToggle: () => void }) => {
     return (
         <div 
             onClick={onToggle}
@@ -193,7 +70,14 @@ const SettlementCard = ({ item, participants, onToggle }: { item: Settlement, pa
             {/* Avatars Flow */}
             <div className="flex items-center gap-2 flex-1">
                 <div className="relative">
-                    <img src={getAvatarByName(item.fromName, participants)} className="w-10 h-10 rounded-full object-cover bg-gray-200 border border-white" />
+                    <Image
+                        src={getAvatarByName(item.fromName, participants)}
+                        alt={item.fromName}
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover bg-gray-200 border border-white"
+                        unoptimized
+                    />
                     <div className="absolute -bottom-1 -right-1 bg-red-100 text-[8px] font-bold px-1 rounded text-red-600 border border-white">PAY</div>
                 </div>
                 
@@ -202,7 +86,14 @@ const SettlementCard = ({ item, participants, onToggle }: { item: Settlement, pa
                 </div>
 
                 <div className="relative">
-                    <img src={getAvatarByName(item.toName, participants)} className="w-10 h-10 rounded-full object-cover bg-gray-200 border border-white" />
+                    <Image
+                        src={getAvatarByName(item.toName, participants)}
+                        alt={item.toName}
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover bg-gray-200 border border-white"
+                        unoptimized
+                    />
                     <div className="absolute -bottom-1 -right-1 bg-green-100 text-[8px] font-bold px-1 rounded text-green-600 border border-white">GET</div>
                 </div>
             </div>
@@ -234,7 +125,7 @@ const SettlementCard = ({ item, participants, onToggle }: { item: Settlement, pa
 };
 
 // 3. Consumption Card (Details)
-const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDetail, participants: any[] }) => {
+const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDetail, participants: Participant[] }) => {
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -244,7 +135,14 @@ const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDeta
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <img src={getAvatarByName(detail.userName, participants)} className="w-10 h-10 rounded-full object-cover bg-gray-200" />
+                    <Image
+                        src={getAvatarByName(detail.userName, participants)}
+                        alt={detail.userName}
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover bg-gray-200"
+                        unoptimized
+                    />
                     <span className="font-bold text-sm text-ui-black">{detail.userName}</span>
                 </div>
                 
@@ -278,25 +176,65 @@ const UserConsumptionCard = ({ detail, participants }: { detail: ConsumptionDeta
 export default function SummaryPage() {
     const router = useRouter();
     const params = useParams();
+    const { userId, loading: authLoading } = useAuth();
     
     const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
     const [currentTab, setCurrentTab] = useState<'SETTLEMENT' | 'DETAILS'>('SETTLEMENT');
+    const [eventData, setEventData] = useState<EventWithActivities | null>(null);
+    const [loading, setLoading] = useState(true);
     
     // Local state untuk tracking settlement yang sudah dibayar (checkbox)
     const [paidSettlementIds, setPaidSettlementIds] = useState<string[]>([]);
 
-    // 1. Load Data & Calculate
-    const { eventData, summaryData } = useMemo(() => {
-        const event = MOCK_DATABASE.events.find(e => e.id === eventId);
-        if (!event) return { eventData: null, summaryData: null };
-        
-        return { 
-            eventData: event, 
-            summaryData: calculateSummary(event) 
-        };
-    }, [eventId]);
+    // Fetch event data dari Firebase
+    useEffect(() => {
+        const fetchEvent = async () => {
+            if (authLoading) return;
+            if (!userId || !eventId) {
+                setLoading(false);
+                return;
+            }
 
-    if (!eventData || !summaryData) return <div className="p-10 text-center">Event not found</div>;
+            try {
+                setLoading(true);
+                const allEvents = await getEventsWithActivities(userId);
+                const event = allEvents.find((e) => e.id === eventId);
+                setEventData(event || null);
+            } catch (error) {
+                console.error("Error fetching event:", error);
+                setEventData(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEvent();
+    }, [userId, eventId, authLoading]);
+
+    // Calculate summary dari fetched data
+    const summaryData = useMemo(() => {
+        if (!eventData) return null;
+        // Cast: EventWithActivities is structurally compatible with SummaryEvent;
+        // items is optional in Activity but required in SummaryActivity — safe at runtime
+        // because calculateSummary guards against empty arrays internally.
+        return calculateSummary(eventData as Parameters<typeof calculateSummary>[0]);
+    }, [eventData]);
+
+    if (!eventData || !summaryData) return (
+        <div className="p-10 text-center bg-ui-background h-full flex flex-col items-center justify-center gap-4">
+            {loading ? (
+                <>
+                    <div className="w-12 h-12 border-4 border-ui-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-ui-dark-grey">Loading summary...</p>
+                </>
+            ) : (
+                <>
+                    <p className="text-ui-dark-grey font-bold">Event not found</p>
+                    <button onClick={() => router.back()} className="text-ui-accent-yellow font-bold hover:underline">Go Back</button>
+                </>
+            )}
+        </div>
+    );
 
     const togglePaid = (id: string) => {
         if (paidSettlementIds.includes(id)) {
@@ -317,7 +255,7 @@ export default function SummaryPage() {
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
                     <div className="pt-6 px-6">
-                        <h2 className="text-xl font-bold text-ui-black mb-6">{eventData.title}</h2>
+                        <h2 className="text-xl font-bold text-ui-black mb-6">{eventData.title ?? eventData.name}</h2>
                     </div>
 
                     {/* Tab Switcher */}
@@ -349,7 +287,7 @@ export default function SummaryPage() {
                                                 <SettlementCard 
                                                     key={item.id} 
                                                     item={{ ...item, isPaid }} 
-                                                    participants={eventData.participants}
+                                                    participants={eventData.participants ?? []}
                                                     onToggle={() => togglePaid(item.id)}
                                                 />
                                             );
@@ -369,7 +307,7 @@ export default function SummaryPage() {
                                         <UserConsumptionCard 
                                             key={idx} 
                                             detail={detail} 
-                                            participants={eventData.participants} 
+                                            participants={eventData.participants ?? []} 
                                         />
                                     ))}
                                 </div>

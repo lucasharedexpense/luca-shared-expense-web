@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
   }
 
   // KASUS B: User SUDAH login, tapi malah buka halaman Greeting atau Login
-  if (isLoggedIn && (pathname === "/" || pathname === "/auth/login" || pathname === "/auth/signup")) {
+  if (isLoggedIn && (pathname === "/" || pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/verify-email")) {
     return NextResponse.redirect(new URL("/home", request.url));
   }
 

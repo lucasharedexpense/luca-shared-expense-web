@@ -49,6 +49,7 @@ export default function AvatarStack({
               zIndex: visibleAvatars.length - index,
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={initialSrc} 
               alt={`User ${index}`} 

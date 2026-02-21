@@ -1,35 +1,71 @@
 "use client";
 
-import React, { useState } from "react";
-import { Search, Plus, CalendarClock, Edit2 } from "lucide-react"; // Import Edit2
-import { MOCK_DATABASE } from "@/lib/dummy-data";
+import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
+import { Search, Plus, CalendarClock, Edit2, Trash2 } from "lucide-react";
 import NewEventModal from "./NewEventModal";
+import AvatarStack from "@/components/ui/AvatarStack";
+import DeleteConfirmModal from "@/components/ui/DeleteConfirmModal";
+import { useAuth } from "@/lib/auth-context";
+import { createEvent, updateEvent, deleteEvent } from "@/lib/firestore";
+import { getContacts, updateContact } from "@/lib/firebase-contacts";
+import type { EventWithActivities, ActivityItem } from "@/lib/firestore";
+import { getUserProfile } from "@/lib/firebase-auth";
 
-// Helper hitung total
-const getEventTotal = (event: any) => {
-  return event.activities.reduce((acc: number, act: any) => {
-     const actTotal = act.items.reduce((s: number, i: any) => s + (i.price * i.quantity), 0);
-     return acc + actTotal;
-  }, 0);
-};
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
+/** Shape expected by NewEventModal's initialData prop */
+interface EditableEvent {
+  id: string;
+  title: string;
+  date: string;
+  location?: string;
+  imageUrl?: string;
+  participants: { name: string; avatarName: string }[];
+}
 
 interface EventListProps {
   onEventClick: (eventId: string) => void;
   activeId?: string | null;
+  events?: EventWithActivities[];
+  onRefresh?: () => void;
 }
 
-export default function EventList({ onEventClick, activeId }: EventListProps) {
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+const getEventTotal = (event: EventWithActivities): number => {
+  return event.activities.reduce((acc, act) => {
+    const actTotal = (act.items ?? []).reduce(
+      (s: number, i: ActivityItem) => s + i.price * i.quantity,
+      0
+    );
+    return acc + actTotal;
+  }, 0);
+};
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
+
+export default function EventList({ onEventClick, activeId, events: providedEvents, onRefresh }: EventListProps) {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [events, setEvents] = useState(MOCK_DATABASE.events);
+  const [events, setEvents] = useState<EventWithActivities[]>(providedEvents ?? []);
+
+  // Sync events when parent re-fetches
+  useEffect(() => {
+    const source = providedEvents ?? [];
+    const sorted = [...source].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    setEvents(sorted);
+  }, [providedEvents]);
 
   // --- STATE UNTUK EDIT ---
   // Menyimpan data event yang sedang diedit, atau null jika create baru
-  const [editingEvent, setEditingEvent] = useState<any | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EditableEvent | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<EventWithActivities | null>(null);
 
   const filteredEvents = events.filter(e => 
-    e.title.toLowerCase().includes(search.toLowerCase())
+    e.title?.toLowerCase().includes(search.toLowerCase())
   );
 
   // HANDLER: Buka Modal Create
@@ -39,55 +75,236 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
   };
 
   // HANDLER: Buka Modal Edit
-  const openEditModal = (e: React.MouseEvent, event: any) => {
-    e.stopPropagation(); // Biar ga ke-trigger onEventClick (pindah halaman)
-    setEditingEvent(event);
+  const openEditModal = (e: React.MouseEvent, event: EventWithActivities) => {
+    e.stopPropagation();
+    // Map EventWithActivities to the shape NewEventModal expects
+    const editable: EditableEvent = {
+      id: event.id,
+      title: event.title ?? event.name,
+      date: typeof event.date === "string"
+        ? event.date
+        : event.date instanceof Date
+          ? event.date.toLocaleDateString("en-GB")
+          : new Date((event.date as { toDate(): Date }).toDate()).toLocaleDateString("en-GB"),
+      location: event.location,
+      imageUrl: event.imageUrl,
+      participants: (event.participants ?? []).map((p) => ({
+        name: p.name,
+        avatarName: p.avatar ?? p.name,
+      })),
+    };
+    setEditingEvent(editable);
     setShowNewEventModal(true);
   };
 
-  // HANDLER: Save (Create / Update)
-  const handleSaveEvent = (title: string, date: Date, participants: string[]) => {
+  // HANDLER: Delete Event
+  const handleDeleteEvent = (e: React.MouseEvent, event: EventWithActivities) => {
+    e.stopPropagation();
+    setEventToDelete(event);
+  };
+
+  const confirmDeleteEvent = useCallback(async () => {
+    if (!user?.uid || !eventToDelete) return;
+    try {
+      const allContacts = await getContacts(user.uid);
+      let eventCreatedAt: number = 0;
+      const createdAtData = eventToDelete.createdAt ?? 0;
+      
+      // Convert Firestore Timestamp to number if needed
+      if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+        eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
+      } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+        eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+      } else if (typeof createdAtData === 'number') {
+        eventCreatedAt = createdAtData;
+      }
+
+      console.log("\n=== DELETING EVENT ===");
+      console.log("Event createdAt:", eventCreatedAt, typeof eventCreatedAt);
+      console.log("Event createdAt as string:", String(eventCreatedAt));
+
+      const participantNames = (eventToDelete.participants ?? []).map(p => p.name);
+
+      if (participantNames.length > 0) {
+        const updatePromises = allContacts
+          .filter(contact => participantNames.includes(contact.name))
+          .map(contact => {
+            console.log(`\nContact: ${contact.name}`);
+            console.log("Before - isEvent array:", JSON.stringify(contact.isEvent));
+            
+            const eventCreatedAtStr = String(eventCreatedAt);
+            const updatedIsEvent = contact.isEvent.filter(event => {
+              const eventCreatedAtFromDb = String(event.eventCreatedAt);
+              const shouldKeep = eventCreatedAtFromDb !== eventCreatedAtStr;
+              console.log(`  Comparing: "${eventCreatedAtFromDb}" !== "${eventCreatedAtStr}" ? ${shouldKeep}`);
+              return shouldKeep;
+            });
+            
+            console.log("After - isEvent array:", JSON.stringify(updatedIsEvent));
+            console.log("Removed", contact.isEvent.length - updatedIsEvent.length, "entries");
+            return updateContact(user.uid, contact.id, { isEvent: updatedIsEvent });
+          });
+        
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+          console.log("=== Event deleted and contacts updated ===");
+        }
+      }
+
+      // Delete the event
+      await deleteEvent(user.uid, eventToDelete.id);
+      onRefresh?.();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Failed to delete event.");
+    } finally {
+      setEventToDelete(null);
+    }
+  }, [user?.uid, eventToDelete, onRefresh]);
+
+  // HANDLER: Save (Create / Update) - Firebase
+  const handleSaveEvent = useCallback(async (data: {
+    title: string;
+    date: Date;
+    location: string;
+    imageUrl: string;
+    participants: { name: string; avatarName: string }[];
+  }) => {
+    if (!user?.uid) return;
     setIsLoading(true);
 
-    setTimeout(() => {
-        if (editingEvent) {
-            // --- LOGIC UPDATE ---
-            const updatedEvents = events.map(ev => {
-                if (ev.id === editingEvent.id) {
-                    return {
-                        ...ev,
-                        title: title,
-                        date: date.toISOString(),
-                        // Gabungkan "You" jika belum ada, plus participants baru
-                        participants: ["You", ...participants], 
-                    };
-                }
-                return ev;
-            });
-            // @ts-ignore
-            setEvents(updatedEvents);
-        } else {
-            // --- LOGIC CREATE ---
-            const newEvent = {
-                id: Math.random().toString(36).substr(2, 9),
-                title: title,
-                date: date.toISOString(),
-                status: "active",
-                participants: ["You", ...participants],
-                activities: []
-            };
-            // @ts-ignore
-            setEvents([newEvent, ...events]);
-            onEventClick(newEvent.id);
+    try {
+      // Fetch current user's profile from Firestore
+      const userProfile = await getUserProfile(user.uid);
+      const currentUserParticipant = userProfile
+        ? {
+            name: userProfile.username ?? user.displayName ?? "You",
+            avatarName: userProfile.avatarName ?? userProfile.username ?? user.displayName ?? "You",
+          }
+        : {
+            name: user.displayName ?? "You",
+            avatarName: user.displayName ?? "You",
+          };
+
+      // Always include current user as first participant
+      const allParticipants = [
+        currentUserParticipant,
+        ...data.participants,
+      ];
+
+      const eventPayload = {
+        title: data.title,
+        date: data.date,
+        location: data.location,
+        imageUrl: data.imageUrl,
+        participants: allParticipants,
+      };
+
+      if (editingEvent) {
+        // --- UPDATE EXISTING EVENT ---
+        // Get the full event data from events array to get createdAt
+        const fullEventData = events.find(e => e.id === editingEvent.id);
+        let eventCreatedAt: number = 0;
+        const createdAtData = fullEventData?.createdAt ?? 0;
+        
+        // Convert Firestore Timestamp to number if needed
+        if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
+          eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
+        } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
+          eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+        } else if (typeof createdAtData === 'number') {
+          eventCreatedAt = createdAtData;
         }
+
+        // Get old participants from existing event data
+        const oldParticipantNames = (fullEventData?.participants ?? []).map(p => p.name);
+        const newParticipantNames = allParticipants.map(p => p.name);
+
+        // Find removed and added participants
+        const removedParticipants = oldParticipantNames.filter(name => !newParticipantNames.includes(name));
+        const addedParticipants = newParticipantNames.filter(name => !oldParticipantNames.includes(name));
+
+        // Update contacts' isEvent array
+        if (removedParticipants.length > 0 || addedParticipants.length > 0) {
+          try {
+            // Fetch fresh contact data to ensure we have the latest isEvent array
+            const latestContacts = await getContacts(user.uid);
+            const updatePromises: Promise<void>[] = [];
+
+            // For removed participants: remove from isEvent array
+            removedParticipants.forEach(name => {
+              const contact = latestContacts.find(c => c.name === name);
+              if (contact) {
+                const updatedIsEvent = contact.isEvent.filter((event: { eventCreatedAt: number; stillEvent: 0 | 1; }) => event.eventCreatedAt !== eventCreatedAt);
+                updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+              }
+            });
+
+            // For added participants: add new entry to isEvent
+            addedParticipants.forEach(name => {
+              const contact = latestContacts.find(c => c.name === name);
+              if (contact) {
+                const updatedIsEvent = [
+                  ...contact.isEvent,
+                  { eventCreatedAt, stillEvent: 1 as const },
+                ];
+                updatePromises.push(updateContact(user.uid, contact.id, { isEvent: updatedIsEvent }));
+              }
+            });
+
+            if (updatePromises.length > 0) {
+              await Promise.all(updatePromises);
+            }
+          } catch (err) {
+            console.error("Failed to update participant isEvent:", err);
+          }
+        }
+
+        await updateEvent(user.uid, editingEvent.id, eventPayload);
+      } else {
+        // --- CREATE NEW EVENT ---
+        const eventCreatedAt = Date.now();
         
-        // Reset & Close
-        setIsLoading(false);
-        setShowNewEventModal(false);
-        setEditingEvent(null);
-        
-    }, 800);
-  };
+        // Create the event first
+        const newId = await createEvent(user.uid, eventPayload);
+
+        // Then update all non-current participants' isEvent array
+        const participantNames = data.participants.map(p => p.name);
+        if (participantNames.length > 0) {
+          try {
+            // Fetch fresh contact data to ensure we have the latest isEvent array
+            const latestContacts = await getContacts(user.uid);
+            
+            const updatePromises = participantNames.map((name) => {
+              const contact = latestContacts.find((c) => c.name === name);
+              if (!contact) return Promise.resolve();
+
+              const updatedIsEvent = [
+                ...contact.isEvent,
+                { eventCreatedAt, stillEvent: 1 as const },
+              ];
+              return updateContact(user.uid, contact.id, { isEvent: updatedIsEvent });
+            });
+            await Promise.all(updatePromises);
+          } catch (err) {
+            console.error("Failed to update participant isEvent:", err);
+          }
+        }
+
+        onEventClick(newId);
+      }
+
+      // Refresh data from parent
+      onRefresh?.();
+    } catch (error) {
+      console.error("Error saving event:", error);
+      alert("Failed to save event. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setShowNewEventModal(false);
+      setEditingEvent(null);
+    }
+  }, [user?.uid, user?.displayName, editingEvent, onEventClick, onRefresh, events]);
 
   return (
     <>
@@ -101,6 +318,8 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                         placeholder="Search events..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        autoComplete="off"
+                        suppressHydrationWarning
                         className="w-full h-12 pl-11 pr-4 rounded-full bg-gray-100 border-none outline-none focus:bg-white focus:ring-2 focus:ring-ui-accent-yellow transition-all text-sm font-medium placeholder:text-gray-400"
                     />
                 </div>
@@ -127,7 +346,7 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                             key={event.id}
                             onClick={() => onEventClick(event.id)}
                             className={`
-                                relative p-4 rounded-2xl border transition-all cursor-pointer group
+                                relative rounded-2xl border transition-all cursor-pointer group overflow-hidden
                                 hover:shadow-md hover:-translate-y-0.5
                                 ${isActive 
                                     ? "bg-ui-accent-yellow/5 border-ui-accent-yellow ring-1 ring-ui-accent-yellow shadow-sm" 
@@ -135,6 +354,21 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                                 }
                             `}
                         >
+                            {/* Event Image Thumbnail */}
+                            {event.imageUrl && (
+                                <div className="w-full aspect-video overflow-hidden relative">
+                                    <Image
+                                        src={event.imageUrl}
+                                        alt={event.title ?? event.name}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 400px"
+                                        className="object-cover"
+                                        unoptimized
+                                    />
+                                </div>
+                            )}
+
+                            <div className="p-4">
                             {/* Active Indicator */}
                             {isActive && <div className="absolute left-0 top-4 bottom-4 w-1 bg-ui-accent-yellow rounded-r-full" />}
 
@@ -146,39 +380,53 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
                                     </h3>
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
                                         <CalendarClock className="w-3 h-3" />
-                                        <span>{new Date(event.date).toLocaleDateString()}</span>
+                                        <span>{typeof event.date === 'string' ? event.date : (event.date instanceof Date ? event.date : event.date.toDate()).toLocaleDateString("en-GB")}</span>
                                     </div>
                                 </div>
                                 
-                                {/* TOMBOL EDIT (Hanya muncul saat hover card) */}
-                                <button 
-                                    onClick={(e) => openEditModal(e, event)}
-                                    className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-ui-accent-yellow hover:text-ui-black transition-all opacity-0 group-hover:opacity-100"}
-                                    title="Edit Event"
-                                >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                </button>
+                                {/* TOMBOL EDIT & DELETE (Hanya muncul saat hover card) */}
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button 
+                                        onClick={(e) => openEditModal(e, event)}
+                                        className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-ui-accent-yellow hover:text-ui-black transition-all"}
+                                        title="Edit Event"
+                                    >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => handleDeleteEvent(e, event)}
+                                        className={"p-1.5 rounded-lg bg-gray-100 text-gray-400 hover:bg-red-500 hover:text-white transition-all"}
+                                        title="Delete Event"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
                             
                             {/* Footer Card */}
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50 pl-2">
-                                <div className="flex items-center -space-x-2">
-                                    {[...Array(Math.min(3, event.participants.length))].map((_, i) => (
-                                        <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-500">
-                                            {String.fromCharCode(65+i)}
-                                        </div>
-                                    ))}
-                                    {event.participants.length > 3 && (
-                                        <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-400">
-                                            +{event.participants.length - 3}
-                                        </div>
-                                    )}
-                                </div>
+                                <AvatarStack
+                                    avatars={
+                                      event.participants?.map((p) => {
+                                        // If avatarName is a URL, use it directly
+                                        if (p.avatarName && typeof p.avatarName === "string" && p.avatarName.startsWith("http")) {
+                                          return p.avatarName;
+                                        }
+                                        // Otherwise, generate Dicebear avatar from avatarName or fallback to name
+                                        const seed = p.avatarName || p.name || "user";
+                                        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+                                      }) || []
+                                    }
+                                    size={24}
+                                    overlap={-8}
+                                    limit={3}
+                                />
 
                                 <span className="text-sm font-bold text-ui-black">
                                     {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(getEventTotal(event))}
                                 </span>
                             </div>
+                            </div>{/* end p-4 wrapper */}
                         </div>
                     )
                 })}
@@ -191,7 +439,16 @@ export default function EventList({ onEventClick, activeId }: EventListProps) {
             onClose={() => setShowNewEventModal(false)}
             onSubmit={handleSaveEvent}
             isLoading={isLoading}
-            initialData={editingEvent} // Kirim data kalau lagi edit
+            initialData={editingEvent}
+        />
+
+        {/* --- MODAL DELETE EVENT --- */}
+        <DeleteConfirmModal
+            isOpen={!!eventToDelete}
+            onClose={() => setEventToDelete(null)}
+            onConfirm={confirmDeleteEvent}
+            title="Delete Event?"
+            name={eventToDelete?.title || "this event"}
         />
     </>
   );

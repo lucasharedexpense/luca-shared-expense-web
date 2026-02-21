@@ -15,7 +15,8 @@ export type HeaderVariant =
   | "ACTIVITY_DETAILS"
   | "EDIT_ACTIVITY" 
   | "ACCOUNT_SETTINGS" 
-  | "SUMMARY";
+  | "SUMMARY"
+  | "SCAN";
 
 interface HeaderConfig {
   title: string;
@@ -26,7 +27,7 @@ interface HeaderConfig {
 // Config Map (Mirip property di Enum Kotlin)
 const HEADER_CONFIG: Record<HeaderVariant, HeaderConfig> = {
   HOME:             { title: "Luca",             showLeftIconAsBack: false, showRightLogo: true },
-  EVENT_DETAILS:    { title: "Event Details",    showLeftIconAsBack: true,  showRightLogo: false },
+  EVENT_DETAILS:    { title: "Event Details",    showLeftIconAsBack: false,  showRightLogo: false },
   NEW_EVENT:        { title: "New Event",        showLeftIconAsBack: true,  showRightLogo: false },
   EDIT_EVENT:       { title: "Editing Event",    showLeftIconAsBack: true,  showRightLogo: false },
   NEW_ACTIVITY:     { title: "New Activity",     showLeftIconAsBack: true,  showRightLogo: false },
@@ -34,6 +35,7 @@ const HEADER_CONFIG: Record<HeaderVariant, HeaderConfig> = {
   EDIT_ACTIVITY:    { title: "Edit Activity",    showLeftIconAsBack: true,  showRightLogo: false },
   ACCOUNT_SETTINGS: { title: "Account Settings", showLeftIconAsBack: true,  showRightLogo: false },
   SUMMARY:          { title: "Summary",          showLeftIconAsBack: true,  showRightLogo: false },
+  SCAN:             { title: "Scan",          showLeftIconAsBack: true,  showRightLogo: false },
 };
 
 // --- 2. COMPONENT UTAMA ---

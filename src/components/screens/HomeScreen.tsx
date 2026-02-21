@@ -1,32 +1,55 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import EventCard from "@/components/ui/EventCard";
-import { MOCK_DATABASE } from "@/lib/dummy-data";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/useAuth";
+import { getEventsWithActivities, EventWithActivities } from "@/lib/firestore";
 
 export default function HomeScreen() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventWithActivities[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [navIndex, setNavIndex] = useState(1);
   const router = useRouter();
+  const { userId, loading: authLoading } = useAuth();
 
-  // Load Data
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      // Hack: Kita duplikat data dummy biar listnya jadi banyak & bisa dites scroll
-      const data = await MOCK_DATABASE.events;
-      setEvents([...data, ...data, ...data]); // Duplikat 3x biar panjang
+
+  // Load Data from Firebase
+  const loadData = useCallback(async () => {
+    if (authLoading) return;
+    if (!userId) {
       setLoading(false);
-    };
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await getEventsWithActivities(userId);
+      setEvents(data);
+    } catch (error) {
+      console.error("Error loading events:", error);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, authLoading]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (userId && !authLoading) loadData();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [userId, authLoading, loadData]);
 
   const filteredEvents = events.filter((e) =>
-    e.title.toLowerCase().includes(searchQuery.toLowerCase())
+    e.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
