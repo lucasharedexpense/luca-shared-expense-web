@@ -34,7 +34,7 @@ export default function EditEventPage() {
         const allEvents = await getEventsWithActivities(userId);
         const event = allEvents.find((e) => e.id === eventId);
         setEventData(event || null);
-      } catch {
+      } catch (error) {
         setEventData(null);
       } finally {
         setLoading(false);
@@ -153,7 +153,7 @@ export default function EditEventPage() {
           });
 
           await Promise.all(updatePromises);
-        } catch {
+        } catch (error) {
           // Don't alert - event was updated successfully
         }
       }
@@ -166,7 +166,7 @@ export default function EditEventPage() {
         imageUrl: data.imageUrl || eventData?.imageUrl || "",
       });
       router.back();
-    } catch {
+    } catch (error) {
       alert("Failed to update event.");
     }
   };

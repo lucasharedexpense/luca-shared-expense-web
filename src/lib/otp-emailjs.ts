@@ -88,7 +88,7 @@ export const sendOtpEmail = async (email: string): Promise<{ success: boolean; m
     };
 
     return { success: true, message: "OTP sent successfully!" };
-  } catch {
+  }  catch (error) {
     const errMsg =
       error instanceof Error
         ? error.message

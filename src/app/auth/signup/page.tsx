@@ -147,7 +147,7 @@ export default function SignUpPage() {
           setIsLoading(false);
           return;
         }
-    } catch {
+    }  catch (error) {
         // fetchSignInMethods bisa error di beberapa config Firebase, skip saja
     }
 

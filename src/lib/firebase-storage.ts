@@ -33,7 +33,7 @@ export async function uploadEventImage(
     const downloadUrl = await getDownloadURL(snapshot.ref);
 
     return downloadUrl;
-  } catch {
+  } catch (error) {
     throw error;
   }
 }

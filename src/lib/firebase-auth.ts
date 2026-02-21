@@ -69,7 +69,7 @@ export const signUpWithEmail = async (
     });
 
     return user;
-  } catch {
+  } catch (error) {
     const authError = error as AuthError;
     throw new Error(getAuthErrorMessage(authError));
   }
@@ -83,7 +83,7 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
-  } catch {
+  } catch (error) {
     const authError = error as AuthError;
     throw new Error(getAuthErrorMessage(authError));
   }
@@ -113,7 +113,7 @@ export const signInWithGoogle = async (): Promise<User> => {
     ensureUserDocument(user);
 
     return user;
-  } catch {
+  } catch (error) {
     const authError = error as AuthError;
     throw new Error(getAuthErrorMessage(authError));
   } finally {
@@ -134,7 +134,7 @@ const ensureUserDocument = async (user: User) => {
         createdAt: Date.now(),
       });
     }
-  } catch {
+  } catch (error) {
   }
 };
 
@@ -145,7 +145,7 @@ const ensureUserDocument = async (user: User) => {
 export const logout = async (): Promise<void> => {
   try {
     await signOut(auth);
-  } catch {
+} catch (error) {
     throw error;
   }
 };
@@ -166,7 +166,7 @@ export const getUserProfile = async (uid: string) => {
   try {
     const users = await queryDocuments("users", [where("uid", "==", uid)]);
     return users.length > 0 ? users[0] : null;
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -187,7 +187,7 @@ export const updateUserProfile = async (
     } else {
       throw new Error("User profile not found");
     }
-  } catch {
+  } catch (error) {
     throw error;
   }
 };
@@ -212,7 +212,7 @@ export const changePassword = async (
 
     // Update the password
     await updatePassword(user, newPassword);
-  } catch {
+  } catch (error) {
     const authError = error as AuthError;
     if (authError.code === "auth/wrong-password") {
       throw new Error("Current password is incorrect");
@@ -246,7 +246,7 @@ export const deleteAccount = async (password?: string): Promise<void> => {
 
     // Delete the user from Firebase Auth
     await deleteUser(user);
-  } catch {
+  } catch (error) {
     const authError = error as AuthError;
     if (authError.code === "auth/requires-recent-login") {
       throw new Error("Please log in again before deleting your account");

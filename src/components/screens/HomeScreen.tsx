@@ -27,7 +27,7 @@ export default function HomeScreen() {
       setLoading(true);
       const data = await getEventsWithActivities(userId);
       setEvents(data);
-    } catch {
+    } catch (error) {
       setEvents([]);
     } finally {
       setLoading(false);

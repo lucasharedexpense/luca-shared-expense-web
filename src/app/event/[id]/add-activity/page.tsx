@@ -34,7 +34,7 @@ export default function AddActivityPage() {
         const allEvents = await getEventsWithActivities(userId);
         const event = allEvents.find((e) => e.id === eventId);
         setEventData(event || null);
-      } catch {
+      } catch (error) {
         setEventData(null);
       } finally {
         setLoading(false);
@@ -120,7 +120,7 @@ export default function AddActivityPage() {
       });
 
       router.back();
-    } catch {
+    }  catch (error) {
       alert("Failed to create activity. Please try again.");
     } finally {
       setSaving(false);

@@ -310,7 +310,7 @@ export default function ActivityEditPage() {
         setAllEventParticipants(
           event?.participants?.map(p => ({ name: p.name, avatarName: p.avatarName || "" })) ?? []
         );
-      } catch {
+      } catch (error) {
       } finally {
         setPageLoading(false);
       }
@@ -333,7 +333,7 @@ export default function ActivityEditPage() {
         if (itemsList.length > 0 && itemsList[0].taxPercentage) {
           setTaxPercent(itemsList[0].taxPercentage);
         }
-      } catch {
+      }  catch (error) {
       }
     };
     fetchItems();
@@ -455,7 +455,7 @@ export default function ActivityEditPage() {
           }
 
           router.back();
-      } catch {
+      } catch (error) {
       } finally {
           setSaving(false);
       }

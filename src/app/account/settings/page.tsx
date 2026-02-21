@@ -251,7 +251,7 @@ export default function AccountSettingsPage() {
           });
           setNewUsername(authUser.displayName || authUser.email?.split("@")[0] || "User");
         }
-      } catch {
+      } catch (error) {
         setErrorMessage("Failed to load profile");
       } finally {
         setProfileLoading(false);
@@ -318,7 +318,7 @@ export default function AccountSettingsPage() {
         await updateEvent(authUser.uid, event.id, { participants: updatedParticipants });
       }));
       setToastMessage("Profile picture updated");
-    } catch {
+    } catch (error) {
       setErrorMessage("Failed to update profile picture");
     } finally {
       setIsLoading(false);
@@ -333,7 +333,7 @@ export default function AccountSettingsPage() {
       setUserProfile(prev => prev ? { ...prev, username: newUsername.trim() } : null);
       setIsEditingUsername(false);
       setToastMessage("Username updated successfully");
-    } catch {
+    } catch (error) {
       setErrorMessage("Failed to update username");
     } finally {
       setIsLoading(false);
@@ -374,7 +374,7 @@ export default function AccountSettingsPage() {
       await logout();
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
-    } catch {
+    } catch (error) {
       setErrorMessage("Failed to log out");
     }
   };

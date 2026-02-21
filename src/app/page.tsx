@@ -47,7 +47,7 @@ export default function GreetingPage() {
          router.push("/home");
       }
 
-    } catch {
+    } catch (error) {
       const msg = error instanceof Error ? error.message : "";
       if (msg !== "__CANCELLED_POPUP__") {
         // Show error while button is still disabled

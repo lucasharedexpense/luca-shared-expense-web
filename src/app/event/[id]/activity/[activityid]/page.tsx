@@ -121,7 +121,7 @@ export default function ActivityDetailPage() {
         
         setEventData(event || null);
         setActivityData(activity || null);
-      } catch {
+      } catch (error) {
         setEventData(null);
         setActivityData(null);
       } finally {

@@ -124,7 +124,7 @@ export default function FillProfilePage() {
         // Redirect ke Home
         router.push("/home");
 
-    } catch {
+    } catch (error) {
         setIsLoading(false);
     }
   };

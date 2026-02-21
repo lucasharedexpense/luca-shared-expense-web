@@ -77,7 +77,7 @@ export default function CameraPage() {
         await videoRef.current.play();
       }
       setIsLoading(false);
-    } catch {
+    } catch (err) {
       setIsLoading(false);
       if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError")) {
         setCameraError("Camera permission denied. Allow camera access in your browser settings, then click Retry.");

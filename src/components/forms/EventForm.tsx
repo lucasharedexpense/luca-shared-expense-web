@@ -89,7 +89,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
         if (!isNaN(d.getTime())) {
           return d.toISOString().split('T')[0]; // Convert to YYYY-MM-DD for input type="date"
         }
-      } catch {
+      } catch (error) {
         // fallback
       }
     }
@@ -140,7 +140,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
         try {
           setUploading(true);
           imageUrl = await uploadEventImage(user.uid, imageFile);
-        } catch {
+        } catch (error) {
           alert("Failed to upload image. Event will be created without image.");
           imageUrl = imagePreview || "";
         } finally {

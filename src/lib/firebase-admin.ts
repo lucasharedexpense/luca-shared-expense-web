@@ -28,7 +28,7 @@ function initAdmin() {
         }),
       });
       return getFirestore();
-    } catch {
+    } catch (error) {
       // Firebase Admin initialization failed with secure credentials
     }
   }

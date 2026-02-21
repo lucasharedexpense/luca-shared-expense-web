@@ -130,7 +130,7 @@ export default function ContactsPage() {
       }
       setIsFormOpen(false);
       setEditingContact(null);
-    } catch {
+    } catch (error) {
       setErrorMessage("Failed to save contact");
     } finally {
       setIsSaving(false);
@@ -156,7 +156,7 @@ export default function ContactsPage() {
       setSelectedContact(null);
       setIsDeleteConfirmOpen(false);
       setToastMessage("Contact deleted");
-    } catch {
+    } catch (error) {
       setErrorMessage("Failed to delete contact");
     } finally {
       setIsSaving(false);

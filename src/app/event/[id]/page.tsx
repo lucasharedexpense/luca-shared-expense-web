@@ -102,7 +102,7 @@ export default function EventDetailPage() {
       const allEvents = await getEventsWithActivities(userId);
       const event = allEvents.find((e) => e.id === eventId);
       setEventData(event || null);
-    } catch {
+    } catch (error) {
       setEventData(null);
     } finally {
       setLoading(false);
@@ -121,7 +121,7 @@ export default function EventDetailPage() {
     try {
       await deleteActivity(userId, eventId, activityToDelete);
       await fetchEvent(); // Refresh data
-    } catch {
+    } catch (error) {
       alert("Failed to delete activity.");
     } finally {
       setActivityToDelete(null);
@@ -315,7 +315,7 @@ export default function EventDetailPage() {
               try {
                 setSummarizing(true);
                 await generateAndSaveSettlement(userId, eventId);
-              } catch {
+              } catch (error) {
                 // redirect() throws NEXT_REDIRECT which is caught here
                 // but the navigation still happens. No-op.
               } finally {

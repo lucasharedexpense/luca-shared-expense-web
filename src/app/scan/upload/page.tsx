@@ -57,7 +57,7 @@ export default function UploadPage() {
         setError(null);
         router.push("/scan/result");
       }
-    } catch {
+    } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to scan receipt. Please try again.";
       setError(errorMsg);
       setReceiptData(null);

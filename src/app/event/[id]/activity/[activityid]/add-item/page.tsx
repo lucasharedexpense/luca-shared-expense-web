@@ -50,7 +50,7 @@ export default function AddItemPage() {
           const participantNames = activityData.participants?.map((p) => p.name) || [];
           setSelectedMembers(participantNames);
         }
-      } catch {
+      } catch (error) {
       } finally {
         setLoading(false);
       }
@@ -128,7 +128,7 @@ export default function AddItemPage() {
 
       // Redirect to activity detail page
       router.push(`/event/${eventId}/activity/${activityId}`);
-    } catch {
+    } catch (error) {
       alert("Failed to create item. Please try again.");
     } finally {
       setSaving(false);

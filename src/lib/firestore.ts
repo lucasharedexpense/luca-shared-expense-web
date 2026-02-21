@@ -182,7 +182,7 @@ async function getActivitiesForEvent(
     );
 
     return activities;
-  } catch {
+  } catch (error) {
     return []; // Return empty array if error
   }
 }
@@ -229,7 +229,7 @@ export async function getEventsWithActivities(
     });
 
     return eventsWithActivities;
-  } catch {
+  } catch (error) {
     return [];
   }
 }
@@ -270,7 +270,7 @@ export async function getEventWithActivities(
       ...event,
       activities,
     };
-  } catch {
+  } catch (error) {
     return null;
   }
 }
