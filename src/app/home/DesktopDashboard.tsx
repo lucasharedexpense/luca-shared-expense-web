@@ -37,6 +37,15 @@ interface Item {
     timestamp?: number;
 }
 
+interface Contact {
+    id: string;
+    name: string;
+    avatarName: string;
+    phoneNumber: string;
+    bankAccounts: unknown[];
+    userId: string;
+}
+
 interface Participant {
     id?: string;
     name: string;
