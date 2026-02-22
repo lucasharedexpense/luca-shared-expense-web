@@ -8,7 +8,6 @@ import {
   ChevronRight, 
   Lock, 
   Shield, 
-  Bell, 
   HelpCircle, 
   Info, 
   LogOut, 
@@ -17,7 +16,11 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  DatabaseZap,
+  KeyRound,
+  ServerCrash
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getUserProfile, changePassword, logout } from "@/lib/firebase-auth";
@@ -168,11 +171,91 @@ const PasswordChangeModal = ({ isOpen, onClose, onSubmit }: { isOpen: boolean; o
     );
 };
 
+// --- COMPONENT: PRIVACY & SECURITY MODAL ---
+const PrivacySecurityModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  if (!isOpen) return null;
+
+  const sections = [
+    {
+      icon: <KeyRound className="w-5 h-5" />,
+      title: "Authentication & Access",
+      body: "Your account is protected by secure authentication powered by Firebase Auth. All login sessions are verified and encrypted. Luca never stores your raw password — only a securely hashed version is kept on our servers.",
+    },
+    {
+      icon: <DatabaseZap className="w-5 h-5" />,
+      title: "Your Data & Storage",
+      body: "All personal data — including your name, email, expenses, and contacts — is stored in Google Firestore with strict read/write security rules. Only you and the people you explicitly invite to an event can access that event's data.",
+    },
+    {
+      icon: <FileText className="w-5 h-5" />,
+      title: "Data Usage & Privacy",
+      body: "Luca does not sell or share your personal information with third parties. Your data is used solely to provide the expense-splitting service. Uploaded receipt images are stored privately in Firebase Storage and are only accessible to you.",
+    },
+    {
+      icon: <ServerCrash className="w-5 h-5" />,
+      title: "Incident & Breach Policy",
+      body: "In the unlikely event of a security incident, affected users will be notified promptly via email. We follow industry-standard procedures to contain breaches, revoke compromised sessions, and restore data integrity as quickly as possible.",
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white w-full max-w-lg rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-5 flex flex-col max-h-[85dvh]">
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-ui-accent-yellow/20 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-ui-black" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-ui-black leading-tight">Privacy &amp; Security</h3>
+              <p className="text-xs text-gray-400">How Luca keeps your data safe</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 flex flex-col gap-4">
+          {sections.map((s, i) => (
+            <div key={i} className="bg-gray-50 rounded-2xl p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-ui-black shrink-0">
+                  {s.icon}
+                </div>
+                <h4 className="text-sm font-bold text-ui-black">{s.title}</h4>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">{s.body}</p>
+            </div>
+          ))}
+
+          <p className="text-center text-xs text-gray-300 pb-2">
+            Last updated: February 2026 &mdash; Luca v1.0.0
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6 pt-2 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-ui-accent-yellow rounded-xl font-bold text-sm text-ui-black shadow-lg shadow-ui-accent-yellow/20 hover:brightness-105 transition-all"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN PAGE ---
 export default function SettingsPage() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -332,13 +415,7 @@ export default function SettingsPage() {
                 <SettingsItem 
                     icon={<Shield className="w-5 h-5" />}
                     title="Privacy & Security"
-                    onClick={() => { /* TODO: Privacy settings page */ }}
-                />
-                <SettingsItem 
-                    icon={<Bell className="w-5 h-5" />}
-                    title="Notifications"
-                    subtitle="On, Email & Push"
-                    onClick={() => { /* TODO: Notifications settings page */ }}
+                    onClick={() => setShowPrivacyModal(true)}
                 />
             </SettingsGroupContainer>
 
@@ -375,6 +452,10 @@ export default function SettingsPage() {
       </div>
 
       {/* MODALS */}
+      <PrivacySecurityModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+      />
       <PasswordChangeModal 
         isOpen={showPasswordModal} 
         onClose={() => setShowPasswordModal(false)}
