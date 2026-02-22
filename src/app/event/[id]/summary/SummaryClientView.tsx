@@ -79,16 +79,13 @@ function SummaryTabSwitcher({
 function SettlementCard({
   item,
   participants,
-  onToggle,
 }: {
   item: SettlementWithPaid;
   participants: SummaryParticipant[];
-  onToggle: () => void;
 }) {
   return (
     <div
-      onClick={onToggle}
-      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
+      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
         item.isPaid
           ? "bg-gray-50 border-transparent opacity-80"
           : "bg-white border-ui-accent-yellow/50 shadow-sm"
@@ -136,35 +133,6 @@ function SettlementCard({
           {" pays "}
           <span className="font-bold text-ui-black">{item.toName}</span>
         </p>
-      </div>
-
-      {/* Amount & Status */}
-      <div className="flex items-center gap-3">
-        <div className="flex flex-col items-end">
-          <span
-            className={`font-bold ${
-              item.isPaid ? "line-through text-gray-400" : "text-ui-black"
-            }`}
-          >
-            {formatCurrency(item.amount)}
-          </span>
-          {item.isPaid ? (
-            <span className="text-[10px] font-bold text-green-600 flex items-center gap-0.5">
-              PAID <Check className="w-3 h-3" />
-            </span>
-          ) : (
-            <span className="text-[10px] font-bold text-red-400">UNPAID</span>
-          )}
-        </div>
-
-        {/* Checkbox */}
-        <div
-          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-            item.isPaid ? "bg-green-500 border-green-500" : "border-gray-300"
-          }`}
-        >
-          {item.isPaid && <Check className="w-3.5 h-3.5 text-white" />}
-        </div>
       </div>
     </div>
   );
@@ -252,13 +220,6 @@ export default function SummaryClientView({
   const [currentTab, setCurrentTab] = useState<"SETTLEMENT" | "DETAILS">(
     "SETTLEMENT",
   );
-  const [paidSettlementIds, setPaidSettlementIds] = useState<string[]>([]);
-
-  const togglePaid = (id: string) => {
-    setPaidSettlementIds((prev) =>
-      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id],
-    );
-  };
 
   return (
     <div className="flex flex-col h-screen w-full bg-ui-accent-yellow">
@@ -270,12 +231,6 @@ export default function SummaryClientView({
         <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
           {/* Header */}
           <div className="pt-6 px-6 flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 text-ui-black" />
-            </button>
             <h2 className="text-xl font-bold text-ui-black">
               {data.eventName}
             </h2>
@@ -314,13 +269,11 @@ export default function SummaryClientView({
                 ) : (
                   <div className="flex flex-col gap-3">
                     {data.settlements.map((item) => {
-                      const isPaid = paidSettlementIds.includes(item.id);
                       return (
                         <SettlementCard
                           key={item.id}
-                          item={{ ...item, isPaid }}
+                          item={{ ...item, isPaid: false }}
                           participants={data.participants}
-                          onToggle={() => togglePaid(item.id)}
                         />
                       );
                     })}
@@ -351,21 +304,6 @@ export default function SummaryClientView({
             )}
           </div>
         </div>
-
-        {/* Bottom Share Button */}
-        {currentTab === "SETTLEMENT" && (
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pt-10">
-            <button
-              onClick={() => {
-                // TODO: Implement share settlement plan
-              }}
-              className="w-full h-14 bg-ui-black text-white rounded-full shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg"
-            >
-              <Share2 className="w-5 h-5" />
-              <span className="mt-0.5">Share Settlement Plan</span>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
