@@ -252,7 +252,6 @@ export default function AccountSettingsPage() {
           setNewUsername(authUser.displayName || authUser.email?.split("@")[0] || "User");
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error);
         setErrorMessage("Failed to load profile");
       } finally {
         setProfileLoading(false);
@@ -320,7 +319,6 @@ export default function AccountSettingsPage() {
       }));
       setToastMessage("Profile picture updated");
     } catch (error) {
-      console.error("Error updating avatar:", error);
       setErrorMessage("Failed to update profile picture");
     } finally {
       setIsLoading(false);
@@ -336,7 +334,6 @@ export default function AccountSettingsPage() {
       setIsEditingUsername(false);
       setToastMessage("Username updated successfully");
     } catch (error) {
-      console.error("Error updating username:", error);
       setErrorMessage("Failed to update username");
     } finally {
       setIsLoading(false);
@@ -350,7 +347,6 @@ export default function AccountSettingsPage() {
       await changePassword(oldP, newP);
       setToastMessage("Password updated successfully");
     } catch (error) {
-      console.error("Error updating password:", error);
       const errMsg = error instanceof Error ? error.message : "Failed to update password";
       setErrorMessage(errMsg);
     } finally {
@@ -366,7 +362,6 @@ export default function AccountSettingsPage() {
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
     } catch (error) {
-      console.error("Error deleting account:", error);
       const errMsg = error instanceof Error ? error.message : "Failed to delete account";
       setErrorMessage(errMsg);
       setIsLoading(false);
@@ -380,7 +375,6 @@ export default function AccountSettingsPage() {
       document.cookie = "luca_session=; path=/; max-age=0";
       router.push("/");
     } catch (error) {
-      console.error("Error logging out:", error);
       setErrorMessage("Failed to log out");
     }
   };

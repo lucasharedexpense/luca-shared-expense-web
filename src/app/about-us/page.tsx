@@ -1,15 +1,16 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
   Code, 
   Globe, 
-  Instagram, 
-  Info
+  Instagram 
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons"; // Asumsi file icon yang dibuat sebelumnya
+import NextImage from "next/image";
 
 // --- DATA: TEAM MEMBERS ---
 const TEAM_MEMBERS = [
@@ -57,11 +58,12 @@ const TechItem = ({ tech, description }: { tech: string, description: string }) 
 
 const TeamMemberCard = ({ name, role, src }: { name: string, role: string, src: string }) => (
   <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col items-center text-center shadow-sm h-full hover:shadow-md transition-shadow">
-    <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
-        <img 
+    <div className=" relative w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center mb-3 text-gray-400">
+        <Image 
           src={src} 
           alt="Profile" 
-          className="w-full h-full object-cover" 
+          fill
+          className="object-cover" 
         />
     </div>
     <h3 className="text-sm font-bold text-ui-black mb-5 md:mb-0">{name}</h3>

@@ -23,17 +23,10 @@ export const validateFirebaseEnv = () => {
     .map(([key]) => key);
 
   if (missingVars.length > 0) {
-    console.error(
-      "❌ Missing Firebase environment variables:",
-      missingVars.join(", ")
-    );
-    console.error(
-      "\n📋 How to fix:\n1. Copy .env.local.example to .env.local\n2. Ensure all Firebase credentials are filled\n3. Restart dev server\n"
-    );
     throw new Error(
-      `Missing Firebase config: ${missingVars.join(", ")}. See console for details.`
+      `Missing Firebase config: ${missingVars.join(", ")}. Ensure all NEXT_PUBLIC_FIREBASE_* variables are set in .env.local.`
     );
   }
 
-  console.log("✅ Firebase environment variables loaded successfully");
+  // Environment variables validated successfully
 };

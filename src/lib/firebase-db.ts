@@ -28,7 +28,6 @@ export const addDocument = async (
     });
     return docRef.id;
   } catch (error) {
-    console.error("Error adding document:", error);
     throw error;
   }
 };
@@ -48,7 +47,6 @@ export const getDocument = async (
     }
     return null;
   } catch (error) {
-    console.error("Error getting document:", error);
     throw error;
   }
 };
@@ -66,7 +64,6 @@ export const getDocuments = async (
       ...doc.data(),
     }));
   } catch (error) {
-    console.error("Error getting documents:", error);
     throw error;
   }
 };
@@ -86,7 +83,6 @@ export const queryDocuments = async (
       ...doc.data(),
     }));
   } catch (error) {
-    console.error("Error querying documents:", error);
     throw error;
   }
 };
@@ -106,7 +102,6 @@ export const updateDocument = async (
       updatedAt: new Date(),
     });
   } catch (error) {
-    console.error("Error updating document:", error);
     throw error;
   }
 };
@@ -122,7 +117,6 @@ export const deleteDocument = async (
     const docRef = doc(db, collectionName, docId);
     await deleteDoc(docRef);
   } catch (error) {
-    console.error("Error deleting document:", error);
     throw error;
   }
 };

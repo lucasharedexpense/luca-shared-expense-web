@@ -55,6 +55,7 @@ export interface Activity {
   categoryColorHex?: string;
   items?: ActivityItem[];
   participants?: ActivityParticipant[];
+  isSplitEqual?: boolean;
 }
 
 export interface Participant {
@@ -97,6 +98,7 @@ function docToActivity(doc: QueryDocumentSnapshot<DocumentData>): Activity {
     categoryColorHex: data.categoryColorHex,
     items: data.items || [],
     participants: data.participants || [],
+    isSplitEqual: data.isSplitEqual ?? false,
   };
 }
 
@@ -125,8 +127,9 @@ function docToEvent(doc: QueryDocumentSnapshot<DocumentData>): Event {
 }
 
 /**
- * Fetch all activities for a specific event
+ * Fetch all activities for a specific event, including their items sub-collection
  * Path: users/{userId}/events/{eventId}/activities
+ *       users/{userId}/events/{eventId}/activities/{activityId}/items
  */
 async function getActivitiesForEvent(
   userId: string,
@@ -145,15 +148,43 @@ async function getActivitiesForEvent(
 
     const activitiesSnapshot = await getDocs(activitiesRef);
 
-    // Convert snapshots to Activity objects
-    const activities = activitiesSnapshot.docs.map(docToActivity);
+    // For each activity, also fetch its items sub-collection
+    const activities = await Promise.all(
+      activitiesSnapshot.docs.map(async (actDoc) => {
+        const activity = docToActivity(actDoc);
+
+        // Fetch items sub-collection for this activity
+        const itemsRef = collection(
+          db,
+          "users",
+          userId,
+          "events",
+          eventId,
+          "activities",
+          actDoc.id,
+          "items"
+        );
+        const itemsSnapshot = await getDocs(itemsRef);
+
+        const items: ActivityItem[] = itemsSnapshot.docs.map((itemDoc) => {
+          const d = itemDoc.data();
+          return {
+            itemName: d.itemName ?? "",
+            price: d.price ?? 0,
+            quantity: d.quantity ?? 0,
+            memberNames: d.memberNames ?? [],
+            discountAmount: d.discountAmount,
+            taxPercentage: d.taxPercentage,
+            timestamp: d.timestamp,
+          };
+        });
+
+        return { ...activity, items };
+      })
+    );
 
     return activities;
   } catch (error) {
-    console.error(
-      `Error fetching activities for event ${eventId}:`,
-      error
-    );
     return []; // Return empty array if error
   }
 }
@@ -174,7 +205,6 @@ export async function getEventsWithActivities(
     const eventsSnapshot = await getDocs(eventsRef);
 
     if (eventsSnapshot.empty) {
-      console.log("No events found for user:", userId);
       return [];
     }
 
@@ -200,12 +230,8 @@ export async function getEventsWithActivities(
       return bCreated - aCreated;
     });
 
-    console.log(
-      `✅ Fetched ${eventsWithActivities.length} events with activities`
-    );
     return eventsWithActivities;
   } catch (error) {
-    console.error("Error fetching events with activities:", error);
     return [];
   }
 }
@@ -247,7 +273,6 @@ export async function getEventWithActivities(
       activities,
     };
   } catch (error) {
-    console.error(`Error fetching event ${eventId}:`, error);
     return null;
   }
 }
@@ -283,10 +308,8 @@ export async function createEvent(
       createdAt: Date.now(),
       isFinish: 0,
     });
-    console.log(`✅ Created event: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
-    console.error("Error creating event:", error);
     throw error;
   }
 }
@@ -321,9 +344,7 @@ export async function updateEvent(
     if (data.participants !== undefined) updateData.participants = data.participants;
 
     await updateDoc(eventRef, updateData);
-    console.log(`✅ Updated event: ${eventId}`);
   } catch (error) {
-    console.error("Error updating event:", error);
     throw error;
   }
 }
@@ -339,9 +360,7 @@ export async function deleteEvent(
   try {
     const eventRef = doc(db, "users", userId, "events", eventId);
     await deleteDoc(eventRef);
-    console.log(`✅ Deleted event: ${eventId}`);
   } catch (error) {
-    console.error("Error deleting event:", error);
     throw error;
   }
 }
@@ -378,10 +397,8 @@ export async function createActivity(
       payerName: data.payerName,
     });
     
-    console.log(`✅ Created activity: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
-    console.error("Error creating activity:", error);
     throw error;
   }
 }
@@ -407,9 +424,7 @@ export async function updateActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await updateDoc(activityRef, data);
-    console.log(`✅ Updated activity: ${activityId}`);
   } catch (error) {
-    console.error("Error updating activity:", error);
     throw error;
   }
 }
@@ -426,9 +441,7 @@ export async function deleteActivity(
   try {
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await deleteDoc(activityRef);
-    console.log(`✅ Deleted activity: ${activityId}`);
   } catch (error) {
-    console.error("Error deleting activity:", error);
     throw error;
   }
 }
@@ -475,10 +488,8 @@ export async function createItem(
       timestamp: Date.now(),
     });
 
-    console.log(`✅ Created item: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
-    console.error("Error creating item:", error);
     throw error;
   }
 }
@@ -514,9 +525,7 @@ export async function updateItem(
       itemId
     );
     await updateDoc(itemRef, data);
-    console.log(`✅ Updated item: ${itemId}`);
   } catch (error) {
-    console.error("Error updating item:", error);
     throw error;
   }
 }
@@ -544,9 +553,7 @@ export async function deleteItem(
       itemId
     );
     await deleteDoc(itemRef);
-    console.log(`✅ Deleted item: ${itemId}`);
   } catch (error) {
-    console.error("Error deleting item:", error);
     throw error;
   }
 }

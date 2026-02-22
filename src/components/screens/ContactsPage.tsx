@@ -53,8 +53,7 @@ export default function ContactsPage() {
       try {
         const data = await getContacts(authUser.uid);
         setContacts(data);
-      } catch (error) {
-        console.error("Error fetching contacts:", error);
+      } catch {
         setErrorMessage("Failed to load contacts");
       } finally {
         setIsLoadingContacts(false);
@@ -79,15 +78,12 @@ export default function ContactsPage() {
 
   // --- LOGIC GROUPING (A-Z) ---
   const groupedContacts = useMemo(() => {
-    // 1. Filter Search
     const filtered = contacts.filter((c) => 
       c.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // 2. Sort A-Z
     const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
 
-    // 3. Grouping
     const groups: Record<string, ContactData[]> = {};
     sorted.forEach((contact) => {
       const firstChar = contact.name.charAt(0).toUpperCase();
@@ -100,19 +96,14 @@ export default function ContactsPage() {
     return groups;
   }, [contacts, searchQuery]);
 
-  // List huruf untuk Sidebar
   const activeLetters = Object.keys(groupedContacts).sort();
 
-  // Scroll Handler untuk Alphabet Sidebar
   const scrollToSection = (letter: string) => {
     const container = document.getElementById("contact-list-container");
     const element = document.getElementById(`group-${letter}`);
     
     if (container && element) {
-      // offsetTop adalah jarak elemen dari atas container
-      // Kita kurangi sedikit (misal 24px) sebagai buffer biar ga terlalu mepet atas
       const topPos = element.offsetTop; 
-      
       container.scrollTo({
         top: topPos,
         behavior: "smooth"
@@ -120,20 +111,17 @@ export default function ContactsPage() {
     }
   };
 
-  // --- CRUD HANDLERS (Firebase) ---
   const handleSaveContact = async (contactData: ContactData) => {
     if (!authUser) return;
     setIsSaving(true);
     try {
       if (editingContact) {
-        // Update existing contact
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _updateId, ...updateData } = contactData;
         await updateContact(authUser.uid, editingContact.id, updateData);
         setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...contactData, id: editingContact.id } : c));
         setToastMessage("Contact updated successfully");
       } else {
-        // Add new contact
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _newId, ...newData } = contactData;
         const newId = await addContact(authUser.uid, newData);
@@ -143,7 +131,6 @@ export default function ContactsPage() {
       setIsFormOpen(false);
       setEditingContact(null);
     } catch (error) {
-      console.error("Error saving contact:", error);
       setErrorMessage("Failed to save contact");
     } finally {
       setIsSaving(false);
@@ -170,7 +157,6 @@ export default function ContactsPage() {
       setIsDeleteConfirmOpen(false);
       setToastMessage("Contact deleted");
     } catch (error) {
-      console.error("Error deleting contact:", error);
       setErrorMessage("Failed to delete contact");
     } finally {
       setIsSaving(false);
@@ -178,14 +164,11 @@ export default function ContactsPage() {
   };
 
   return (
-    // CONTAINER UTAMA (Penting: h-full biar tingginya ngikutin Layout parent)
     <div className="flex flex-col h-full w-full bg-ui-background">
       
-      {/* 1. HEADER SECTION (Fixed / Tidak ikut scroll) */}
       <div className="px-5 pb-4 pt-4 shrink-0 z-20 flex flex-col gap-1">
         <h1 className="text-2xl font-semibold font-display text-ui-black">Contacts</h1>
 
-        {/* Search & Add */}
         <div className="flex gap-3">
           <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search contacts..."/>
           <button 
@@ -196,8 +179,6 @@ export default function ContactsPage() {
           </button>
         </div>
       </div>
-
-      {/* 2. AREA PUTIH (Content Wrapper) */}
       <div className="flex-1 overflow-hidden flex flex-col relative z-0">
          
          {/* Loading State */}

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Image as ImageIcon, Camera, AlertCircle } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { useScan } from "../scan-context";
+import { compressImage } from "@/lib/compress-image";
 
-/** Returns true when running on a touch-based mobile/tablet device */
+/** Layar > 1024px dianggap desktop/laptop → WebRTC camera.
+ *  Layar ≤ 1024px dianggap tablet/HP → native camera app. */
 function isMobileOrTablet(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent);
+  if (typeof window === "undefined") return false;
+  return window.innerWidth <= 1024;
 }
 
 export default function CameraPage() {
@@ -48,7 +50,9 @@ export default function CameraPage() {
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -105,8 +109,9 @@ export default function CameraPage() {
 
   // ── Shared file handler ────────────────────────────────────────────────────
 
-  const handleFileSelected = (file: File) => {
-    setFile(file);
+  const handleFileSelected = async (file: File) => {
+    const compressed = await compressImage(file);
+    setFile(compressed);
     setError(null);
     setReceiptData(null);
     const reader = new FileReader();
@@ -115,7 +120,7 @@ export default function CameraPage() {
       stopCamera();
       router.push("/scan/upload");
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(compressed);
   };
 
   const handleNativeCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,15 +143,20 @@ export default function CameraPage() {
     canvasRef.current.width = videoRef.current.videoWidth;
     canvasRef.current.height = videoRef.current.videoHeight;
     ctx.drawImage(videoRef.current, 0, 0);
-    canvasRef.current.toBlob((blob) => {
+    canvasRef.current.toBlob(async (blob) => {
       if (!blob) return;
-      const file = new File([blob], "receipt-photo.jpg", { type: "image/jpeg" });
-      setFile(file);
-      setPreview(canvasRef.current!.toDataURL("image/jpeg"));
-      setError(null);
-      setReceiptData(null);
-      stopCamera();
-      router.push("/scan/upload");
+      const raw = new File([blob], "receipt-photo.jpg", { type: "image/jpeg" });
+      const compressed = await compressImage(raw);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFile(compressed);
+        setPreview(reader.result as string);
+        setError(null);
+        setReceiptData(null);
+        stopCamera();
+        router.push("/scan/upload");
+      };
+      reader.readAsDataURL(compressed);
     }, "image/jpeg");
   };
 

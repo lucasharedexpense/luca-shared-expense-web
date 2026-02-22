@@ -46,7 +46,7 @@ export default function SidebarDesktop() {
       {/* --- BAGIAN BARU: CTA BUTTON (Pengganti tombol Scan tengah di Mobile) --- */}
       <div className="px-4 mb-6">
         <button 
-            onClick={() => router.push("/scan")} // Atau ke /new-event langsung
+            onClick={() => router.push("/scan/camera")} // Langsung ke camera page (otomatis detect desktop/mobile)
             className="w-full py-3 bg-ui-accent-yellow rounded-xl flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
             aria-label="Scan receipt"
         >

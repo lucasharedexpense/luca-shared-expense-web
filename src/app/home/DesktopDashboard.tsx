@@ -4,8 +4,13 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import EventList from "@/components/features/EventList";
 import NewActivityModal from "@/components/features/NewActivityModal";
+/** Shape expected by NewActivityModal's participants prop */
+interface ModalParticipant {
+  id: string;
+  name: string;
+  avatarName: string;
+}
 import SearchBar from "@/components/ui/SearchBar";
-import type { Contact } from "@/lib/dummy-data";
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities, deleteActivity, createActivity, updateActivity, createItem, updateItem, deleteItem } from "@/lib/firestore";
 import type { EventWithActivities, Activity as FirestoreActivity } from "@/lib/firestore";
@@ -15,8 +20,9 @@ import {
     Calculator
 } from "lucide-react";
 import SummaryModal from "@/components/features/SummaryModel";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Toggle from "@/components/ui/Toggle";
 
 // ─── INTERFACES ───────────────────────────────────────────────────────────────
 
@@ -29,6 +35,15 @@ interface Item {
     discountAmount?: number;
     taxPercentage?: number;
     timestamp?: number;
+}
+
+interface Contact {
+    id: string;
+    name: string;
+    avatarName: string;
+    phoneNumber: string;
+    bankAccounts: unknown[];
+    userId: string;
 }
 
 interface Participant {
@@ -269,19 +284,8 @@ const EventDetailColumn = ({
     eventId, activeActivityId, onActivityClick, onClose, 
     onAddClick, onEditActivity, onSummaryClick, onDeleteActivity, events
 }: EventDetailColumnProps) => {
-    const [searchQuery, setSearchQuery] = useState("");
     const event = events.find((e) => e.id === eventId);
     if (!event) return null;
-
-    // Filter activities based on search query
-    const filteredActivities = event.activities.filter((activity) => {
-        const query = searchQuery.toLowerCase();
-        return (
-            activity.title.toLowerCase().includes(query) ||
-            activity.category.toLowerCase().includes(query) ||
-            activity.payerName.toLowerCase().includes(query)
-        );
-    });
 
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -301,15 +305,6 @@ const EventDetailColumn = ({
             {/* Tambahkan 'pb-28' agar konten terbawah tidak ketutup tombol floating */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar pb-28">
                 
-                {/* Search Bar */}
-                <div className="mb-3 sticky top-0 bg-white z-10 py-1">
-                    <SearchBar
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search activity..."
-                    />
-                </div>
-
                 {/* Tombol Add New Activity (Tetap di atas sebagai input) */}
                 <button 
                     onClick={onAddClick}
@@ -322,12 +317,7 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {filteredActivities.length === 0 && event.activities.length > 0 ? (
-                    <div className="text-center py-8 opacity-50">
-                        <p className="text-sm text-gray-500">No activities match your search.</p>
-                    </div>
-                ) : (
-                    filteredActivities.map((act) => {
+                {event.activities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -390,8 +380,7 @@ const EventDetailColumn = ({
                             <ChevronRight className={`w-5 h-5 shrink-0 ${isActive ? "text-ui-black" : "text-gray-300"}`} />
                         </div>
                     )
-                })
-                )}
+                })}
             </div>
 
             {/* 3. BIG FLOATING ACTION BUTTON (Summary) */}
@@ -428,6 +417,21 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     // --- STATE EDIT MODE ---
     const [isEditing, setIsEditing] = useState(false);
     const [items, setItems] = useState<Item[]>([]);
+
+    // --- STATE EQUAL SPLIT ---
+    const currentSplitEqual = activity?.isSplitEqual ?? false;
+    const [isEqualSplit, setIsEqualSplit] = useState(currentSplitEqual);
+    
+    // State tambahan buat tracking perubahan dari Firebase tanpa useEffect
+    const [prevSplitEqual, setPrevSplitEqual] = useState(currentSplitEqual);
+    const originalItemMappings = React.useRef<Record<string, string[]>>({});
+
+    // Sinkronisasi state dari Firebase (Render-phase update)
+    // Ini cara resmi dari React buat gantiin useEffect di kasus seperti ini
+    if (currentSplitEqual !== prevSplitEqual) {
+        setPrevSplitEqual(currentSplitEqual);
+        setIsEqualSplit(currentSplitEqual);
+    }
     
     // Modal Item States
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -435,32 +439,15 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
     const [itemIds, setItemIds] = useState<(string | null)[]>([]);
 
-    // Real-time items listener from Firebase
-    useEffect(() => {
-        if (!userId || !eventId || !activityId) return;
-
-        const itemsRef = collection(
-            db,
-            "users",
-            userId,
-            "events",
-            eventId,
-            "activities",
-            activityId,
-            "items"
-        );
-
-        const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
-            const itemsList = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as Item[];
-            setItems(itemsList);
-            setItemIds(itemsList.map(item => item.id ?? null));
-        });
-
-        return () => unsubscribe();
-    }, [userId, eventId, activityId]);
+    // When activityId changes, reset items to what is stored in the events prop.
+    // Using render-phase state reset (React-recommended alternative to useEffect + setState).
+    const [prevActivityId, setPrevActivityId] = useState(activityId);
+    if (prevActivityId !== activityId) {
+        setPrevActivityId(activityId);
+        const activityItems = (activity?.items ?? []) as Item[];
+        setItems(activityItems);
+        setItemIds(activityItems.map((item) => item.id ?? null));
+    }
 
     // Calculations - Now based on items from Firebase
     const subTotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
@@ -522,8 +509,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 // Delete from local state
                 setItems(prev => prev.filter((_, i) => i !== idx));
                 setItemIds(prev => prev.filter((_, i) => i !== idx));
-            } catch (error) {
-                console.error("Error deleting item:", error);
+            } catch {
                 alert("Failed to delete item.");
             }
         }
@@ -573,8 +559,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 }
             }
             setIsModalOpen(false);
-        } catch (error) {
-            console.error("Error saving item:", error);
+        } catch {
             alert("Failed to save item.");
         }
     };
@@ -604,6 +589,62 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
             
             {/* Items List */}
             <div className="flex-1 overflow-y-auto p-0 pb-40">
+                
+                {/* Equal Split Toggle */}
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-ui-black">Equal Split</span>
+                        <span className="text-[10px] text-gray-400 font-medium">Bagi rata semua item ke semua partisipan</span>
+                    </div>
+                    <Toggle 
+                        label="" // label dikosongin biar ngga dobel teks
+                        checked={isEqualSplit}
+                        onChange={async (val) => {
+                            if (!userId || !eventId || !activityId || !activity) return;
+
+                            // 1. Optimistic update UI
+                            setIsEqualSplit(val);
+
+                            try {
+                                const batch = writeBatch(db);
+                                
+                                // 2. Update status isSplitEqual
+                                const activityRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId));
+                                batch.update(activityRef, { isSplitEqual: val });
+
+                                const allParticipantNames = activity.participants?.map((p) => p.name) || [];
+
+                                // 3. Update semua items
+                                if (val === true) {
+                                    items.forEach((item) => {
+                                        if (!item.id) return;
+                                        originalItemMappings.current[item.id] = item.memberNames; // Save backup
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: allParticipantNames });
+                                    });
+                                } else {
+                                    items.forEach((item) => {
+                                        if (!item.id) return;
+                                        const originalMembers = originalItemMappings.current[item.id] || []; 
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: originalMembers });
+                                    });
+                                }
+
+                                // 4. Commit batch
+                                await batch.commit();
+                                console.log("Berhasil atomic update isSplitEqual & item members!");
+                                
+                            } catch (error) {
+                                console.error("Firebase update error:", error);
+                                setIsEqualSplit(!val); // Revert UI kalo error
+                            }
+                        }}
+                    />
+                </div>
+
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr className="text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -814,8 +855,7 @@ export default function DesktopDashboard() {
             setEventsLoading(true);
             const data = await getEventsWithActivities(userId);
             setEvents(data);
-        } catch (error) {
-            console.error("Error loading events:", error);
+        } catch {
             setEvents([]);
         } finally {
             setEventsLoading(false);
@@ -863,8 +903,7 @@ export default function DesktopDashboard() {
             
             // Refresh from Firebase
             await refreshEvents();
-        } catch (error) {
-            console.error("Error deleting activity:", error);
+        } catch {
             alert("Failed to delete activity.");
         } finally {
             setActivityToDelete(null);
@@ -946,8 +985,7 @@ export default function DesktopDashboard() {
             setShowActivityModal(false); 
             setEditingActivity(null); 
             setRefreshKey(prev => prev + 1);
-        } catch (error) {
-            console.error("Error creating/updating activity:", error);
+        } catch {
             alert("Failed to save activity. Please try again.");
             setIsLoading(false);
         }

@@ -11,6 +11,8 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   deleteUser,
+  browserLocalPersistence,
+  setPersistence,
 } from "firebase/auth";
 import { addDocument, queryDocuments, updateDocument, deleteDocument } from "./firebase-db";
 import { where } from "firebase/firestore";
@@ -90,35 +92,21 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
 };
 
 // ============================================================================
-// SIGN IN WITH GOOGLE
+// SIGN IN WITH GOOGLE  (popup-based)
 // ============================================================================
 
-// Module-level lock to prevent concurrent signInWithPopup calls
-// (React Strict Mode double-mount or rapid clicks)
-let _googlePopupInFlight = false;
-
 export const signInWithGoogle = async (): Promise<User> => {
-  // Guard: if a popup is already open, wait for it instead of opening another
-  if (_googlePopupInFlight) {
-    throw new Error("__CANCELLED_POPUP__");
-  }
-  _googlePopupInFlight = true;
+  // Ensure session persists in localStorage (survives page refresh)
+  await setPersistence(auth, browserLocalPersistence);
 
-  try {
-    const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
-    const user = userCredential.user;
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
 
-    // Fire-and-forget: create user doc in Firestore if needed (don't block redirect)
-    ensureUserDocument(user);
-
-    return user;
-  } catch (error) {
-    const authError = error as AuthError;
-    throw new Error(getAuthErrorMessage(authError));
-  } finally {
-    _googlePopupInFlight = false;
-  }
+  const userCredential = await signInWithPopup(auth, provider);
+  const user = userCredential.user;
+  // Fire-and-forget: create Firestore doc if first time
+  ensureUserDocument(user);
+  return user;
 };
 
 // Background helper — ensures a Firestore user doc exists without blocking sign-in
@@ -135,7 +123,6 @@ const ensureUserDocument = async (user: User) => {
       });
     }
   } catch (error) {
-    console.error("Error ensuring user document:", error);
   }
 };
 
@@ -146,8 +133,7 @@ const ensureUserDocument = async (user: User) => {
 export const logout = async (): Promise<void> => {
   try {
     await signOut(auth);
-  } catch (error) {
-    console.error("Error signing out:", error);
+} catch (error) {
     throw error;
   }
 };
@@ -169,7 +155,6 @@ export const getUserProfile = async (uid: string) => {
     const users = await queryDocuments("users", [where("uid", "==", uid)]);
     return users.length > 0 ? users[0] : null;
   } catch (error) {
-    console.error("Error getting user profile:", error);
     throw error;
   }
 };
@@ -191,7 +176,6 @@ export const updateUserProfile = async (
       throw new Error("User profile not found");
     }
   } catch (error) {
-    console.error("Error updating user profile:", error);
     throw error;
   }
 };

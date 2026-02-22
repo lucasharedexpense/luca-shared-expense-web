@@ -12,10 +12,17 @@ import {
   LucideIcon // Import tipe LucideIcon buat InfoChip
 } from "lucide-react";
 import AvatarStack from "@/components/ui/AvatarStack";
-import { Event } from "@/lib/dummy-data"; 
+
+interface EventHeaderData {
+  title: string;
+  location: string;
+  date: string;
+  imageUrl: string;
+  participants?: { name: string; avatarName?: string }[];
+}
 
 interface EventHeaderCardProps {
-  event: Event;
+  event: EventHeaderData;
   onBackClick: () => void;
   onEditClick: () => void;
   onDeleteClick: () => void;

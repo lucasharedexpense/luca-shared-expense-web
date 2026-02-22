@@ -81,7 +81,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
 
   // Handle Navigasi dari Navbar Bawah
   const handleNavSelect = (index: number) => {
-    if (index === 0) router.push("/scan");
+    if (index === 0) router.push("/scan/camera");
     if (index === 1) router.push("/");
     if (index === 2) router.push("/contacts");
   };
@@ -96,11 +96,21 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           <Header 
             variant={headerVariant} 
             onLeftIconClick={() => {
-              // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home. Kalau mode lain (Details), Back.
+              // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home.
+              // Kalau Activity Details, balik ke event detail langsung.
+              // Kalau mode lain (Details), Back.
               if (headerVariant === "HOME") {
                 setIsSidebarOpen(true);
               } else if (headerVariant === "SCAN") {
                 router.push("/home");
+              } else if (headerVariant === "ACTIVITY_DETAILS") {
+                // Ekstrak eventId dari pathname: /event/[id]/activity/[activityid]
+                const match = pathname.match(/^\/event\/([^/]+)\/activity/);
+                if (match) {
+                  router.push(`/event/${match[1]}`);
+                } else {
+                  router.back();
+                }
               } else {
                 router.back();
               }
@@ -122,8 +132,8 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
           onItemSelected={handleNavSelect}
           // Tombol Plus di Navbar mengarah ke halaman Add Event
           onAddClick={() => router.push("/new-event")}
-          // Tombol Scan mengarah ke halaman Scan (kamera akan terbuka otomatis)
-          onScanClick={() => router.push("/scan")}
+          // Tombol Scan mengarah langsung ke kamera (otomatis detect mobile/desktop)
+          onScanClick={() => router.push("/scan/camera")}
         />
       )}
 

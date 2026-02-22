@@ -2,16 +2,17 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Edit2, Trash2, Plus, ScanLine } from "lucide-react";
-import { Item } from "@/lib/dummy-data";
+import { Edit2, Plus, ScanLine } from "lucide-react";
+import type { ActivityItem } from "@/lib/firestore";
 
 // Item as stored in Firestore includes an `id` field from doc.id
+type Item = ActivityItem;
 type ItemWithId = Item & { id: string };
 import { useAuth } from "@/lib/useAuth";
 import { getEventsWithActivities } from "@/lib/firestore";
 import { Wave } from "@/components/ui/Icons"; // Pastikan path import Wave benar
 import Toggle from "@/components/ui/Toggle";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // --- 1. COMPONENT TERPISAH: RECEIPT ITEM ---
@@ -64,7 +65,7 @@ function ReceiptItem({ item, getAvatarByName }: ReceiptItemProps) {
                                 style: "currency", 
                                 currency: "IDR", 
                                 minimumFractionDigits: 0 
-                            }).format(item.discountAmount)}
+                            }).format(item.discountAmount ?? 0)}
                         </span>
                     )}
                 </div>
@@ -94,10 +95,13 @@ export default function ActivityDetailPage() {
   
   // State
   const [eventData, setEventData] = useState<{ id: string; participants?: { name: string; avatarName?: string }[] } | null>(null);
-  const [activityData, setActivityData] = useState<{ id: string; title: string; payerName: string; category?: string; participants?: { name: string; avatarName?: string }[] } | null>(null);
+  const [activityData, setActivityData] = useState<{ id: string; title: string; payerName: string; category?: string; isSplitEqual?: boolean; participants?: { name: string; avatarName?: string }[] } | null>(null);
   const [items, setItems] = useState<ItemWithId[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEqualSplit, setIsEqualSplit] = useState(false);
+
+  // Pake useRef biar nilainya nggak hilang/nyangkut pas toggle dipencet bolak-balik
+  const originalItemMappings = React.useRef<Record<string, string[]>>({});
   
   // Unwrap params
   const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -120,8 +124,10 @@ export default function ActivityDetailPage() {
         
         setEventData(event || null);
         setActivityData(activity || null);
+
+        // Ambil nilai isEqualSplit dari Firebase dan pasang ke state toggle
+        setIsEqualSplit(activity?.isSplitEqual ?? false);
       } catch (error) {
-        console.error("Error fetching activity:", error);
         setEventData(null);
         setActivityData(null);
       } finally {
@@ -263,8 +269,50 @@ export default function ActivityDetailPage() {
                     <Toggle 
                         label="Equal Split"
                         checked={isEqualSplit}
-                        onChange={(val) => {
+                        onChange={async (val) => {
+                            console.log("Toggle diklik! Nilai baru:", val);
+                            if (!userId || !eventId || !activityId || !activityData) return;
+
+                            // 1. Ganti state UI seketika
                             setIsEqualSplit(val);
+
+                            try {
+                                const batch = writeBatch(db);
+                                
+                                // 2. Update status isSplitEqual ke dalam batch
+                                const activityRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId));
+                                batch.update(activityRef, { isSplitEqual: val });
+
+                                const allParticipantNames = activityData.participants?.map((p) => p.name) || [];
+
+                                // 3. Update semua items
+                                if (val === true) {
+                                    // JADI TRUE: Backup dulu ke useRef, baru timpa pake semua nama
+                                    items.forEach((item) => {
+                                        originalItemMappings.current[item.id] = item.memberNames; // Save backup
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: allParticipantNames });
+                                    });
+                                } else {
+                                    // JADI FALSE: Panggil backup dari useRef
+                                    items.forEach((item) => {
+                                        // Ambil backup. Kalo aneh-aneh kosong, minimal balikin array kosong biar ga error
+                                        const originalMembers = originalItemMappings.current[item.id] || []; 
+                                        
+                                        const itemRef = doc(db, "users", String(userId), "events", String(eventId), "activities", String(activityId), "items", item.id);
+                                        batch.update(itemRef, { memberNames: originalMembers });
+                                    });
+                                }
+
+                                // 4. Tembak semuanya ke database secara bersamaan (Atomic)
+                                await batch.commit();
+                                console.log("Berhasil atomic update isSplitEqual & item members!");
+                                
+                            } catch (error) {
+                                console.error("Firebase update error:", error);
+                                setIsEqualSplit(!val); // Kalo gagal, balikin UI toggle-nya
+                            }
                         }}
                     />
                 </div>
@@ -368,16 +416,6 @@ export default function ActivityDetailPage() {
       </div>
 
       <div className="fixed bottom-30 right-5 z-20">
-          <button 
-            //  logic delete taro sini
-             onClick={() => {}}
-             className="w-14 h-14 bg-ui-accent-red text-ui-white rounded-full shadow-lg shadow-black/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/10"
-          >
-             <Trash2 className="w-6 h-6" />
-          </button>
-      </div>
-
-      <div className="fixed bottom-48 right-5 z-20">
           <button 
              onClick={() => router.push(`/scan/camera?eventId=${eventId}&activityId=${activityId}`)}
              className="w-14 h-14 bg-ui-white text-ui-black rounded-full shadow-lg shadow-black/20 flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-ui-grey/20"

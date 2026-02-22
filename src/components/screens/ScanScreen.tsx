@@ -52,7 +52,6 @@ export default function ScanPage() {
       } catch (error) {
         if (!isMounted) return;
         
-        console.error("Error accessing camera:", error);
         let errorMsg = "Unable to access camera";
         
         if (error instanceof DOMException) {
@@ -67,14 +66,12 @@ export default function ScanPage() {
       }
     };
 
-    // Only start camera if on scan page
     if (pathname === "/scan/camera") {
       startCamera();
     } else {
       stopCameraMedia();
     }
 
-    // Cleanup: Stop camera when component unmounts or pathname changes
     return () => {
       isMounted = false;
       stopCameraMedia();
@@ -89,7 +86,6 @@ export default function ScanPage() {
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
         
-        // Download the image atau proses lebih lanjut
         const link = document.createElement("a");
         link.href = canvasRef.current.toDataURL("image/jpeg");
         link.download = `receipt-${Date.now()}.jpg`;
