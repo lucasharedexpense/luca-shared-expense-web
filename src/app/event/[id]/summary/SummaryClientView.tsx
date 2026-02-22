@@ -82,15 +82,12 @@ function SummaryTabSwitcher({
 function SettlementCard({
   item,
   participants,
-  onToggle,
 }: {
   item: SettlementWithPaid;
   participants: SummaryParticipant[];
-  onToggle: () => void;
 }) {
   return (
     <div
-      onClick={onToggle}
       className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
         item.isPaid
           ? "bg-gray-50 border-transparent opacity-80"
@@ -139,6 +136,19 @@ function SettlementCard({
           {" pays "}
           <span className="font-bold text-ui-black">{item.toName}</span>
         </p>
+      </div>
+
+      {/* Amount & Status */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col items-end">
+          <span
+            className={`font-bold ${
+              item.isPaid ? "line-through text-gray-400" : "text-ui-black"
+            }`}
+          >
+            {formatCurrency(item.amount)}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -308,7 +318,6 @@ export default function SummaryClientView({
                           key={item.id}
                           item={{ ...item, isPaid }}
                           participants={data.participants}
-                          onToggle={() => togglePaid(item.id)}
                         />
                       );
                     })}

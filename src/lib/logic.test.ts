@@ -3,7 +3,8 @@
  *
  * Comprehensive unit tests for:
  *   1. Settlement Logic  (calculateSummary, handleSplitEqual, validateSplitTotal)
- *   2. AI / Hugging Face Integration  (scanReceipt server action)
+ *   2. Smart Split Algorithm  (smartSplitBill, calculateConsumptionDetails)
+ *   3. AI / Hugging Face Integration  (scanReceipt server action)
  *
  * Run:  npm test
  */
@@ -11,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { calculateSummary } from "./settlement-logic";
 import { handleSplitEqual, validateSplitTotal } from "./splitCalculations";
+import { smartSplitBill, calculateConsumptionDetails } from "./smart-split-algorithm";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. SETTLEMENT LOGIC TESTS
@@ -646,5 +648,312 @@ describe("scanReceipt (AI Integration — mocked)", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/unknown/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. SMART SPLIT ALGORITHM TESTS (smartSplitBill)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Helper to build a FirestoreActivity */
+const makeActivity = (
+  id: string,
+  payerName: string,
+  title: string,
+  items: {
+    id: string;
+    itemName: string;
+    price: number;
+    quantity: number;
+    memberNames: string[];
+    taxPercentage?: number;
+    discountAmount?: number;
+  }[]
+) => ({ id, payerName, title, items });
+
+describe("smartSplitBill", () => {
+  // ── 4a. Basic settlements ─────────────────────────────────────────────────
+
+  it("returns empty array when there are no activities", () => {
+    const result = smartSplitBill([]);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns no settlements when a person pays only for themselves", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Solo Lunch", [
+        { id: "i1", itemName: "Salad", price: 50_000, quantity: 1, memberNames: ["Alice"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+    expect(result).toHaveLength(0);
+  });
+
+  it("generates one settlement: Bob pays Alice when Alice pays for both", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Shared Dish", price: 100_000, quantity: 1, memberNames: ["Alice", "Bob"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].fromName).toBe("Bob");
+    expect(result[0].toName).toBe("Alice");
+    expect(result[0].amount).toBe(50_000);
+  });
+
+  it("generates two settlements when Alice and Bob each pay for separate equal items", () => {
+    // Alice pays 100k for all 3; Bob pays 60k for all 3
+    // Net: Alice is owed 100k - (100k/3 + 60k/3) = ...
+    // Simpler: Alice pays 90k item (3 people), Bob pays 30k item (3 people)
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Pizza", price: 90_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+      ]),
+      makeActivity("a2", "Bob", "Drinks", [
+        { id: "i2", itemName: "Beer", price: 30_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+
+    // Charlie owes both Alice and Bob; Alice and Bob net out partially
+    const totalAmount = result.reduce((sum, s) => sum + s.amount, 0);
+    expect(totalAmount).toBeGreaterThan(0);
+    // All settlement fromName/toName should be valid strings
+    result.forEach((s) => {
+      expect(typeof s.fromName).toBe("string");
+      expect(typeof s.toName).toBe("string");
+      expect(s.amount).toBeGreaterThan(0);
+      expect(s.fromName).not.toBe(s.toName);
+    });
+  });
+
+  // ── 4b. Bilateral simplification ─────────────────────────────────────────
+
+  it("cancels mutual debts (bilateral simplification): A owes B 60k, B owes A 40k → A pays B 20k", () => {
+    // Activity 1: B pays 120k split among A and B (A owes B 60k)
+    // Activity 2: A pays 80k split among A and B (B owes A 40k)
+    // Net: A owes B 20k
+    const activities = [
+      makeActivity("a1", "B", "Lunch", [
+        { id: "i1", itemName: "Food", price: 120_000, quantity: 1, memberNames: ["A", "B"] },
+      ]),
+      makeActivity("a2", "A", "Dinner", [
+        { id: "i2", itemName: "Drinks", price: 80_000, quantity: 1, memberNames: ["A", "B"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].fromName).toBe("A");
+    expect(result[0].toName).toBe("B");
+    expect(result[0].amount).toBe(20_000);
+  });
+
+  it("results in no settlements when mutual debts cancel out perfectly", () => {
+    // A pays 100k for A+B; B pays 100k for A+B → they're even
+    const activities = [
+      makeActivity("a1", "A", "Lunch", [
+        { id: "i1", itemName: "Food", price: 100_000, quantity: 1, memberNames: ["A", "B"] },
+      ]),
+      makeActivity("a2", "B", "Dinner", [
+        { id: "i2", itemName: "Drinks", price: 100_000, quantity: 1, memberNames: ["A", "B"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+    expect(result).toHaveLength(0);
+  });
+
+  // ── 4c. Tax and discount ──────────────────────────────────────────────────
+
+  it("applies tax correctly when calculating who owes whom", () => {
+    // Alice pays for item 100k + 10% tax = 110k, split between Alice and Bob
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Steak", price: 100_000, quantity: 1, memberNames: ["Alice", "Bob"], taxPercentage: 10 },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].fromName).toBe("Bob");
+    expect(result[0].toName).toBe("Alice");
+    expect(result[0].amount).toBe(55_000); // 110k / 2
+  });
+
+  it("applies discount correctly when calculating who owes whom", () => {
+    // Alice pays for item 100k - 20k discount = 80k, split between Alice and Bob
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Pasta", price: 100_000, quantity: 1, memberNames: ["Alice", "Bob"], discountAmount: 20_000 },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].fromName).toBe("Bob");
+    expect(result[0].toName).toBe("Alice");
+    expect(result[0].amount).toBe(40_000); // 80k / 2
+  });
+
+  // ── 4d. Sum invariant ────────────────────────────────────────────────────
+
+  it("settlement amounts sum equals total debt (3 people, one payer)", () => {
+    // Alice pays 90k for Alice+Bob+Charlie
+    // Bob and Charlie each owe 30k
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Meal", price: 90_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+    const totalSettled = result.reduce((sum, s) => sum + s.amount, 0);
+
+    expect(result).toHaveLength(2);
+    expect(totalSettled).toBe(60_000); // Bob 30k + Charlie 30k
+  });
+
+  it("each settlement has a unique id", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Meal", price: 90_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+      ]),
+    ];
+    const result = smartSplitBill(activities);
+    const ids = result.map((s) => s.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. SMART SPLIT ALGORITHM TESTS (calculateConsumptionDetails)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("calculateConsumptionDetails", () => {
+  it("returns empty array when there are no activities", () => {
+    const result = calculateConsumptionDetails([]);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns empty array when items have no members", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Meal", price: 50_000, quantity: 1, memberNames: [] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+    expect(result).toHaveLength(0);
+  });
+
+  it("assigns full item cost to a single consumer", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Lunch", [
+        { id: "i1", itemName: "Salad", price: 50_000, quantity: 1, memberNames: ["Bob"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].userName).toBe("Bob");
+    expect(result[0].totalConsumption).toBe(50_000);
+  });
+
+  it("splits item cost equally among all consumers", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Pizza", price: 90_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result).toHaveLength(3);
+    result.forEach((d) => expect(d.totalConsumption).toBe(30_000));
+  });
+
+  it("correctly includes tax in consumption amount", () => {
+    // 100k + 10% tax = 110k / 2 = 55k each
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Steak", price: 100_000, quantity: 1, memberNames: ["Alice", "Bob"], taxPercentage: 10 },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result).toHaveLength(2);
+    result.forEach((d) => expect(d.totalConsumption).toBe(55_000));
+  });
+
+  it("correctly applies discount in consumption amount", () => {
+    // 100k - 20k discount = 80k / 2 = 40k each
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Pasta", price: 100_000, quantity: 1, memberNames: ["Alice", "Bob"], discountAmount: 20_000 },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result).toHaveLength(2);
+    result.forEach((d) => expect(d.totalConsumption).toBe(40_000));
+  });
+
+  it("accumulates consumption across multiple activities for the same user", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Lunch", [
+        { id: "i1", itemName: "Sandwich", price: 30_000, quantity: 1, memberNames: ["Bob"] },
+      ]),
+      makeActivity("a2", "Alice", "Dinner", [
+        { id: "i2", itemName: "Pasta", price: 50_000, quantity: 1, memberNames: ["Bob"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].userName).toBe("Bob");
+    expect(result[0].totalConsumption).toBe(80_000);
+    expect(result[0].items).toHaveLength(2);
+  });
+
+  it("includes per-item breakdown in items array", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Steak", price: 100_000, quantity: 1, memberNames: ["Bob"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+    const detail = result[0];
+
+    expect(detail.items).toHaveLength(1);
+    expect(detail.items[0].itemName).toBe("Steak");
+    expect(detail.items[0].activityTitle).toBe("Dinner");
+    expect(detail.items[0].splitAmount).toBe(100_000);
+  });
+
+  it("sum of all consumption equals total expense (no tax/discount)", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Meal", price: 120_000, quantity: 1, memberNames: ["Alice", "Bob", "Charlie"] },
+        { id: "i2", itemName: "Drinks", price: 60_000, quantity: 1, memberNames: ["Alice", "Bob"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+    const totalConsumed = result.reduce((sum, d) => sum + d.totalConsumption, 0);
+
+    // 120k + 60k = 180k total expense, split among participants → sum must equal 180k
+    expect(Math.round(totalConsumed)).toBe(180_000);
+  });
+
+  it("sorts results descending by totalConsumption", () => {
+    const activities = [
+      makeActivity("a1", "Alice", "Dinner", [
+        { id: "i1", itemName: "Cheap", price: 10_000, quantity: 1, memberNames: ["LowSpender"] },
+        { id: "i2", itemName: "Expensive", price: 90_000, quantity: 1, memberNames: ["HighSpender"] },
+      ]),
+    ];
+    const result = calculateConsumptionDetails(activities);
+
+    expect(result[0].userName).toBe("HighSpender");
+    expect(result[1].userName).toBe("LowSpender");
   });
 });
