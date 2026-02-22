@@ -85,27 +85,39 @@ export default function EventHeaderCard({
       </div>
 
       {/* --- 3. MAIN CONTENT (Bottom) --- */}
-      <div className="absolute bottom-0 left-0 w-full p-5 z-10 flex flex-col items-start">
-        
-        {/* Title Besar */}
-        <h1 className={`text-2xl font-bold font-display leading-tight mb-3 line-clamp-2 drop-shadow-sm ${hasImage ? 'text-white' : 'text-ui-black'}`}>
-          {event.title}
-        </h1>
+      <div className="absolute bottom-0 left-0 w-full px-5 pb-5 z-10 flex flex-row items-end justify-between gap-3">
 
-        {/* Chips Row (Location & Date) */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <InfoChip icon={MapPin} text={event.location} />
-          <InfoChip icon={Calendar} text={event.date} />
+        {/* LEFT: Title pill + Location */}
+        <div className="flex flex-col items-start gap-1.5 flex-1 min-w-0">
+          {/* Title inside white rounded pill */}
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-4 py-2 shadow-sm max-w-full">
+            <h1 className="text-lg font-bold font-display leading-tight text-ui-black line-clamp-2">
+              {event.title}
+            </h1>
+          </div>
+
+          {/* Location */}
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-sm flex items-center gap-1.5 max-w-full">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-ui-accent-yellow" />
+            <span className="text-xs font-semibold truncate text-ui-black">
+              {event.location}
+            </span>
+          </div>
         </div>
 
-        {/* Avatar Stack */}
-        <div className="pl-1">
-             <AvatarStack 
-                avatars={participantAvatars} 
-                size={32} 
-                limit={4}
-                overlap={-10}
-            />
+        {/* RIGHT: Avatars + Date */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <AvatarStack
+            avatars={participantAvatars}
+            size={32}
+            limit={3}
+            overlap={-10}
+          />
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-sm">
+            <span className="text-xs font-semibold text-ui-black">
+              {event.date}
+            </span>
+          </div>
         </div>
       </div>
     </div>
