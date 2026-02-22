@@ -11,11 +11,45 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  getDoc,
+  where,
   QueryDocumentSnapshot,
   DocumentData,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+
+// ==================== TYPE DEFINITIONS ====================
+
+/**
+ * Extended Firestore database type with internal projectId property
+ */
+interface FirestoreDatabase {
+  projectId?: string;
+}
+
+// ==================== HELPERS ====================
+
+/**
+ * Get the Firestore document ID for a user by their auth UID
+ * This is CRITICAL: Auth UID ≠ Firestore Document ID
+ */
+async function getUserDocId(uid: string): Promise<string> {
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("uid", "==", uid));
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      throw new Error(`User document not found for UID: ${uid}`);
+    }
+    const userDocId = querySnapshot.docs[0].id;
+    console.log("[Firestore] Resolved UID", uid, "to Document ID:", userDocId);
+    return userDocId;
+  } catch (_error) {
+    console.error("[Firestore] Error resolving user document ID:", _error);
+    throw _error;
+  }
+}
 
 // ==================== HELPERS ====================
 
@@ -184,36 +218,44 @@ async function getActivitiesForEvent(
     );
 
     return activities;
-  } catch (error) {
+  } catch (_error) {
     return []; // Return empty array if error
   }
 }
 
 /**
  * Fetch all events with their activities for a user
- * Path: users/{userId}/events → users/{userId}/events/{eventId}/activities
+ * Path: users/{userDocId}/events → users/{userDocId}/events/{eventId}/activities
  * 
- * @param userId - The user ID to fetch events for
+ * @param userId - The Firebase Auth UID (will be resolved to Firestore document ID)
  * @returns Promise<EventWithActivities[]> - Array of events with nested activities
  */
 export async function getEventsWithActivities(
   userId: string
 ): Promise<EventWithActivities[]> {
   try {
+    console.log("[Firestore] Fetching events for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
     // Step 1: Fetch all events for this user
-    const eventsRef = collection(db, "users", userId, "events");
+    const eventsRef = collection(db, "users", userDocId, "events");
     const eventsSnapshot = await getDocs(eventsRef);
 
     if (eventsSnapshot.empty) {
+      console.log("[Firestore] No events found for user");
       return [];
     }
+
+    console.log("[Firestore] Found", eventsSnapshot.size, "events");
 
     // Step 2: For each event, fetch its activities in parallel
     const eventsWithActivitiesPromises = eventsSnapshot.docs.map(
       async (eventDoc) => {
         const event = docToEvent(eventDoc);
         // Fetch activities for this event (nested sub-collection)
-        const activities = await getActivitiesForEvent(userId, event.id);
+        const activities = await getActivitiesForEvent(userDocId, event.id);
         // Combine event with its activities and add title field for component compatibility
         return {
           ...event,
@@ -232,6 +274,7 @@ export async function getEventsWithActivities(
 
     return eventsWithActivities;
   } catch (error) {
+    console.error("[Firestore] Error fetching events:", error);
     return [];
   }
 }
@@ -244,10 +287,15 @@ export async function getEventWithActivities(
   eventId: string
 ): Promise<EventWithActivities | null> {
   try {
+    console.log("[Firestore] Fetching event", eventId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
     const activitiesRef = collection(
       db,
       "users",
-      userId,
+      userDocId,
       "events",
       eventId,
       "activities"
@@ -255,13 +303,14 @@ export async function getEventWithActivities(
 
     // Fetch event document and activities in parallel
     const [eventSnapshot, activitiesSnapshot] = await Promise.all([
-      getDocs(query(collection(db, "users", userId, "events"))),
+      getDocs(query(collection(db, "users", userDocId, "events"))),
       getDocs(activitiesRef),
     ]);
 
     // Find the specific event
     const eventDoc = eventSnapshot.docs.find((doc) => doc.id === eventId);
     if (!eventDoc) {
+      console.warn("[Firestore] Event not found:", eventId);
       return null;
     }
 
@@ -273,6 +322,7 @@ export async function getEventWithActivities(
       activities,
     };
   } catch (error) {
+    console.error("[Firestore] Error fetching event:", error);
     return null;
   }
 }
@@ -289,7 +339,8 @@ export interface CreateEventData {
 }
 
 /**
- * Create a new event under users/{userId}/events
+ * Create a new event under users/{userDocId}/events
+ * IMPORTANT: Uses Firestore document ID (not Auth UID)
  * Returns the new event ID
  */
 export async function createEvent(
@@ -297,8 +348,15 @@ export async function createEvent(
   data: CreateEventData
 ): Promise<string> {
   try {
-    const eventsRef = collection(db, "users", userId, "events");
-    const docRef = await addDoc(eventsRef, {
+    console.log("[Firestore] Creating event for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const eventsRef = collection(db, "users", userDocId, "events");
+    console.log("[Firestore] Events collection reference path: users/" + userDocId + "/events");
+    
+    const eventDoc = {
       title: data.title,
       location: data.location || "",
       date: typeof data.date === "string" ? data.date : formatDateToDDMMYYYY(data.date),
@@ -307,16 +365,38 @@ export async function createEvent(
       settlementResultJson: "{}",
       createdAt: Date.now(),
       isFinish: 0,
-    });
+    };
+    
+    console.log("[Firestore] Document to save:", eventDoc);
+    
+    const docRef = await addDoc(eventsRef, eventDoc);
+    console.log("[Firestore] ✅ Event created successfully with ID:", docRef.id);
+    
+    // Verify the event was actually written by immediately reading it back
+    console.log("[Firestore] Verifying event was written to database...");
+    try {
+      const eventRef = doc(db, "users", userDocId, "events", docRef.id);
+      const verifySnap = await getDoc(eventRef);
+      
+      if (verifySnap.exists()) {
+        console.log("[Firestore] ✅✅ Verification SUCCESS - Event exists in database:", verifySnap.data());
+      } else {
+        console.error("[Firestore] ❌ Verification FAILED - Event does NOT exist in database after creation!");
+      }
+    } catch (verifyError) {
+      console.error("[Firestore] Verification check failed:", verifyError);
+    }
+    
     return docRef.id;
   } catch (error) {
+    console.error("[Firestore] ❌ Error creating event:", error);
     throw error;
   }
 }
 
 /**
  * Update an existing event
- * Path: users/{userId}/events/{eventId}
+ * Path: users/{userDocId}/events/{eventId}
  */
 export async function updateEvent(
   userId: string,
@@ -324,7 +404,12 @@ export async function updateEvent(
   data: Partial<CreateEventData>
 ): Promise<void> {
   try {
-    const eventRef = doc(db, "users", userId, "events", eventId);
+    console.log("[Firestore] Updating event", eventId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const eventRef = doc(db, "users", userDocId, "events", eventId);
     const updateData: Partial<{
       title: string;
       location: string;
@@ -344,30 +429,39 @@ export async function updateEvent(
     if (data.participants !== undefined) updateData.participants = data.participants;
 
     await updateDoc(eventRef, updateData);
+    console.log("[Firestore] Event updated successfully");
   } catch (error) {
+    console.error("[Firestore] Error updating event:", error);
     throw error;
   }
 }
 
 /**
  * Delete an event
- * Path: users/{userId}/events/{eventId}
+ * Path: users/{userDocId}/events/{eventId}
  */
 export async function deleteEvent(
   userId: string,
   eventId: string
 ): Promise<void> {
   try {
-    const eventRef = doc(db, "users", userId, "events", eventId);
+    console.log("[Firestore] Deleting event", eventId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const eventRef = doc(db, "users", userDocId, "events", eventId);
     await deleteDoc(eventRef);
+    console.log("[Firestore] Event deleted successfully");
   } catch (error) {
+    console.error("[Firestore] Error deleting event:", error);
     throw error;
   }
 }
 
 /**
- * Create a new activity under users/{userId}/events/{eventId}/activities
- * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ * Create a new activity under users/{userDocId}/events/{eventId}/activities
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}
  * Returns the new activity ID
  */
 export async function createActivity(
@@ -384,7 +478,12 @@ export async function createActivity(
   }
 ): Promise<string> {
   try {
-    const activitiesRef = collection(db, "users", userId, "events", eventId, "activities");
+    console.log("[Firestore] Creating activity for event", eventId, "user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const activitiesRef = collection(db, "users", userDocId, "events", eventId, "activities");
     
     const docRef = await addDoc(activitiesRef, {
       title: data.title,
@@ -397,15 +496,17 @@ export async function createActivity(
       payerName: data.payerName,
     });
     
+    console.log("[Firestore] Activity created successfully", docRef.id);
     return docRef.id;
   } catch (error) {
+    console.error("[Firestore] Error creating activity:", error);
     throw error;
   }
 }
 
 /**
  * Update an existing activity
- * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}
  */
 export async function updateActivity(
   userId: string,
@@ -422,16 +523,23 @@ export async function updateActivity(
   }>
 ): Promise<void> {
   try {
-    const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
+    console.log("[Firestore] Updating activity", activityId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const activityRef = doc(db, "users", userDocId, "events", eventId, "activities", activityId);
     await updateDoc(activityRef, data);
+    console.log("[Firestore] Activity updated successfully");
   } catch (error) {
+    console.error("[Firestore] Error updating activity:", error);
     throw error;
   }
 }
 
 /**
  * Delete an activity from an event
- * Path: users/{userId}/events/{eventId}/activities/{activityId}
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}
  */
 export async function deleteActivity(
   userId: string,
@@ -439,9 +547,16 @@ export async function deleteActivity(
   activityId: string
 ): Promise<void> {
   try {
-    const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
+    console.log("[Firestore] Deleting activity", activityId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    const activityRef = doc(db, "users", userDocId, "events", eventId, "activities", activityId);
     await deleteDoc(activityRef);
+    console.log("[Firestore] Activity deleted successfully");
   } catch (error) {
+    console.error("[Firestore] Error deleting activity:", error);
     throw error;
   }
 }
@@ -449,8 +564,8 @@ export async function deleteActivity(
 // ==================== CREATE / UPDATE / DELETE ITEM ====================
 
 /**
- * Create a new item under users/{userId}/events/{eventId}/activities/{activityId}/items
- * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ * Create a new item under users/{userDocId}/events/{eventId}/activities/{activityId}/items
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}/items/{itemId}
  * Returns the new item ID
  */
 export async function createItem(
@@ -467,10 +582,15 @@ export async function createItem(
   }
 ): Promise<string> {
   try {
+    console.log("[Firestore] Creating item for activity", activityId, "user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
     const itemsRef = collection(
       db,
       "users",
-      userId,
+      userDocId,
       "events",
       eventId,
       "activities",
@@ -488,15 +608,17 @@ export async function createItem(
       timestamp: Date.now(),
     });
 
+    console.log("[Firestore] Item created successfully", docRef.id);
     return docRef.id;
   } catch (error) {
+    console.error("[Firestore] Error creating item:", error);
     throw error;
   }
 }
 
 /**
  * Update an existing item
- * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}/items/{itemId}
  */
 export async function updateItem(
   userId: string,
@@ -513,10 +635,15 @@ export async function updateItem(
   }>
 ): Promise<void> {
   try {
+    console.log("[Firestore] Updating item", itemId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
     const itemRef = doc(
       db,
       "users",
-      userId,
+      userDocId,
       "events",
       eventId,
       "activities",
@@ -525,14 +652,16 @@ export async function updateItem(
       itemId
     );
     await updateDoc(itemRef, data);
+    console.log("[Firestore] Item updated successfully");
   } catch (error) {
+    console.error("[Firestore] Error updating item:", error);
     throw error;
   }
 }
 
 /**
  * Delete an item from an activity
- * Path: users/{userId}/events/{eventId}/activities/{activityId}/items/{itemId}
+ * Path: users/{userDocId}/events/{eventId}/activities/{activityId}/items/{itemId}
  */
 export async function deleteItem(
   userId: string,
@@ -541,10 +670,15 @@ export async function deleteItem(
   itemId: string
 ): Promise<void> {
   try {
+    console.log("[Firestore] Deleting item", itemId, "for user UID:", userId);
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
     const itemRef = doc(
       db,
       "users",
-      userId,
+      userDocId,
       "events",
       eventId,
       "activities",
@@ -553,7 +687,41 @@ export async function deleteItem(
       itemId
     );
     await deleteDoc(itemRef);
+    console.log("[Firestore] Item deleted successfully");
   } catch (error) {
+    console.error("[Firestore] Error deleting item:", error);
+    throw error;
+  }
+}
+
+/**
+ * Diagnostic function to check Firestore connectivity and database status
+ * This helps troubleshoot why events aren't being written
+ */
+export async function diagnosticCheckFirestore(): Promise<void> {
+  try {
+    console.log("\n=== FIRESTORE DIAGNOSTIC CHECK ===");
+    
+    // Check database instance
+    console.log("[DIAGNOSTIC] Database instance:", db);
+    console.log("[DIAGNOSTIC] Database project ID:", (db as unknown as FirestoreDatabase)?.projectId || "unknown");
+    
+    // Try reading from users collection to verify connectivity
+    const usersRef = collection(db, "users");
+    const usersSnapshot = await getDocs(query(usersRef));
+    console.log("[DIAGNOSTIC] ✅ Firestore connectivity OK - Found", usersSnapshot.size, "users in database");
+    
+    // Check Firestore settings
+    console.log("[DIAGNOSTIC] Firestore configured and responsive");
+    console.log("[DIAGNOSTIC] If events still don't appear:");
+    console.log("   1. Go to Firebase Console > Firestore Database");
+    console.log("   2. Check the Project ID matches:", (db as unknown as FirestoreDatabase)?.projectId);
+    console.log("   3. Verify Security Rules allow writes to users/{uid}/events");
+    console.log("   4. Check Network tab in DevTools for failed requests");
+    
+  } catch (error) {
+    console.error("[DIAGNOSTIC] ❌ FIRESTORE ERROR:", error);
+    console.error("[DIAGNOSTIC] This indicates Firestore is not accessible");
     throw error;
   }
 }

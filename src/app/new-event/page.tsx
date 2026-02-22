@@ -28,6 +28,7 @@ export default function NewEventPage() {
 
     try {
       setSaving(true);
+      console.log("[Event Creation] Starting event creation process for user:", user.uid);
 
       // Map participant IDs to participant objects using firebaseContacts
       const participants = data.participantIds
@@ -56,21 +57,26 @@ export default function NewEventPage() {
 
       // Add the current user as a participant
       participants.unshift(currentUserParticipant);
+      console.log("[Event Creation] Participants prepared:", participants);
 
       // Capture timestamp before creating event
       const eventCreatedAt = Date.now();
-
-      await createEvent(user.uid, {
+      const eventData = {
         title: data.title,
         location: data.location,
         date: data.date ? new Date(data.date) : new Date(),
         participants,
         imageUrl: data.imageUrl || "",
-      });
+      };
+
+      console.log("[Event Creation] Creating event with data:", eventData);
+      const eventId = await createEvent(user.uid, eventData);
+      console.log("[Event Creation] Event created successfully with ID:", eventId);
 
       // Update all selected participants' isEvent array
       if (data.participantIds.length > 0) {
         try {
+          console.log("[Event Creation] Updating contacts for", data.participantIds.length, "participants");
           // Fetch fresh contact data to ensure we have the latest isEvent array
           const latestContacts = await getContacts(user.uid);
           
@@ -85,13 +91,19 @@ export default function NewEventPage() {
             return updateContact(user.uid, id, { isEvent: updatedIsEvent });
           });
           await Promise.all(updatePromises);
-        } catch {
+          console.log("[Event Creation] Participant contacts updated successfully");
+        } catch (contactError) {
+          console.error("[Event Creation] Error updating contacts:", contactError);
+          // Don't fail event creation if contact update fails
         }
       }
 
+      console.log("[Event Creation] Event created successfully! Redirecting to home");
       router.push("/home");
-    } catch {
-      alert("Failed to create event. Please try again.");
+    } catch (error) {
+      console.error("[Event Creation] Error creating event:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to create event: ${errorMessage}`);
     } finally {
       setSaving(false);
     }

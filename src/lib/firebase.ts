@@ -14,6 +14,12 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+console.log("[Firebase] Initializing with config:", {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  storageBucket: firebaseConfig.storageBucket,
+});
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -22,6 +28,8 @@ export const auth = getAuth(app);
 
 // Initialize Firestore
 export const db = getFirestore(app);
+// Ganti (db as any).projectId dengan firebaseConfig.projectId
+console.log("[Firebase] Firestore initialized with project:", firebaseConfig.projectId || "unknown");
 
 // Initialize Firebase Storage
 export const storage = getStorage(app);
