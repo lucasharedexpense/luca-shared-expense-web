@@ -284,4 +284,7 @@ def scan_receipt_full(file: UploadFile = File(...)):
         return {"status": "error", "message": str(e), "raw_ocr": full_text}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, workers=2)
+    port = int(os.environ.get("PORT", 8080))
+    
+    # WAJIB workers=1 agar server Linux tidak kehabisan RAM (OOM)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=1)
