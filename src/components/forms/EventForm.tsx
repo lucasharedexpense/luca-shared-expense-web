@@ -97,18 +97,29 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
   });
 
    // Store only the contact ID in selectedParticipants for true sync
-   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
-      initialData?.participants
-         ? initialData.participants.map((p) => {
-               // Try to find the contact by name and avatarName (legacy events)
-               const found = firebaseContacts.find(
-                  (c) => c.name === p.name && c.avatarName === p.avatarName
-               );
-               return found ? found.id : null;
-            }).filter((id): id is string => id !== null)
-         : []
-   );
-  
+   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+   const [participantsInitialized, setParticipantsInitialized] = useState(false);
+
+   // Populate selectedParticipants once firebaseContacts loads (edit mode)
+   useEffect(() => {
+      if (!isEditing || !initialData?.participants || participantsInitialized) return;
+      if (firebaseContacts.length === 0) return; // wait for contacts to load
+
+      const ids = initialData.participants
+         .map((p) => {
+            // 1. Match by id field if present
+            const byId = 'id' in p && p.id ? firebaseContacts.find((c) => c.id === (p as { id: string }).id) : null;
+            if (byId) return byId.id;
+            // 2. Match by name
+            const byName = firebaseContacts.find((c) => c.name === p.name);
+            return byName ? byName.id : null;
+         })
+         .filter((id): id is string => id !== null);
+
+      setSelectedParticipants(ids);
+      setParticipantsInitialized(true);
+   }, [firebaseContacts, initialData, isEditing, participantsInitialized]);
+
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // --- HANDLERS ---
@@ -296,7 +307,7 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                      <Users className="w-3 h-3" /> Who&apos;s Joining?
                   </label>
                   <span className="text-xs bg-ui-accent-yellow/20 text-ui-dark-grey px-2 py-1 rounded-full font-bold">
-                     {selectedParticipants.length} people
+                     {isEditing && contactsLoading ? "Loading..." : `${selectedParticipants.length} people`}
                   </span>
                </div>
                
@@ -308,6 +319,15 @@ export default function EventForm({ initialData, isEditing = false, onSubmit }: 
                  >
                     <Plus className="w-5 h-5 text-ui-dark-grey group-hover:text-ui-accent-yellow" />
                  </button>
+
+                 {/* Loading skeleton while contacts load in edit mode */}
+                 {isEditing && contactsLoading && (
+                   <>
+                     {[0, 1, 2].map((i) => (
+                       <div key={i} className="w-12 h-12 rounded-full bg-ui-dark-grey/10 animate-pulse shrink-0" />
+                     ))}
+                   </>
+                 )}
 
                           {selectedParticipants.map((id) => {
                              const contact = firebaseContacts.find((c) => c.id === id);

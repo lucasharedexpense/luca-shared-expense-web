@@ -10,7 +10,10 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
+  Flag,
+  Loader2,
 } from "lucide-react";
+import { updateEvent, removeEventFromContactsIsEvent } from "@/lib/firestore";
 import type {
   SummaryPageData,
   SummaryParticipant,
@@ -79,13 +82,16 @@ function SummaryTabSwitcher({
 function SettlementCard({
   item,
   participants,
+  onToggle,
 }: {
   item: SettlementWithPaid;
   participants: SummaryParticipant[];
+  onToggle: () => void;
 }) {
   return (
     <div
-      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+      onClick={onToggle}
+      className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
         item.isPaid
           ? "bg-gray-50 border-transparent opacity-80"
           : "bg-white border-ui-accent-yellow/50 shadow-sm"
@@ -133,6 +139,35 @@ function SettlementCard({
           {" pays "}
           <span className="font-bold text-ui-black">{item.toName}</span>
         </p>
+      </div>
+
+      {/* Amount & Status */}
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col items-end">
+          <span
+            className={`font-bold ${
+              item.isPaid ? "line-through text-gray-400" : "text-ui-black"
+            }`}
+          >
+            {formatCurrency(item.amount)}
+          </span>
+          {item.isPaid ? (
+            <span className="text-[10px] font-bold text-green-600 flex items-center gap-0.5">
+              PAID <Check className="w-3 h-3" />
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-red-400">UNPAID</span>
+          )}
+        </div>
+
+        {/* Checkbox */}
+        <div
+          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+            item.isPaid ? "bg-green-500 border-green-500" : "border-gray-300"
+          }`}
+        >
+          {item.isPaid && <Check className="w-3.5 h-3.5 text-white" />}
+        </div>
       </div>
     </div>
   );
@@ -213,13 +248,40 @@ function UserConsumptionCard({
 
 export default function SummaryClientView({
   data,
+  userId,
 }: {
   data: SummaryPageData;
+  userId: string;
 }) {
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState<"SETTLEMENT" | "DETAILS">(
     "SETTLEMENT",
   );
+  const [paidSettlementIds, setPaidSettlementIds] = useState<string[]>([]);
+  const [finishingEvent, setFinishingEvent] = useState(false);
+
+  const togglePaid = (id: string) => {
+    setPaidSettlementIds((prev) =>
+      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id],
+    );
+  };
+
+  const handleFinishEvent = async () => {
+    try {
+      setFinishingEvent(true);
+      // Remove event from all contacts' isEvent arrays
+      await removeEventFromContactsIsEvent(userId, data.eventId);
+      // Mark event as finished
+      await updateEvent(userId, data.eventId, { isFinish: 1 });
+      // Redirect to home page after finishing event
+      router.push("/home");
+    } catch (_error) {
+      console.error("Error finishing event:", _error);
+      alert("Failed to finish event. Please try again.");
+    } finally {
+      setFinishingEvent(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen w-full bg-ui-accent-yellow">
@@ -231,6 +293,12 @@ export default function SummaryClientView({
         <div className="flex-1 overflow-y-auto no-scrollbar pb-32">
           {/* Header */}
           <div className="pt-6 px-6 flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 text-ui-black" />
+            </button>
             <h2 className="text-xl font-bold text-ui-black">
               {data.eventName}
             </h2>
@@ -269,11 +337,13 @@ export default function SummaryClientView({
                 ) : (
                   <div className="flex flex-col gap-3">
                     {data.settlements.map((item) => {
+                      const isPaid = paidSettlementIds.includes(item.id);
                       return (
                         <SettlementCard
                           key={item.id}
-                          item={{ ...item, isPaid: false }}
+                          item={{ ...item, isPaid }}
                           participants={data.participants}
+                          onToggle={() => togglePaid(item.id)}
                         />
                       );
                     })}
@@ -304,6 +374,41 @@ export default function SummaryClientView({
             )}
           </div>
         </div>
+
+        {/* Bottom Buttons */}
+        {currentTab === "SETTLEMENT" && (
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pt-10 flex flex-col gap-3">
+            <button
+              onClick={() => {
+                // TODO: Implement share settlement plan
+              }}
+              className="w-full h-14 bg-ui-black text-white rounded-full shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg"
+            >
+              <Share2 className="w-5 h-5" />
+              <span className="mt-0.5">Share Settlement Plan</span>
+            </button>
+
+            {data.isFinish !== 1 && (
+              <button
+                onClick={handleFinishEvent}
+                disabled={finishingEvent}
+                className="w-full h-14 bg-ui-accent-yellow text-ui-black rounded-full shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {finishingEvent ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="mt-0.5">Finishing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Flag className="w-5 h-5" />
+                    <span className="mt-0.5">Finish Event</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

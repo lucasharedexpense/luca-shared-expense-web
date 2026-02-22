@@ -67,6 +67,7 @@ export default function NewEventPage() {
         date: data.date ? new Date(data.date) : new Date(),
         participants,
         imageUrl: data.imageUrl || "",
+        createdAt: eventCreatedAt, // Pass the timestamp to ensure consistency
       };
 
       console.log("[Event Creation] Creating event with data:", eventData);

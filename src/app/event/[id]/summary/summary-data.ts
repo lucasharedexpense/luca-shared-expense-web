@@ -26,11 +26,13 @@ export interface SummaryParticipant {
 
 export interface SummaryPageData {
   eventName: string;
+  eventId: string;
   participants: SummaryParticipant[];
   settlements: SettlementTransaction[];
   consumptionDetails: ConsumptionDetail[];
   totalExpense: number;
   calculatedAt: string | null;
+  isFinish: number;
 }
 
 // ─── Data fetcher ───────────────────────────────────────────────────────────────
@@ -140,10 +142,12 @@ export async function fetchSummaryPageData(
 
   return {
     eventName,
+    eventId,
     participants,
     settlements,
     consumptionDetails,
     totalExpense,
     calculatedAt,
+    isFinish: eventData.isFinish ?? 0,
   };
 }

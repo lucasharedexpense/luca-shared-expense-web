@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
   Edit2, 
@@ -9,7 +10,7 @@ import {
   MapPin, 
   Calendar, 
   ShoppingCart,
-  LucideIcon // Import tipe LucideIcon buat InfoChip
+  LucideIcon 
 } from "lucide-react";
 import AvatarStack from "@/components/ui/AvatarStack";
 
@@ -23,18 +24,18 @@ interface EventHeaderData {
 
 interface EventHeaderCardProps {
   event: EventHeaderData;
-  onBackClick: () => void;
+  // onBackClick udah dihapus karena di-handle langsung di bawah
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
 
-// Tambahkan ': React.JSX.Element' di sini
 export default function EventHeaderCard({
   event,
-  onBackClick,
   onEditClick,
   onDeleteClick
 }: EventHeaderCardProps): React.JSX.Element {
+  
+  const router = useRouter();
 
   // PREVENT ERROR: Mapping dulu dari Object -> String[] buat AvatarStack
   const participantAvatars = event.participants?.map((p) => p.avatarName) || [];
@@ -69,7 +70,7 @@ export default function EventHeaderCard({
 
       {/* --- 2. TOP BAR (Buttons) --- */}
       <div className="relative z-10 flex justify-between items-center p-5">
-        <CircleButton onClick={onBackClick}>
+        <CircleButton onClick={() => router.push('/home')}>
           <ArrowLeft className="w-5 h-5 text-ui-black" />
         </CircleButton>
 
@@ -84,27 +85,39 @@ export default function EventHeaderCard({
       </div>
 
       {/* --- 3. MAIN CONTENT (Bottom) --- */}
-      <div className="absolute bottom-0 left-0 w-full p-5 z-10 flex flex-col items-start">
-        
-        {/* Title Besar */}
-        <h1 className={`text-2xl font-bold font-display leading-tight mb-3 line-clamp-2 drop-shadow-sm ${hasImage ? 'text-white' : 'text-ui-black'}`}>
-          {event.title}
-        </h1>
+      <div className="absolute bottom-0 left-0 w-full px-5 pb-5 z-10 flex flex-row items-end justify-between gap-3">
 
-        {/* Chips Row (Location & Date) */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <InfoChip icon={MapPin} text={event.location} />
-          <InfoChip icon={Calendar} text={event.date} />
+        {/* LEFT: Title pill + Location */}
+        <div className="flex flex-col items-start gap-1.5 flex-1 min-w-0">
+          {/* Title inside white rounded pill */}
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-4 py-2 shadow-sm max-w-full">
+            <h1 className="text-lg font-bold font-display leading-tight text-ui-black line-clamp-2">
+              {event.title}
+            </h1>
+          </div>
+
+          {/* Location */}
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-sm flex items-center gap-1.5 max-w-full">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-ui-accent-yellow" />
+            <span className="text-xs font-semibold truncate text-ui-black">
+              {event.location}
+            </span>
+          </div>
         </div>
 
-        {/* Avatar Stack */}
-        <div className="pl-1">
-             <AvatarStack 
-                avatars={participantAvatars} 
-                size={32} 
-                limit={4}
-                overlap={-10}
-            />
+        {/* RIGHT: Avatars + Date */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <AvatarStack
+            avatars={participantAvatars}
+            size={32}
+            limit={3}
+            overlap={-10}
+          />
+          <div className="bg-ui-white/95 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-sm">
+            <span className="text-xs font-semibold text-ui-black">
+              {event.date}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -113,7 +126,6 @@ export default function EventHeaderCard({
 
 // --- SUB COMPONENTS ---
 
-// Tambahkan ': React.JSX.Element' di sini
 function CircleButton({ 
   children, 
   onClick 
@@ -131,7 +143,6 @@ function CircleButton({
   );
 }
 
-// Tambahkan ': React.JSX.Element' di sini juga
 function InfoChip({ 
   icon: Icon, 
   text 
