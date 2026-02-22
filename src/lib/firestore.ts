@@ -19,6 +19,15 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
+// ==================== TYPE DEFINITIONS ====================
+
+/**
+ * Extended Firestore database type with internal projectId property
+ */
+interface FirestoreDatabase {
+  projectId?: string;
+}
+
 // ==================== HELPERS ====================
 
 /**
@@ -36,9 +45,9 @@ async function getUserDocId(uid: string): Promise<string> {
     const userDocId = querySnapshot.docs[0].id;
     console.log("[Firestore] Resolved UID", uid, "to Document ID:", userDocId);
     return userDocId;
-  } catch (error) {
-    console.error("[Firestore] Error resolving user document ID:", error);
-    throw error;
+  } catch (_error) {
+    console.error("[Firestore] Error resolving user document ID:", _error);
+    throw _error;
   }
 }
 
@@ -209,7 +218,7 @@ async function getActivitiesForEvent(
     );
 
     return activities;
-  } catch (error) {
+  } catch (_error) {
     return []; // Return empty array if error
   }
 }
@@ -695,7 +704,7 @@ export async function diagnosticCheckFirestore(): Promise<void> {
     
     // Check database instance
     console.log("[DIAGNOSTIC] Database instance:", db);
-    console.log("[DIAGNOSTIC] Database project ID:", (db as any)?.projectId || "unknown");
+    console.log("[DIAGNOSTIC] Database project ID:", (db as unknown as FirestoreDatabase)?.projectId || "unknown");
     
     // Try reading from users collection to verify connectivity
     const usersRef = collection(db, "users");
@@ -706,7 +715,7 @@ export async function diagnosticCheckFirestore(): Promise<void> {
     console.log("[DIAGNOSTIC] Firestore configured and responsive");
     console.log("[DIAGNOSTIC] If events still don't appear:");
     console.log("   1. Go to Firebase Console > Firestore Database");
-    console.log("   2. Check the Project ID matches:", (db as any)?.projectId);
+    console.log("   2. Check the Project ID matches:", (db as unknown as FirestoreDatabase)?.projectId);
     console.log("   3. Verify Security Rules allow writes to users/{uid}/events");
     console.log("   4. Check Network tab in DevTools for failed requests");
     

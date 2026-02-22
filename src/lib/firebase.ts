@@ -28,7 +28,8 @@ export const auth = getAuth(app);
 
 // Initialize Firestore
 export const db = getFirestore(app);
-console.log("[Firebase] Firestore initialized with project:", (db as any).projectId || "unknown");
+// Ganti (db as any).projectId dengan firebaseConfig.projectId
+console.log("[Firebase] Firestore initialized with project:", firebaseConfig.projectId || "unknown");
 
 // Initialize Firebase Storage
 export const storage = getStorage(app);
