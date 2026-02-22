@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
   Edit2, 
@@ -9,7 +10,7 @@ import {
   MapPin, 
   Calendar, 
   ShoppingCart,
-  LucideIcon // Import tipe LucideIcon buat InfoChip
+  LucideIcon 
 } from "lucide-react";
 import AvatarStack from "@/components/ui/AvatarStack";
 
@@ -23,18 +24,18 @@ interface EventHeaderData {
 
 interface EventHeaderCardProps {
   event: EventHeaderData;
-  onBackClick: () => void;
+  // onBackClick udah dihapus karena di-handle langsung di bawah
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
 
-// Tambahkan ': React.JSX.Element' di sini
 export default function EventHeaderCard({
   event,
-  onBackClick,
   onEditClick,
   onDeleteClick
 }: EventHeaderCardProps): React.JSX.Element {
+  
+  const router = useRouter();
 
   // PREVENT ERROR: Mapping dulu dari Object -> String[] buat AvatarStack
   const participantAvatars = event.participants?.map((p) => p.avatarName) || [];
@@ -69,7 +70,7 @@ export default function EventHeaderCard({
 
       {/* --- 2. TOP BAR (Buttons) --- */}
       <div className="relative z-10 flex justify-between items-center p-5">
-        <CircleButton onClick={onBackClick}>
+        <CircleButton onClick={() => router.push('/home')}>
           <ArrowLeft className="w-5 h-5 text-ui-black" />
         </CircleButton>
 
@@ -113,7 +114,6 @@ export default function EventHeaderCard({
 
 // --- SUB COMPONENTS ---
 
-// Tambahkan ': React.JSX.Element' di sini
 function CircleButton({ 
   children, 
   onClick 
@@ -131,7 +131,6 @@ function CircleButton({
   );
 }
 
-// Tambahkan ': React.JSX.Element' di sini juga
 function InfoChip({ 
   icon: Icon, 
   text 
