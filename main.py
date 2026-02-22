@@ -213,7 +213,7 @@ def scan_ml_only(file: UploadFile = File(...)):
     full_text = run_ml_ocr(image)
     
     return {
-        "status": "success", 
+        "status": "success",
         "message": "ML OCR selesai diproses",
         "raw_text": full_text
     }

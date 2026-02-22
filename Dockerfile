@@ -27,4 +27,4 @@ EXPOSE 7860
 RUN chmod -R 777 /code
 
 # Jalankan aplikasi
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "main.py"]
