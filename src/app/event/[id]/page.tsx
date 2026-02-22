@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation"; 
 import { useAuth } from "@/lib/useAuth";
-import { getEventsWithActivities, deleteActivity, deleteEvent, EventWithActivities } from "@/lib/firestore";
-import { getContacts, updateContact } from "@/lib/firebase-contacts";
+import { getEventsWithActivities, deleteActivity, deleteEvent, removeEventFromContactsIsEvent, EventWithActivities } from "@/lib/firestore";
 import EventHeaderCard from "@/components/ui/EventHeaderCard";
 import { ShoppingCart, Utensils, Car, Zap, Ticket, Trash2, Loader2 } from "lucide-react"; 
 import FabAdd from "@/components/ui/FABAdd";
@@ -128,36 +127,9 @@ export default function EventDetailPage() {
   const confirmDeleteEvent = async () => {
     if (!userId || !eventId) return;
     try {
-      const allContacts = await getContacts(userId);
-      let eventCreatedAt: number = 0;
-      const createdAtData = eventData?.createdAt ?? 0;
-      
-      if (typeof createdAtData === 'object' && createdAtData !== null && 'toMillis' in createdAtData) {
-        eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
-      } else if (typeof createdAtData === 'object' && createdAtData !== null && 'seconds' in createdAtData) {
-        eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
-      } else if (typeof createdAtData === 'number') {
-        eventCreatedAt = createdAtData;
-      }
-
-      const participantNames = (eventData?.participants ?? []).map(p => p.name);
-
-      if (participantNames.length > 0) {
-        const eventCreatedAtStr = String(eventCreatedAt);
-        const updatePromises = allContacts
-          .filter(contact => participantNames.includes(contact.name))
-          .map(contact => {
-            const updatedIsEvent = contact.isEvent.filter(event => 
-              String(event.eventCreatedAt) !== eventCreatedAtStr
-            );
-            return updateContact(userId, contact.id, { isEvent: updatedIsEvent });
-          });
-        
-        if (updatePromises.length > 0) {
-          await Promise.all(updatePromises);
-        }
-      }
-
+      // Remove event from all contacts' isEvent arrays
+      await removeEventFromContactsIsEvent(userId, eventId);
+      // Delete the event
       await deleteEvent(userId, eventId);
       router.replace("/home");
     } catch {
@@ -311,9 +283,12 @@ export default function EventDetailPage() {
               try {
                 setSummarizing(true);
                 await generateAndSaveSettlement(userId, eventId);
+                // Fallback navigation for mobile in case redirect doesn't work
+                router.push(`/event/${eventId}/summary`);
               } catch (error) {
-                // redirect() throws NEXT_REDIRECT which is caught here
-                // but the navigation still happens. No-op.
+                // Server action throws NEXT_REDIRECT which is caught here
+                // Fallback to client-side navigation
+                router.push(`/event/${eventId}/summary`);
               } finally {
                 setSummarizing(false);
               }

@@ -26,11 +26,13 @@ export interface SummaryParticipant {
 
 export interface SummaryPageData {
   eventName: string;
+  eventId: string;
   participants: SummaryParticipant[];
   settlements: SettlementTransaction[];
   consumptionDetails: ConsumptionDetail[];
   totalExpense: number;
   calculatedAt: string | null;
+  isFinish: number;
 }
 
 // ─── Data fetcher ───────────────────────────────────────────────────────────────

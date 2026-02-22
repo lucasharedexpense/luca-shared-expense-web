@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/useAuth";
 import { collection, doc, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculateSummary } from "@/lib/settlement-logic";
+import { getUserDocId } from "@/lib/firestore";
 import SummaryClientView from "./SummaryClientView";
 import type { SummaryPageData, SummaryParticipant } from "./summary-data";
 import type { SettlementTransaction } from "@/lib/smart-split-algorithm";
@@ -39,8 +40,11 @@ export default function SummaryPage() {
       try {
         setLoading(true);
 
+        // ── 0. Resolve Auth UID to Firestore Document ID ──────────────────
+        const userDocId = await getUserDocId(userId);
+
         // ── 1. Fetch event doc (has settlementResultJson + participants) ──────
-        const eventRef = doc(db, "users", userId, "events", eventId);
+        const eventRef = doc(db, "users", userDocId, "events", eventId);
         const eventSnap = await getDoc(eventRef);
 
         if (!eventSnap.exists()) {
@@ -63,13 +67,13 @@ export default function SummaryPage() {
         try {
           const parsed = JSON.parse(eventData.settlementResultJson || "{}");
           calculatedAt = parsed.calculatedAt ?? null;
-        } catch {
-          // ignore
+        } catch (_parseError) {
+          // ignore parse errors
         }
 
         // ── 3. Fetch activities + items ────────────────────────────────────
         const activitiesSnap = await getDocs(
-          collection(db, "users", userId, "events", eventId, "activities"),
+          collection(db, "users", userDocId, "events", eventId, "activities"),
         );
 
         const activities = await Promise.all(
@@ -80,7 +84,7 @@ export default function SummaryPage() {
               collection(
                 db,
                 "users",
-                userId,
+                userDocId,
                 "events",
                 eventId,
                 "activities",
@@ -114,11 +118,13 @@ export default function SummaryPage() {
 
         setData({
           eventName,
+          eventId,
           participants,
           settlements: result.settlements as SettlementTransaction[],
           consumptionDetails: result.consumptionDetails,
           totalExpense: result.totalExpense,
           calculatedAt,
+          isFinish: eventData.isFinish ?? 0,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load summary.");
@@ -151,5 +157,5 @@ export default function SummaryPage() {
     );
   }
 
-  return <SummaryClientView data={data} />;
+  return <SummaryClientView data={data} userId={userId} />;
 }
