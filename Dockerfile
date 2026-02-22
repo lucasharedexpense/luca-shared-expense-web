@@ -19,6 +19,8 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 # Copy sisa file
 COPY . /code
 
+EXPOSE 7860
+
 # Beri hak akses (optional tapi aman)
 RUN chmod -R 777 /code
 
