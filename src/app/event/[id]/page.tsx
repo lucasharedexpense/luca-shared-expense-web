@@ -187,7 +187,7 @@ export default function EventDetailPage() {
              ...eventData,
              date: formatDate(eventData.date),
            } as unknown as Parameters<typeof EventHeaderCard>[0]['event']}
-           onBackClick={() => router.back()}
+           // onBackClick udah DIHAPUS karena dihandle otomatis di dalam EventHeaderCard
            onEditClick={() => router.push(`/event/${eventId}/edit`)}
            onDeleteClick={() => setShowDeleteEvent(true)}
         />

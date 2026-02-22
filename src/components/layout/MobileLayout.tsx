@@ -99,7 +99,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
               // Kalau mode HOME, buka Sidebar. Kalau mode SCAN, balik ke home.
               // Kalau Activity Details, balik ke event detail langsung.
               // Kalau mode lain (Details), Back.
-              if (headerVariant === "HOME") {
+              if (headerVariant === "HOME" || headerVariant === "EVENT_DETAILS") {
                 setIsSidebarOpen(true);
               } else if (headerVariant === "SCAN") {
                 router.push("/home");

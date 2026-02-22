@@ -2,12 +2,15 @@
 
 import React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
   Edit2, 
   Trash2, 
-  MapPin,
-  ShoppingCart
+  MapPin, 
+  Calendar, 
+  ShoppingCart,
+  LucideIcon 
 } from "lucide-react";
 import AvatarStack from "@/components/ui/AvatarStack";
 
@@ -21,18 +24,18 @@ interface EventHeaderData {
 
 interface EventHeaderCardProps {
   event: EventHeaderData;
-  onBackClick: () => void;
+  // onBackClick udah dihapus karena di-handle langsung di bawah
   onEditClick: () => void;
   onDeleteClick: () => void;
 }
 
-// Tambahkan ': React.JSX.Element' di sini
 export default function EventHeaderCard({
   event,
-  onBackClick,
   onEditClick,
   onDeleteClick
 }: EventHeaderCardProps): React.JSX.Element {
+  
+  const router = useRouter();
 
   // PREVENT ERROR: Mapping dulu dari Object -> String[] buat AvatarStack
   const participantAvatars = event.participants?.map((p) => p.avatarName) || [];
@@ -67,7 +70,7 @@ export default function EventHeaderCard({
 
       {/* --- 2. TOP BAR (Buttons) --- */}
       <div className="relative z-10 flex justify-between items-center p-5">
-        <CircleButton onClick={onBackClick}>
+        <CircleButton onClick={() => router.push('/home')}>
           <ArrowLeft className="w-5 h-5 text-ui-black" />
         </CircleButton>
 
@@ -123,7 +126,6 @@ export default function EventHeaderCard({
 
 // --- SUB COMPONENTS ---
 
-// Tambahkan ': React.JSX.Element' di sini
 function CircleButton({ 
   children, 
   onClick 
@@ -141,3 +143,19 @@ function CircleButton({
   );
 }
 
+function InfoChip({ 
+  icon: Icon, 
+  text 
+}: { 
+  icon: LucideIcon; 
+  text: string; 
+}): React.JSX.Element {
+  return (
+    <div className="bg-ui-white/90 backdrop-blur-md rounded-xl px-3 py-1.5 flex items-center gap-1.5 shadow-sm">
+      <Icon className="w-3.5 h-3.5 text-ui-dark-grey" />
+      <span className="text-xs font-bold text-ui-black font-display tracking-wide">
+        {text}
+      </span>
+    </div>
+  );
+}
