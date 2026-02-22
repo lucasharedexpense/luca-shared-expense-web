@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -9,7 +10,7 @@ import {
   Instagram 
 } from "lucide-react";
 import { LucaLogo } from "@/components/ui/Icons"; // Asumsi file icon yang dibuat sebelumnya
-import Image from "next/image";
+import NextImage from "next/image";
 
 // --- DATA: TEAM MEMBERS ---
 const TEAM_MEMBERS = [

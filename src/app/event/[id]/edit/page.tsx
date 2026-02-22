@@ -35,7 +35,6 @@ export default function EditEventPage() {
         const event = allEvents.find((e) => e.id === eventId);
         setEventData(event || null);
       } catch (error) {
-        console.error("Error fetching event:", error);
         setEventData(null);
       } finally {
         setLoading(false);
@@ -50,7 +49,7 @@ export default function EditEventPage() {
     if (userId) {
       getContacts(userId)
         .then((data) => setFirebaseContacts(data))
-        .catch((error) => console.error("Failed to fetch contacts:", error));
+        .catch(() => {});
     }
   }, [userId]);
 
@@ -154,8 +153,7 @@ export default function EditEventPage() {
           });
 
           await Promise.all(updatePromises);
-        } catch (err) {
-          console.error("Failed to update participant isEvent:", err);
+        } catch (error) {
           // Don't alert - event was updated successfully
         }
       }
@@ -169,7 +167,6 @@ export default function EditEventPage() {
       });
       router.back();
     } catch (error) {
-      console.error("Error updating event:", error);
       alert("Failed to update event.");
     }
   };

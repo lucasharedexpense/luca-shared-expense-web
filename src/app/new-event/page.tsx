@@ -19,7 +19,7 @@ export default function NewEventPage() {
     if (user?.uid) {
       getContacts(user.uid)
         .then((data) => setFirebaseContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err));
+        .catch(() => {});
     }
   }, [user?.uid]);
 
@@ -85,14 +85,12 @@ export default function NewEventPage() {
             return updateContact(user.uid, id, { isEvent: updatedIsEvent });
           });
           await Promise.all(updatePromises);
-        } catch (err) {
-          console.error("Failed to update participant isEvent:", err);
+        } catch {
         }
       }
 
       router.push("/home");
-    } catch (error) {
-      console.error("Error creating event:", error);
+    } catch {
       alert("Failed to create event. Please try again.");
     } finally {
       setSaving(false);

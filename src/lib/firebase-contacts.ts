@@ -67,7 +67,6 @@ export const getContacts = async (uid: string): Promise<ContactData[]> => {
       isEvent: doc.data().isEvent || [],
     }));
   } catch (error) {
-    console.error("Error fetching contacts:", error);
     throw error;
   }
 };
@@ -90,7 +89,6 @@ export const addContact = async (
     });
     return docRef.id;
   } catch (error) {
-    console.error("Error adding contact:", error);
     throw error;
   }
 };
@@ -112,7 +110,6 @@ export const updateContact = async (
       updatedAt: new Date(),
     });
   } catch (error) {
-    console.error("Error updating contact:", error);
     throw error;
   }
 };
@@ -130,7 +127,6 @@ export const deleteContact = async (
     const contactRef = doc(db, "users", userDocId, "contacts", contactId);
     await deleteDoc(contactRef);
   } catch (error) {
-    console.error("Error deleting contact:", error);
     throw error;
   }
 };

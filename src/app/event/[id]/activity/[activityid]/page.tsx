@@ -128,7 +128,6 @@ export default function ActivityDetailPage() {
         // Ambil nilai isEqualSplit dari Firebase dan pasang ke state toggle
         setIsEqualSplit(activity?.isSplitEqual ?? false);
       } catch (error) {
-        console.error("Error fetching activity:", error);
         setEventData(null);
         setActivityData(null);
       } finally {

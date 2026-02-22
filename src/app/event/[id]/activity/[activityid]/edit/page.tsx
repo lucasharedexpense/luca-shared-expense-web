@@ -14,6 +14,9 @@ import { db } from "@/lib/firebase";
 
 type ItemWithId = Item & { id?: string };
 
+// TODO: Replace MOCK_DATABASE with real Firestore fetch (useAuth + getEventsWithActivities)
+// import { MOCK_DATABASE } from "@/lib/dummy-data";
+
 /** Item shape matching Firestore activity items */
 interface ActivityItem {
   itemName: string;
@@ -308,7 +311,6 @@ export default function ActivityEditPage() {
           event?.participants?.map(p => ({ name: p.name, avatarName: p.avatarName || "" })) ?? []
         );
       } catch (error) {
-        console.error("Error fetching activity:", error);
       } finally {
         setPageLoading(false);
       }
@@ -331,8 +333,7 @@ export default function ActivityEditPage() {
         if (itemsList.length > 0 && itemsList[0].taxPercentage) {
           setTaxPercent(itemsList[0].taxPercentage);
         }
-      } catch (error) {
-        console.error("Error fetching items:", error);
+      }  catch (error) {
       }
     };
     fetchItems();
@@ -455,7 +456,6 @@ export default function ActivityEditPage() {
 
           router.back();
       } catch (error) {
-          console.error("Error saving:", error);
       } finally {
           setSaving(false);
       }

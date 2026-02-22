@@ -64,18 +64,16 @@ export default function NewEventModal({
   const [contacts, setContacts] = useState<ContactData[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
 
-  // --- EFFECT: FETCH CONTACTS FROM FIREBASE ---
   useEffect(() => {
     if (isOpen && user?.uid) {
       setContactsLoading(true);
       getContacts(user.uid)
         .then((data) => setContacts(data))
-        .catch((err) => console.error("Failed to fetch contacts:", err))
+        .catch(() => {})
         .finally(() => setContactsLoading(false));
     }
   }, [isOpen, user?.uid]);
 
-  // --- EFFECT: ISI FORM SAAT MODAL DIBUKA (EDIT MODE) ---
   useEffect(() => {
     if (isOpen) {
         if (initialData) {
@@ -94,7 +92,6 @@ export default function NewEventModal({
             }
             const isoDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
             setDate(isoDate);
-            // Filter user sendiri dari list participants biar gak dobel
             const others = initialData.participants.filter(p => p.name !== "You" && p.name !== user?.displayName);
             // Map participant names back to ContactData objects from Firebase contacts
             const participantContacts = others
@@ -158,8 +155,7 @@ export default function NewEventModal({
       try {
         setUploading(true);
         imageUrl = await uploadEventImage(user.uid, imageFile);
-      } catch (err) {
-        console.error("Image upload failed:", err);
+      } catch {
         alert("Failed to upload image. Event will be created without image.");
         imageUrl = "";
       } finally {

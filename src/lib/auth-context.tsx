@@ -8,7 +8,7 @@ import { validateFirebaseEnv } from "./validate-env";
 // Validate environment on app load
 try {
   validateFirebaseEnv();
-} catch {
+} catch (error) {
   // Environment validation failed — app will handle missing config
 }
 

@@ -311,7 +311,7 @@ export default function EventDetailPage() {
               try {
                 setSummarizing(true);
                 await generateAndSaveSettlement(userId, eventId);
-              } catch {
+              } catch (error) {
                 // redirect() throws NEXT_REDIRECT which is caught here
                 // but the navigation still happens. No-op.
               } finally {

@@ -123,7 +123,6 @@ const ensureUserDocument = async (user: User) => {
       });
     }
   } catch (error) {
-    console.error("Error ensuring user document:", error);
   }
 };
 
@@ -134,8 +133,7 @@ const ensureUserDocument = async (user: User) => {
 export const logout = async (): Promise<void> => {
   try {
     await signOut(auth);
-  } catch (error) {
-    console.error("Error signing out:", error);
+} catch (error) {
     throw error;
   }
 };
@@ -157,7 +155,6 @@ export const getUserProfile = async (uid: string) => {
     const users = await queryDocuments("users", [where("uid", "==", uid)]);
     return users.length > 0 ? users[0] : null;
   } catch (error) {
-    console.error("Error getting user profile:", error);
     throw error;
   }
 };
@@ -179,7 +176,6 @@ export const updateUserProfile = async (
       throw new Error("User profile not found");
     }
   } catch (error) {
-    console.error("Error updating user profile:", error);
     throw error;
   }
 };

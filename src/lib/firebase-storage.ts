@@ -34,7 +34,6 @@ export async function uploadEventImage(
 
     return downloadUrl;
   } catch (error) {
-    console.error("Error uploading event image:", error);
     throw error;
   }
 }

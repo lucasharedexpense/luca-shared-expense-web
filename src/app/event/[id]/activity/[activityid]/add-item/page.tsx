@@ -51,7 +51,6 @@ export default function AddItemPage() {
           setSelectedMembers(participantNames);
         }
       } catch (error) {
-        console.error("Error fetching activity:", error);
       } finally {
         setLoading(false);
       }
@@ -130,7 +129,6 @@ export default function AddItemPage() {
       // Redirect to activity detail page
       router.push(`/event/${eventId}/activity/${activityId}`);
     } catch (error) {
-      console.error("Error creating item:", error);
       alert("Failed to create item. Please try again.");
     } finally {
       setSaving(false);

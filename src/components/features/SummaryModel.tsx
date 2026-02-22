@@ -102,8 +102,7 @@ export default function SummaryModal({ isOpen, onClose, event }: SummaryModalPro
                                                 await Promise.all(updatePromises);
                                                 // Optionally close modal or show success
                                                 onClose();
-                                            } catch (err) {
-                                                console.error("Failed to finish event:", err);
+                                            } catch (error) {
                                             }
                                         }}
                                 >

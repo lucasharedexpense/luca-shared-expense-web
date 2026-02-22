@@ -127,8 +127,9 @@ function docToEvent(doc: QueryDocumentSnapshot<DocumentData>): Event {
 }
 
 /**
- * Fetch all activities for a specific event
+ * Fetch all activities for a specific event, including their items sub-collection
  * Path: users/{userId}/events/{eventId}/activities
+ *       users/{userId}/events/{eventId}/activities/{activityId}/items
  */
 async function getActivitiesForEvent(
   userId: string,
@@ -147,15 +148,43 @@ async function getActivitiesForEvent(
 
     const activitiesSnapshot = await getDocs(activitiesRef);
 
-    // Convert snapshots to Activity objects
-    const activities = activitiesSnapshot.docs.map(docToActivity);
+    // For each activity, also fetch its items sub-collection
+    const activities = await Promise.all(
+      activitiesSnapshot.docs.map(async (actDoc) => {
+        const activity = docToActivity(actDoc);
+
+        // Fetch items sub-collection for this activity
+        const itemsRef = collection(
+          db,
+          "users",
+          userId,
+          "events",
+          eventId,
+          "activities",
+          actDoc.id,
+          "items"
+        );
+        const itemsSnapshot = await getDocs(itemsRef);
+
+        const items: ActivityItem[] = itemsSnapshot.docs.map((itemDoc) => {
+          const d = itemDoc.data();
+          return {
+            itemName: d.itemName ?? "",
+            price: d.price ?? 0,
+            quantity: d.quantity ?? 0,
+            memberNames: d.memberNames ?? [],
+            discountAmount: d.discountAmount,
+            taxPercentage: d.taxPercentage,
+            timestamp: d.timestamp,
+          };
+        });
+
+        return { ...activity, items };
+      })
+    );
 
     return activities;
   } catch (error) {
-    console.error(
-      `Error fetching activities for event ${eventId}:`,
-      error
-    );
     return []; // Return empty array if error
   }
 }
@@ -203,7 +232,6 @@ export async function getEventsWithActivities(
 
     return eventsWithActivities;
   } catch (error) {
-    console.error("Error fetching events with activities:", error);
     return [];
   }
 }
@@ -245,7 +273,6 @@ export async function getEventWithActivities(
       activities,
     };
   } catch (error) {
-    console.error(`Error fetching event ${eventId}:`, error);
     return null;
   }
 }
@@ -283,7 +310,6 @@ export async function createEvent(
     });
     return docRef.id;
   } catch (error) {
-    console.error("Error creating event:", error);
     throw error;
   }
 }
@@ -319,7 +345,6 @@ export async function updateEvent(
 
     await updateDoc(eventRef, updateData);
   } catch (error) {
-    console.error("Error updating event:", error);
     throw error;
   }
 }
@@ -336,7 +361,6 @@ export async function deleteEvent(
     const eventRef = doc(db, "users", userId, "events", eventId);
     await deleteDoc(eventRef);
   } catch (error) {
-    console.error("Error deleting event:", error);
     throw error;
   }
 }
@@ -375,7 +399,6 @@ export async function createActivity(
     
     return docRef.id;
   } catch (error) {
-    console.error("Error creating activity:", error);
     throw error;
   }
 }
@@ -402,7 +425,6 @@ export async function updateActivity(
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await updateDoc(activityRef, data);
   } catch (error) {
-    console.error("Error updating activity:", error);
     throw error;
   }
 }
@@ -420,7 +442,6 @@ export async function deleteActivity(
     const activityRef = doc(db, "users", userId, "events", eventId, "activities", activityId);
     await deleteDoc(activityRef);
   } catch (error) {
-    console.error("Error deleting activity:", error);
     throw error;
   }
 }
@@ -469,7 +490,6 @@ export async function createItem(
 
     return docRef.id;
   } catch (error) {
-    console.error("Error creating item:", error);
     throw error;
   }
 }
@@ -506,7 +526,6 @@ export async function updateItem(
     );
     await updateDoc(itemRef, data);
   } catch (error) {
-    console.error("Error updating item:", error);
     throw error;
   }
 }
@@ -535,7 +554,6 @@ export async function deleteItem(
     );
     await deleteDoc(itemRef);
   } catch (error) {
-    console.error("Error deleting item:", error);
     throw error;
   }
 }

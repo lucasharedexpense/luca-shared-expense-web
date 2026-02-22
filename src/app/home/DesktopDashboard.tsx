@@ -37,6 +37,15 @@ interface Item {
     timestamp?: number;
 }
 
+interface Contact {
+    id: string;
+    name: string;
+    avatarName: string;
+    phoneNumber: string;
+    bankAccounts: unknown[];
+    userId: string;
+}
+
 interface Participant {
     id?: string;
     name: string;
@@ -275,19 +284,8 @@ const EventDetailColumn = ({
     eventId, activeActivityId, onActivityClick, onClose, 
     onAddClick, onEditActivity, onSummaryClick, onDeleteActivity, events
 }: EventDetailColumnProps) => {
-    const [searchQuery, setSearchQuery] = useState("");
     const event = events.find((e) => e.id === eventId);
     if (!event) return null;
-
-    // Filter activities based on search query
-    const filteredActivities = event.activities.filter((activity) => {
-        const query = searchQuery.toLowerCase();
-        return (
-            activity.title.toLowerCase().includes(query) ||
-            activity.category.toLowerCase().includes(query) ||
-            activity.payerName.toLowerCase().includes(query)
-        );
-    });
 
     return (
         <div className="flex flex-col h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -307,15 +305,6 @@ const EventDetailColumn = ({
             {/* Tambahkan 'pb-28' agar konten terbawah tidak ketutup tombol floating */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar pb-28">
                 
-                {/* Search Bar */}
-                <div className="mb-3 sticky top-0 bg-white z-10 py-1">
-                    <SearchBar
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search activity..."
-                    />
-                </div>
-
                 {/* Tombol Add New Activity (Tetap di atas sebagai input) */}
                 <button 
                     onClick={onAddClick}
@@ -328,12 +317,7 @@ const EventDetailColumn = ({
                 </button>
 
                 {/* List Activities */}
-                {filteredActivities.length === 0 && event.activities.length > 0 ? (
-                    <div className="text-center py-8 opacity-50">
-                        <p className="text-sm text-gray-500">No activities match your search.</p>
-                    </div>
-                ) : (
-                    filteredActivities.map((act) => {
+                {event.activities.map((act) => {
                     const isActive = activeActivityId === act.id;
                     return (
                         <div 
@@ -396,8 +380,7 @@ const EventDetailColumn = ({
                             <ChevronRight className={`w-5 h-5 shrink-0 ${isActive ? "text-ui-black" : "text-gray-300"}`} />
                         </div>
                     )
-                })
-                )}
+                })}
             </div>
 
             {/* 3. BIG FLOATING ACTION BUTTON (Summary) */}
@@ -456,32 +439,15 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
     const [itemIds, setItemIds] = useState<(string | null)[]>([]);
 
-    // Real-time items listener from Firebase
-    useEffect(() => {
-        if (!userId || !eventId || !activityId) return;
-
-        const itemsRef = collection(
-            db,
-            "users",
-            userId,
-            "events",
-            eventId,
-            "activities",
-            activityId,
-            "items"
-        );
-
-        const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
-            const itemsList = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            })) as Item[];
-            setItems(itemsList);
-            setItemIds(itemsList.map(item => item.id ?? null));
-        });
-
-        return () => unsubscribe();
-    }, [userId, eventId, activityId]);
+    // When activityId changes, reset items to what is stored in the events prop.
+    // Using render-phase state reset (React-recommended alternative to useEffect + setState).
+    const [prevActivityId, setPrevActivityId] = useState(activityId);
+    if (prevActivityId !== activityId) {
+        setPrevActivityId(activityId);
+        const activityItems = (activity?.items ?? []) as Item[];
+        setItems(activityItems);
+        setItemIds(activityItems.map((item) => item.id ?? null));
+    }
 
     // Calculations - Now based on items from Firebase
     const subTotal = useMemo(() => items.reduce((acc, item) => acc + (item.price * item.quantity), 0), [items]);
@@ -543,8 +509,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 // Delete from local state
                 setItems(prev => prev.filter((_, i) => i !== idx));
                 setItemIds(prev => prev.filter((_, i) => i !== idx));
-            } catch (error) {
-                console.error("Error deleting item:", error);
+            } catch {
                 alert("Failed to delete item.");
             }
         }
@@ -594,8 +559,7 @@ const ActivityDetailColumn = ({ eventId, activityId, onClose, onUpdateActivity, 
                 }
             }
             setIsModalOpen(false);
-        } catch (error) {
-            console.error("Error saving item:", error);
+        } catch {
             alert("Failed to save item.");
         }
     };
@@ -891,8 +855,7 @@ export default function DesktopDashboard() {
             setEventsLoading(true);
             const data = await getEventsWithActivities(userId);
             setEvents(data);
-        } catch (error) {
-            console.error("Error loading events:", error);
+        } catch {
             setEvents([]);
         } finally {
             setEventsLoading(false);
@@ -940,8 +903,7 @@ export default function DesktopDashboard() {
             
             // Refresh from Firebase
             await refreshEvents();
-        } catch (error) {
-            console.error("Error deleting activity:", error);
+        } catch {
             alert("Failed to delete activity.");
         } finally {
             setActivityToDelete(null);
@@ -951,12 +913,15 @@ export default function DesktopDashboard() {
     // Helper avatar
     const getAvatarUrl = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`;
 
-    // Convert Participant[] to ModalParticipant[] with generated IDs
-    const getParticipantsWithIds = (participants: Participant[]): ModalParticipant[] => {
+    // Convert ParticipantSimple to Contact-like objects with IDs
+    const getParticipantsWithIds = (participants: Participant[]): Contact[] => {
         return participants.map((p, idx) => ({
             id: `participant-${idx}-${p.name}`,
             name: p.name,
             avatarName: p.avatarName ?? "",
+            phoneNumber: "",
+            bankAccounts: [],
+            userId: "",
         }));
     };
 
@@ -1020,8 +985,7 @@ export default function DesktopDashboard() {
             setShowActivityModal(false); 
             setEditingActivity(null); 
             setRefreshKey(prev => prev + 1);
-        } catch (error) {
-            console.error("Error creating/updating activity:", error);
+        } catch {
             alert("Failed to save activity. Please try again.");
             setIsLoading(false);
         }
