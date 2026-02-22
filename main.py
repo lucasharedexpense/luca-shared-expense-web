@@ -284,4 +284,4 @@ def scan_receipt_full(file: UploadFile = File(...)):
         return {"status": "error", "message": str(e), "raw_ocr": full_text}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, workers=4)
+    uvicorn.run("main:app", host="0.0.0.0", port=7860, workers=2)
