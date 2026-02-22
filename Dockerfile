@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
+RUN python -c "import easyocr; easyocr.Reader(['id'], gpu=False)"
+
 # Copy sisa file
 COPY . /code
 
