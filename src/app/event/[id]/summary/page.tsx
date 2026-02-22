@@ -157,5 +157,16 @@ export default function SummaryPage() {
     );
   }
 
+  // ── Ensure user is authenticated ──────────────────────────────────────────
+  if (!userId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-ui-background gap-4 text-center p-6">
+        <p className="text-ui-dark-grey font-bold text-lg">
+          User not authenticated. Please log in.
+        </p>
+      </div>
+    );
+  }
+
   return <SummaryClientView data={data} userId={userId} />;
 }
