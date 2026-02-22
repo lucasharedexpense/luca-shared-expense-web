@@ -248,8 +248,8 @@ export default function EventList({ onEventClick, activeId, events: providedEven
         // --- CREATE NEW EVENT ---
         const eventCreatedAt = Date.now();
         
-        // Create the event first
-        const newId = await createEvent(user.uid, eventPayload);
+        // Create the event first (pass createdAt to ensure consistency)
+        const newId = await createEvent(user.uid, { ...eventPayload, createdAt: eventCreatedAt });
 
         // Then update all non-current participants' isEvent array
         const participantNames = data.participants.map(p => p.name);

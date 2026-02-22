@@ -34,7 +34,7 @@ interface FirestoreDatabase {
  * Get the Firestore document ID for a user by their auth UID
  * This is CRITICAL: Auth UID ≠ Firestore Document ID
  */
-async function getUserDocId(uid: string): Promise<string> {
+export async function getUserDocId(uid: string): Promise<string> {
   try {
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("uid", "==", uid));
@@ -336,6 +336,7 @@ export interface CreateEventData {
   imageUrl?: string;
   participants: { name: string; avatarName?: string }[];
   isFinish?: number;
+  createdAt?: number; // Optional: if provided, use this timestamp instead of Date.now()
 }
 
 /**
@@ -363,7 +364,7 @@ export async function createEvent(
       imageUrl: data.imageUrl || "",
       participants: data.participants,
       settlementResultJson: "{}",
-      createdAt: Date.now(),
+      createdAt: data.createdAt ?? Date.now(),
       isFinish: 0,
     };
     
@@ -416,6 +417,7 @@ export async function updateEvent(
       date: string;
       imageUrl: string;
       participants: { name: string; avatarName?: string }[];
+      isFinish: number;
     }> = {};
 
     if (data.title !== undefined) updateData.title = data.title;
@@ -427,6 +429,7 @@ export async function updateEvent(
     }
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
     if (data.participants !== undefined) updateData.participants = data.participants;
+    if (data.isFinish !== undefined) updateData.isFinish = data.isFinish;
 
     await updateDoc(eventRef, updateData);
     console.log("[Firestore] Event updated successfully");
@@ -455,6 +458,90 @@ export async function deleteEvent(
     console.log("[Firestore] Event deleted successfully");
   } catch (error) {
     console.error("[Firestore] Error deleting event:", error);
+    throw error;
+  }
+}
+
+/**
+ * Remove an event from all contacts' isEvent arrays
+ * Used when finishing or deleting an event
+ */
+export async function removeEventFromContactsIsEvent(
+  userId: string,
+  eventId: string
+): Promise<void> {
+  try {
+    console.log("[Firestore] Removing event", eventId, "from contacts' isEvent arrays");
+    
+    // Convert Auth UID to Firestore Document ID
+    const userDocId = await getUserDocId(userId);
+    
+    // Step 1: Get the event to retrieve its createdAt timestamp
+    const eventRef = doc(db, "users", userDocId, "events", eventId);
+    const eventSnap = await getDoc(eventRef);
+    
+    if (!eventSnap.exists()) {
+      console.log("[Firestore] Event not found, skipping contact updates");
+      return;
+    }
+    
+    const eventData = eventSnap.data();
+    let eventCreatedAt: number = 0;
+    const createdAtData = eventData.createdAt;
+    
+    // Convert Firestore Timestamp or number to milliseconds
+    if (typeof createdAtData === "object" && createdAtData !== null && "toMillis" in createdAtData) {
+      eventCreatedAt = (createdAtData as { toMillis(): number }).toMillis();
+    } else if (typeof createdAtData === "object" && createdAtData !== null && "seconds" in createdAtData) {
+      eventCreatedAt = (createdAtData as { seconds: number }).seconds * 1000;
+    } else if (typeof createdAtData === "number") {
+      eventCreatedAt = createdAtData;
+    }
+    
+    console.log("[Firestore] Event createdAt normalized to:", eventCreatedAt);
+    
+    // Step 2: Get all contacts
+    const contactsRef = collection(db, "users", userDocId, "contacts");
+    const contactsSnap = await getDocs(contactsRef);
+    
+    console.log("[Firestore] Found", contactsSnap.docs.length, "contacts to check");
+    
+    // Step 3: Update each contact's isEvent array to remove this event
+    const updatePromises: Promise<void>[] = [];
+    
+    contactsSnap.docs.forEach((contactDoc) => {
+      const contactData = contactDoc.data();
+      const isEvent = contactData.isEvent || [];
+      
+      console.log("[Firestore] Contact", contactDoc.id, "has", isEvent.length, "events");
+      console.log("[Firestore] Contact events:", isEvent);
+      
+      // Filter out the event matching by createdAt
+      const updatedIsEvent = isEvent.filter(
+        (event: { eventCreatedAt: number; stillEvent: 0 | 1 }) => {
+          const match = event.eventCreatedAt !== eventCreatedAt;
+          console.log("[Firestore] Event", event.eventCreatedAt, "match:", match, "(comparing to", eventCreatedAt, ")");
+          return match;
+        }
+      );
+      
+      // Only update if the array changed
+      if (updatedIsEvent.length !== isEvent.length) {
+        console.log("[Firestore] Updating contact", contactDoc.id, "- removed 1 event from isEvent array");
+        updatePromises.push(updateDoc(contactDoc.ref, { isEvent: updatedIsEvent }));
+      }
+    });
+    
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+      console.log("[Firestore] Updated", updatePromises.length, "contacts");
+    } else {
+      console.log("[Firestore] No contacts needed updating");
+    }
+    
+    console.log("[Firestore] Successfully removed event from contacts' isEvent arrays");
+  } catch (error) {
+    console.error("[Firestore] Error removing event from contacts:", error);
     throw error;
   }
 }

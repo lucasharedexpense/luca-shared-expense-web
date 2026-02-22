@@ -10,7 +10,10 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
+  Flag,
+  Loader2,
 } from "lucide-react";
+import { updateEvent, removeEventFromContactsIsEvent } from "@/lib/firestore";
 import type {
   SummaryPageData,
   SummaryParticipant,
@@ -245,19 +248,39 @@ function UserConsumptionCard({
 
 export default function SummaryClientView({
   data,
+  userId,
 }: {
   data: SummaryPageData;
+  userId: string;
 }) {
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState<"SETTLEMENT" | "DETAILS">(
     "SETTLEMENT",
   );
   const [paidSettlementIds, setPaidSettlementIds] = useState<string[]>([]);
+  const [finishingEvent, setFinishingEvent] = useState(false);
 
   const togglePaid = (id: string) => {
     setPaidSettlementIds((prev) =>
       prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id],
     );
+  };
+
+  const handleFinishEvent = async () => {
+    try {
+      setFinishingEvent(true);
+      // Remove event from all contacts' isEvent arrays
+      await removeEventFromContactsIsEvent(userId, data.eventId);
+      // Mark event as finished
+      await updateEvent(userId, data.eventId, { isFinish: 1 });
+      // Redirect to home page after finishing event
+      router.push("/home");
+    } catch (_error) {
+      console.error("Error finishing event:", _error);
+      alert("Failed to finish event. Please try again.");
+    } finally {
+      setFinishingEvent(false);
+    }
   };
 
   return (
@@ -352,9 +375,9 @@ export default function SummaryClientView({
           </div>
         </div>
 
-        {/* Bottom Share Button */}
+        {/* Bottom Buttons */}
         {currentTab === "SETTLEMENT" && (
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pt-10">
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pt-10 flex flex-col gap-3">
             <button
               onClick={() => {
                 // TODO: Implement share settlement plan
@@ -364,6 +387,26 @@ export default function SummaryClientView({
               <Share2 className="w-5 h-5" />
               <span className="mt-0.5">Share Settlement Plan</span>
             </button>
+
+            {data.isFinish !== 1 && (
+              <button
+                onClick={handleFinishEvent}
+                disabled={finishingEvent}
+                className="w-full h-14 bg-ui-accent-yellow text-ui-black rounded-full shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all font-bold text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {finishingEvent ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="mt-0.5">Finishing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Flag className="w-5 h-5" />
+                    <span className="mt-0.5">Finish Event</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>
