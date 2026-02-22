@@ -142,10 +142,12 @@ export async function fetchSummaryPageData(
 
   return {
     eventName,
+    eventId,
     participants,
     settlements,
     consumptionDetails,
     totalExpense,
     calculatedAt,
+    isFinish: eventData.isFinish ?? 0,
   };
 }
