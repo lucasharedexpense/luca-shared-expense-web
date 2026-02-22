@@ -272,7 +272,7 @@ export default function ActivityEditPage() {
   const [items, setItems] = useState<ItemWithId[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
-  const [taxPercent, setTaxPercent] = useState(10);
+  const [taxPercent, setTaxPercent] = useState(0);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
   const [globalDiscountAmount, setGlobalDiscountAmount] = useState(0);
 
@@ -330,8 +330,14 @@ export default function ActivityEditPage() {
           ...doc.data(),
         })) as unknown as ItemWithId[];
         setItems(itemsList);
-        if (itemsList.length > 0 && itemsList[0].taxPercentage) {
-          setTaxPercent(itemsList[0].taxPercentage);
+        if (itemsList.length > 0) {
+          // Load global tax from first item's taxPercentage (even if 0)
+          setTaxPercent(itemsList[0].taxPercentage ?? 0);
+          // Load global discount by summing all items' discountAmount
+          const totalDiscount = itemsList.reduce((acc, item) => acc + (item.discountAmount || 0), 0);
+          setGlobalDiscountAmount(totalDiscount);
+          const sub = itemsList.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+          setGlobalDiscountPercent(sub > 0 ? (totalDiscount / sub) * 100 : 0);
         }
       }  catch (error) {
       }
@@ -433,18 +439,25 @@ export default function ActivityEditPage() {
           });
 
           // Save items: update existing, create new
+          // Distribute global discount equally across all items
+          const discountPerItem = items.length > 0 ? globalDiscountAmount / items.length : 0;
           for (const item of items) {
               const { id: itemId, ...itemData } = item;
+              const savedItemData = {
+                  ...itemData,
+                  taxPercentage: taxPercent,
+                  discountAmount: discountPerItem,
+              };
               if (itemId) {
-                  await updateItem(userId, eventId, activityId, itemId, itemData);
+                  await updateItem(userId, eventId, activityId, itemId, savedItemData);
               } else {
                   await createItem(userId, eventId, activityId, {
-                      itemName: itemData.itemName,
-                      price: itemData.price,
-                      quantity: itemData.quantity,
-                      memberNames: itemData.memberNames,
-                      discountAmount: itemData.discountAmount || 0,
-                      taxPercentage: itemData.taxPercentage || 0,
+                      itemName: savedItemData.itemName,
+                      price: savedItemData.price,
+                      quantity: savedItemData.quantity,
+                      memberNames: savedItemData.memberNames,
+                      discountAmount: savedItemData.discountAmount,
+                      taxPercentage: savedItemData.taxPercentage,
                   });
               }
           }
